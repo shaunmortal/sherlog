@@ -279,6 +279,34 @@ def test_rollback_check_reports_what_the_rollback_cleared():
     assert victim["still_abnormal"] == inv.blast_radius(inc, "cart")["abnormal"]
 
 
+def test_rollback_gate_answers_the_verified_top_suspect_its_rollback_proves(monkeypatch):
+    import bench
+
+    # offline over recorded verdicts: no key, and building a Claude client would fail the test
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(anthropic, "Anthropic", lambda **_: pytest.fail("the what-if called the Claude API"))
+    inc = sim.simulate("payment", "errors", 3, hard=True)
+    calls = {"c0": inv.Call("c0", "top_anomalies", {}, "", frozenset({"payment", inc.decoy}), False)}
+
+    def record(*suspects):  # each suspect: (service, confidence, cited call ids)
+        verdict = inv.build_verdict({"causes": [{"service": s, "confidence": c, "evidence": e}
+                                                for s, c, e in suspects]}, calls)
+        return {"root": "payment", "fault": "errors", "seed": 3, "hard": True,
+                "truth": inv.truth_event(inc, verdict), "events": [verdict]}
+
+    records = [
+        record(("payment", 0.5, ["c0"])),  # right but unsure: escalated today, proven by its rollback
+        record((inc.decoy, 0.9, ["c0"])),  # the decoy, confidently: answered wrong today, its rollback proves nothing
+        record(("checkout", 0.9, ["c9"]), ("payment", 0.9, ["c0"])),  # #1 unverified: a verified #2 never counts
+        record(),  # a failed run submits no suspects
+    ]
+    assert bench.gate_stats(records) == {
+        "rollback_gate_answered": 1, "rollback_gate_right": 1,
+        "confidence_or_rollback_answered": 2, "confidence_or_rollback_right": 1,
+    }
+    assert bench.gate_stats([]) == {}
+
+
 def test_hard_mode_callers_complain_less():
     def complaints(hard):
         return sum(1 for s in range(10) for line in sim.simulate("payment", "errors", s, hard=hard).logs
