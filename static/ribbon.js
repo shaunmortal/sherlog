@@ -1,34 +1,48 @@
-// Behind the story page: a soft cyan ribbon that travels across the screen as you scroll and bends away
-// from the pointer, and a clear liquid surface that ripples wherever the pointer moves.
+// Behind the story page: a glossy ribbon laid down the page as you scroll. It grows from the top of the page
+// to where you are reading, shrinks back when you scroll up, and bends away from the pointer; over it, a
+// clear liquid surface ripples wherever the pointer moves.
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-// the ribbon's whole route, in viewport units (x and y from -1 to 1, past the edges is off screen)
-const ROUTE = [[-1.5, 0.1, 0], [-0.7, -0.35, 0.3], [0.15, -0.5, -0.2], [0.95, -0.15, 0.2], [1.35, 0.4, -0.3],
-  [0.55, 0.62, 0.1], [-0.35, 0.3, 0.35], [-1.05, -0.15, -0.1], [-0.45, -0.7, 0.25], [0.5, -0.55, -0.25],
-  [1.2, 0.05, 0.15], [0.7, 0.55, -0.2], [-0.25, 0.6, 0.3], [-1.5, 0.2, 0]];
-const SEGMENTS = 1400, RADIAL = 18;
-const LENGTH = 0.16;                       // how much of the route is visible at once
-const CYAN = new THREE.Color(0x9ce9f5), BLUE = new THREE.Color(0x56b2ea);  // pale cyan into sky blue, soft and matte
-const FOV = 35, DEPTH_PX = 520;            // perspective: the near parts of the ribbon swell, the far parts thin
+const RADIAL = 18, SEGMENTS_PER_SCREEN = 260, MAX_SEGMENTS = 6000;
+const BEND_EVERY = 0.6;                    // viewport heights between the ribbon's bends down the page
+const HEAD_AT = 0.6;                       // the head is drawn this far down the viewport
+const COLOR_BAND = 1.5;                    // viewport heights of ribbon per cyan-blue-cyan cycle
+const DEPTH_PX = 400;
+const CYAN = new THREE.Color(0x8fe3f2), BLUE = new THREE.Color(0x1a2ffb);
 const PUSH_RADIUS = 150, MAX_PUSH = 70;    // px: how far the pointer reaches and how hard it pushes
 const EASE_SCROLL = 0.07, PUSH_DECAY = 0.92;
 
-const shade = (u, out) => out.copy(CYAN).lerp(BLUE, 0.5 - 0.5 * Math.cos((2 * Math.PI * u) / LENGTH));  // cyan, blue, cyan along the ribbon
+const hash = (i) => { const s = Math.sin(i * 12.9898) * 43758.5453; return s - Math.floor(s); };  // stable 0..1 per bend
+
+// The route in page pixels: x from the viewport's centre, y = -(distance down the page). It enters from off
+// screen on the left and swings side to side, staying on screen so the head is always in view, to the bottom.
+function routePoints(w, h, pageH) {
+  const points = [new THREE.Vector3(-0.75 * w, -0.45 * h, 0)];
+  for (let i = 1, y = 0.45 * h; y < pageH; i++) {
+    y += BEND_EVERY * h * (0.8 + 0.4 * hash(i + 3));
+    const side = i % 2 ? 1 : -1;
+    points.push(new THREE.Vector3(side * (0.35 + 0.5 * hash(i)) * (w / 2), -y, (hash(i + 7) - 0.5) * 0.7 * DEPTH_PX));
+  }
+  return points;
+}
 
 export function startRibbon(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
   const liquid = makeLiquid(renderer);
   const scene = new THREE.Scene();
-  // soft studio light: white from above, pale cyan bouncing up from below, so no side of the ribbon goes dark
-  const sun = new THREE.DirectionalLight(0xffffff, 0.9);
-  sun.position.set(0.2, 1, 0.6);
-  scene.add(sun, new THREE.HemisphereLight(0xffffff, 0xcdeef7, 1.7));
-  const camera = new THREE.PerspectiveCamera(FOV, 1, 10, 10000);
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+  const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+  sun.position.set(0.3, 1, 1);
+  scene.add(sun, new THREE.HemisphereLight(0xffffff, 0xb8c4ff, 1.1));  // keeps the underside from going black
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 5000);
+  camera.position.z = 2000;
 
   // the pointer pushes the ribbon aside in the vertex shader, and the ribbon sways a little on its own
   const uniforms = { uPointer: { value: new THREE.Vector2(1e5, 1e5) }, uPush: { value: 0 }, uTime: { value: 0 } };
-  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0 });
+  const material = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.42, clearcoat: 1, clearcoatRoughness: 0.2 });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -41,82 +55,89 @@ export function startRibbon(canvas) {
         transformed.y += sin(world.x * 0.005 + uTime * 0.8) * 10.0;`);
   };
 
-  // round ends; built at full size (never scaled) so the shader's pixel offsets match the tube's
-  const caps = [0, 1].map(() => {
-    const cap = new THREE.Mesh(new THREE.BufferGeometry(), material);
-    scene.add(cap);
-    return cap;
-  });
-  const paintCap = (cap, u) => {
-    const color = shade(u, new THREE.Color()), attr = cap.geometry.attributes.color;
-    for (let k = 0; k < attr.count; k++) attr.setXYZ(k, color.r, color.g, color.b);
+  // the round head; the tail starts off screen, so it needs no cap. Built at full size (never scaled) so the
+  // shader's pixel offsets match the tube's.
+  const cap = new THREE.Mesh(new THREE.BufferGeometry(), material);
+  scene.add(cap);
+  const capColor = new THREE.Color();
+  const paintCap = (u) => {
+    shade(u, capColor);
+    const attr = cap.geometry.attributes.color;
+    for (let k = 0; k < attr.count; k++) attr.setXYZ(k, capColor.r, capColor.g, capColor.b);
     attr.needsUpdate = true;
   };
 
-  let tube = null, route = null;
+  let tube = null, route = null, ys = [], segments = 1, bands = 1, h = 1, pageH = 0;
+  const shade = (u, out) => out.copy(CYAN).lerp(BLUE, 0.5 - 0.5 * Math.cos(2 * Math.PI * u * bands));
   function build() {
-    const w = window.innerWidth, h = window.innerHeight;
+    const w = window.innerWidth;
+    h = window.innerHeight;
+    pageH = document.documentElement.scrollHeight;
     renderer.setSize(w, h, false);
     liquid?.resize(w, h);
-    camera.aspect = w / h;
-    camera.position.z = (h / 2) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));  // at z = 0, one unit is one pixel
+    Object.assign(camera, { left: -w / 2, right: w / 2, top: h / 2, bottom: -h / 2 });
     camera.updateProjectionMatrix();
-    const radius = Math.max(14, Math.min(34, w * 0.021));
-    route = new THREE.CatmullRomCurve3(ROUTE.map(([x, y, z]) => new THREE.Vector3((x * w) / 2, (y * h) / 2, z * DEPTH_PX)), false, 'centripetal');
-    const geometry = new THREE.TubeGeometry(route, SEGMENTS, radius, RADIAL, false);
+    const radius = Math.max(12, Math.min(26, w * 0.016));
+    segments = Math.min(MAX_SEGMENTS, Math.max(400, Math.round((pageH / h) * SEGMENTS_PER_SCREEN)));
+    route = new THREE.CatmullRomCurve3(routePoints(w, h, pageH), false, 'centripetal');
+    route.arcLengthDivisions = segments * 2;  // even spacing along a long route
+    bands = route.getLength() / (COLOR_BAND * h);
+    ys = Array.from({ length: segments + 1 }, (_, i) => route.getPointAt(i / segments).y);
+    const geometry = new THREE.TubeGeometry(route, segments, radius, RADIAL, false);
     const count = geometry.attributes.position.count, colors = new Float32Array(count * 3), color = new THREE.Color();
     for (let k = 0; k < count; k++) {
-      shade(Math.floor(k / (RADIAL + 1)) / SEGMENTS, color);
+      shade(Math.floor(k / (RADIAL + 1)) / segments, color);
       colors.set([color.r, color.g, color.b], k * 3);
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     if (tube) { scene.remove(tube); tube.geometry.dispose(); }
     tube = new THREE.Mesh(geometry, material);
     scene.add(tube);
-    for (const cap of caps) {
-      const sphere = new THREE.SphereGeometry(radius, 24, 16);
-      sphere.setAttribute('color', new THREE.BufferAttribute(new Float32Array(sphere.attributes.position.count * 3), 3));
-      cap.geometry.dispose();
-      cap.geometry = sphere;
-    }
+    const sphere = new THREE.SphereGeometry(radius, 24, 16);
+    sphere.setAttribute('color', new THREE.BufferAttribute(new Float32Array(sphere.attributes.position.count * 3), 3));
+    cap.geometry.dispose();
+    cap.geometry = sphere;
   }
   build();
-  let resizeTimer = 0;
-  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(build, 150); });
+  let rebuildTimer = 0;
+  const rebuildSoon = () => { clearTimeout(rebuildTimer); rebuildTimer = setTimeout(build, 150); };
+  window.addEventListener('resize', rebuildSoon);
+  // content that loads later makes the page longer: lay the route down to the new bottom
+  new ResizeObserver(() => { if (Math.abs(document.documentElement.scrollHeight - pageH) > 1) rebuildSoon(); }).observe(document.body);
 
-  let target = 0, progress = 0, push = 0, last = null;
-  const pointer = new THREE.Vector2(1e5, 1e5);
+  // how far along the route the head should be: the first point below the target line on the page
+  const headFor = (scrollY) => {
+    const target = -(scrollY + HEAD_AT * h);
+    const i = ys.findIndex((y) => y <= target);
+    return (i < 0 ? segments : i) / segments;
+  };
+
+  let progress = 0, push = 0, last = null;
+  const client = new THREE.Vector2(-1, -1);  // pointer in viewport px
   const pointerUv = new THREE.Vector2(-1, -1), frameUv = new THREE.Vector2(-1, -1);  // where the liquid was stirred, 0..1
-  const onScroll = () => { target = window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight); };
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
   window.addEventListener('pointermove', (e) => {
-    const p = new THREE.Vector2(e.clientX - window.innerWidth / 2, window.innerHeight / 2 - e.clientY);
+    const p = new THREE.Vector2(e.clientX, e.clientY);
     if (last) push = Math.min(MAX_PUSH, push + p.distanceTo(last) * 0.6);
     last = p;
-    pointer.copy(p);
+    client.copy(p);
     pointerUv.set(e.clientX / window.innerWidth, 1 - e.clientY / window.innerHeight);
   }, { passive: true });
 
   function frame(now) {
     requestAnimationFrame(frame);
     if (document.hidden) return;
-    progress += (target - progress) * EASE_SCROLL;
+    const scrollY = window.scrollY;
+    camera.position.y = -scrollY - h / 2;  // the camera rides the scroll, so the ribbon stays on the page
+    progress += (headFor(scrollY) - progress) * EASE_SCROLL;
     push *= PUSH_DECAY;
-    uniforms.uPointer.value.copy(pointer);
+    uniforms.uPointer.value.set(client.x - window.innerWidth / 2, -(scrollY + client.y));
     uniforms.uPush.value = push;
     uniforms.uTime.value = now / 1000;
-    // the head enters at the start of the route as the page begins to scroll, the tail leaves at its end
-    const head = progress * (1 + LENGTH);
-    const a = THREE.MathUtils.clamp(head - LENGTH, 0, 1), b = THREE.MathUtils.clamp(head, 0, 1);
-    const first = Math.floor(a * SEGMENTS), end = Math.ceil(b * SEGMENTS);
-    tube.geometry.setDrawRange(first * RADIAL * 6, Math.max(0, end - first) * RADIAL * 6);
-    caps.forEach((cap, i) => {
-      const u = i ? b : a;
-      cap.visible = b > a;
-      cap.position.copy(route.getPointAt(u));
-      paintCap(cap, u);
-    });
+    const end = Math.ceil(progress * segments);
+    tube.geometry.setDrawRange(0, end * RADIAL * 6);
+    cap.visible = end > 0;
+    cap.position.copy(route.getPointAt(Math.min(1, end / segments)));
+    paintCap(end / segments);
     const movedPx = pointerUv.distanceTo(frameUv) * window.innerWidth;
     liquid?.step(frameUv, pointerUv, frameUv.x < 0 ? 0 : Math.min(LIQUID.maxPush, movedPx * LIQUID.pushPerPx));
     frameUv.copy(pointerUv);
@@ -125,6 +146,7 @@ export function startRibbon(canvas) {
   }
   requestAnimationFrame(frame);
 }
+
 
 const SIM_SCALE = 4;   // the liquid is simulated at a quarter of the screen's resolution
 const LIQUID = { damping: 0.965, settle: 0.992, radius: 0.018, pushPerPx: 0.003, maxPush: 0.18, slope: 7.0 };  // settle: the surface flattens again
