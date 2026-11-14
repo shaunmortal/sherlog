@@ -90,7 +90,8 @@ CPU = ("series", "cart", "cpu_pct")
 def test_invalid_documents_are_refused_with_a_useful_422(change, loc, message):
     res = _post("/api/triage", _sample_with(change))
     assert res.status_code == 422
-    assert any(e["loc"] == loc and message in e["msg"] for e in res.json()["detail"]), res.json()["detail"]
+    assert any(e["loc"] == loc and message in e["msg"] for e in res.json()["errors"]), res.json()["errors"]
+    assert f"{'.'.join(map(str, loc[1:]))}: " in res.json()["detail"]
 
 
 def test_bodies_over_the_cap_are_refused_with_413_declared_or_streamed():

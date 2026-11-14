@@ -164,9 +164,11 @@ def _healthy_series() -> dict:
 
 @app.exception_handler(RequestValidationError)
 def bad_input(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """422 with one sentence the console can show, instead of FastAPI's list of error objects."""
-    problems = "; ".join(f"{e['loc'][-1]}: {e['msg']}" for e in exc.errors())
-    return JSONResponse({"detail": f"Bad input. {problems}"}, status_code=422)
+    """422 with one sentence the console can show, plus each error's location for an uploader's script.
+    The path skips the leading body/path/query, so a nested field reads series.cart.cpu_pct.3, not just 3."""
+    errors = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
+    problems = "; ".join(f"{'.'.join(map(str, e['loc'][1:])) or e['loc'][0]}: {e['msg']}" for e in errors)
+    return JSONResponse({"detail": f"Bad input. {problems}", "errors": errors}, status_code=422)
 
 
 @app.get("/")
