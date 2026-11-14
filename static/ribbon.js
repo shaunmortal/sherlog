@@ -1,7 +1,6 @@
-// Behind the story page: a glossy ribbon that travels across the screen as you scroll and bends away
+// Behind the story page: a soft cyan ribbon that travels across the screen as you scroll and bends away
 // from the pointer, and a clear liquid surface that ripples wherever the pointer moves.
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 // the ribbon's whole route, in viewport units (x and y from -1 to 1, past the edges is off screen)
 const ROUTE = [[-1.5, 0.1, 0], [-0.7, -0.35, 0.3], [0.15, -0.5, -0.2], [0.95, -0.15, 0.2], [1.35, 0.4, -0.3],
@@ -9,7 +8,8 @@ const ROUTE = [[-1.5, 0.1, 0], [-0.7, -0.35, 0.3], [0.15, -0.5, -0.2], [0.95, -0
   [1.2, 0.05, 0.15], [0.7, 0.55, -0.2], [-0.25, 0.6, 0.3], [-1.5, 0.2, 0]];
 const SEGMENTS = 1400, RADIAL = 18;
 const LENGTH = 0.16;                       // how much of the route is visible at once
-const CYAN = new THREE.Color(0x8fe3f2), BLUE = new THREE.Color(0x1a2ffb);
+const CYAN = new THREE.Color(0x9ce9f5), BLUE = new THREE.Color(0x56b2ea);  // pale cyan into sky blue, soft and matte
+const FOV = 35, DEPTH_PX = 520;            // perspective: the near parts of the ribbon swell, the far parts thin
 const PUSH_RADIUS = 150, MAX_PUSH = 70;    // px: how far the pointer reaches and how hard it pushes
 const EASE_SCROLL = 0.07, PUSH_DECAY = 0.92;
 
@@ -18,19 +18,17 @@ const shade = (u, out) => out.copy(CYAN).lerp(BLUE, 0.5 - 0.5 * Math.cos((2 * Ma
 export function startRibbon(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
   const liquid = makeLiquid(renderer);
   const scene = new THREE.Scene();
-  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
-  const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-  sun.position.set(0.3, 1, 1);
-  scene.add(sun, new THREE.HemisphereLight(0xffffff, 0xb8c4ff, 1.1));  // keeps the underside from going black
-  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 5000);
-  camera.position.z = 2000;
+  // soft studio light: white from above, pale cyan bouncing up from below, so no side of the ribbon goes dark
+  const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+  sun.position.set(0.2, 1, 0.6);
+  scene.add(sun, new THREE.HemisphereLight(0xffffff, 0xcdeef7, 1.7));
+  const camera = new THREE.PerspectiveCamera(FOV, 1, 10, 10000);
 
   // the pointer pushes the ribbon aside in the vertex shader, and the ribbon sways a little on its own
   const uniforms = { uPointer: { value: new THREE.Vector2(1e5, 1e5) }, uPush: { value: 0 }, uTime: { value: 0 } };
-  const material = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.42, clearcoat: 1, clearcoatRoughness: 0.2 });
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0 });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -60,10 +58,11 @@ export function startRibbon(canvas) {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false);
     liquid?.resize(w, h);
-    Object.assign(camera, { left: -w / 2, right: w / 2, top: h / 2, bottom: -h / 2 });
+    camera.aspect = w / h;
+    camera.position.z = (h / 2) / Math.tan(THREE.MathUtils.degToRad(FOV / 2));  // at z = 0, one unit is one pixel
     camera.updateProjectionMatrix();
-    const radius = Math.max(12, Math.min(26, w * 0.016));
-    route = new THREE.CatmullRomCurve3(ROUTE.map(([x, y, z]) => new THREE.Vector3((x * w) / 2, (y * h) / 2, z * 400)), false, 'centripetal');
+    const radius = Math.max(14, Math.min(34, w * 0.021));
+    route = new THREE.CatmullRomCurve3(ROUTE.map(([x, y, z]) => new THREE.Vector3((x * w) / 2, (y * h) / 2, z * DEPTH_PX)), false, 'centripetal');
     const geometry = new THREE.TubeGeometry(route, SEGMENTS, radius, RADIAL, false);
     const count = geometry.attributes.position.count, colors = new Float32Array(count * 3), color = new THREE.Color();
     for (let k = 0; k < count; k++) {
