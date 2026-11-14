@@ -58,6 +58,7 @@
     .views { flex: 1 0 100%; min-height: 48px; border-top: 1px solid var(--line); }
     .views [role="tablist"], .views [role="tab"] { flex: 1; }
     .views [role="tab"]:first-child { border-left: 0; }
+    .views button, .views .theme { padding: 0 8px; }  /* four tabs and the theme button share one phone-wide row */
   }
   .pad { padding: 20px 22px; }
   .label { margin: 0 0 12px; font: 500 12px var(--sans); letter-spacing: .11em; text-transform: uppercase; color: var(--muted); }
@@ -86,6 +87,18 @@
   .status { margin: 0; padding: 14px 22px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); min-height: 1.5em; }
   .status:empty { padding: 0; border: 0; min-height: 0; }  /* stays in the page so screen readers hear its first message */
   .status.bad { color: var(--bad); } .status.ok { color: var(--ok); }
+
+  /* ---- left: your data ---- */
+  .hint a, .foot a { color: inherit; text-underline-offset: 3px; }
+  a.cell { display: block; color: inherit; text-decoration: none; }
+  .field { display: block; margin: 16px 0 6px; font-size: 14px; color: var(--muted); }
+  #dataFile { max-width: 100%; font: 13px var(--sans); color: var(--muted); }
+  #dataFile::file-selector-button { margin-right: 10px; min-height: 32px; padding: 0 14px; border: 1px solid var(--edge); border-radius: var(--pill); background: var(--card); color: var(--text); font: 500 12px var(--mono); letter-spacing: .06em; cursor: pointer; }
+  #dataText { display: block; width: 100%; min-height: 110px; resize: vertical; padding: 10px 12px; border: 1px solid var(--edge); border-radius: var(--radius-sm); background: var(--card); color: var(--text); font: 12px/1.5 var(--mono); }
+  #dataText::placeholder { color: var(--muted); }
+  .acts { display: flex; flex-wrap: wrap; gap: 0 10px; }
+  #triage { margin-top: 18px; }
+  #triage:empty { display: none; }
 
   /* ---- middle: stats ---- */
   .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
@@ -213,6 +226,14 @@
   .s-reason { margin: 0; font-size: 14px; }
   .blast { margin: -6px 0 14px; font: 13px/1.5 var(--mono); }
   .blast.ok { color: var(--ok); } .blast.warn { color: var(--warn); }
+  /* the rollback test: services still abnormal stay red, those that recover flip to green one by one */
+  .chip { display: inline-block; padding: 0 7px; border-radius: var(--pill); background: var(--bad-soft); color: var(--bad); font-weight: 600; }
+  .chip.ok { background: var(--ok-soft); color: var(--ok); animation: recover .5s var(--ease-quad) backwards; animation-delay: calc(var(--i, 0) * 160ms + 700ms); }
+  @keyframes recover { from { background: var(--bad-soft); color: var(--bad); } }
+  .score .ranks { margin-top: 4px; font: 13px var(--mono); }
+  .score .ranks th { padding: 4px 8px 4px 0; text-align: left; font: 500 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .score .ranks td { padding: 6px 8px 6px 0; text-align: left; font-weight: 400; vertical-align: top; }
+  .ranks small { display: block; color: var(--muted); font-size: 12px; }
   .s-note { margin: 4px 0 0; font: 12px var(--mono); color: var(--muted); }
   .notes { display: grid; gap: 10px; }
   .note-card { padding: 12px 14px; border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow); font-size: 14px; }
@@ -233,6 +254,8 @@
   .ev-table td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); }
   .ev-table th:not(:first-child), .ev-table td:not(:first-child) { text-align: right; white-space: nowrap; }
   .ev-table tbody tr:last-child td { font-weight: 600; }
+
+  .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 24px; padding: 16px 22px 24px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -253,6 +276,7 @@
       <button type="button" role="tab" id="tab-live" aria-controls="breakPanel" data-view="live" aria-selected="true">LIVE</button>
       <button type="button" role="tab" id="tab-replay" aria-controls="replayPanel" data-view="replay" aria-selected="false" tabindex="-1">REPLAY</button>
       <button type="button" role="tab" id="tab-evidence" aria-controls="evidence" data-view="evidence" aria-selected="false" tabindex="-1">EVIDENCE</button>
+      <button type="button" role="tab" id="tab-data" aria-controls="dataPanel" data-view="data" aria-selected="false" tabindex="-1">YOUR DATA</button>
     </div>
     <button type="button" class="theme" id="themeBtn" aria-label="Switch light or dark theme">◐</button>
     <span class="ink" aria-hidden="true"></span>
@@ -283,6 +307,28 @@
       <p class="hint" style="margin:0 0 14px"><span id="replayCount">0</span> investigations recorded from the benchmark. The culprit stays hidden until the end, so you can still guess.</p>
       <div class="grid four" id="replayGrid" role="group" aria-label="Recorded outages"></div>
       <button type="button" class="act ghost" id="randomReplay">Random outage</button>
+    </div>
+    <div class="pad" id="dataPanel" role="tabpanel" aria-labelledby="tab-data" hidden>
+      <h2 class="label">Your data</h2>
+      <p class="hint" style="margin:0">Bring 10 minutes of telemetry from your own shop, its services mapped onto the 11 on the map, and the same alarm, rankings and checks run on it.</p>
+      <p class="hint" style="margin:6px 0 0"><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format, and how to export your telemetry</a></p>
+      <p class="sub">1 · Telemetry</p>
+      <div class="grid">
+        <a class="cell" href="/api/sample-incident" download="sherlog-sample-incident.json"><b>Download</b><small>the sample</small></a>
+        <button type="button" class="cell" id="sampleUse"><b>Use</b><small>the sample</small></button>
+      </div>
+      <label class="field" for="dataFile">Or open a .json file</label>
+      <input type="file" id="dataFile" accept=".json,application/json">
+      <label class="field" for="dataText">Or paste it here</label>
+      <textarea id="dataText" rows="6" spellcheck="false" autocomplete="off" placeholder='{"format": "sherlog-incident/1", …}'></textarea>
+      <p class="sub">2 · Who investigates</p>
+      <div class="grid" id="dataModelGrid" role="radiogroup" aria-label="Model that investigates your data"></div>
+      <div class="acts">
+        <button type="button" class="act ghost" id="triageBtn">Triage (no AI)</button>
+        <button type="button" class="act" id="investigateBtn" aria-describedby="investigateHint">Investigate with Claude</button>
+      </div>
+      <p class="hint" id="investigateHint"></p>
+      <div id="triage"></div>
     </div>
     <p class="status" id="status" role="status"></p>
     <p class="status bad" id="alert" role="alert"></p>
@@ -321,7 +367,6 @@
         <li><b>The scoreboard</b> compares your guess, the agent and a no-AI z-score ranking.</li>
       </ol>
       <p>Or replay any recorded investigation for free, and see the numbers under Evidence.</p>
-      <p class="small">Built from scratch for IceHacks 2026.</p>
     </div>
   </section>
 
@@ -353,6 +398,11 @@
 <div class="sr-only" id="announce" role="log"></div><!-- each step of an investigation, read out politely -->
 </main>
 
+<footer class="foot">
+  <span>Built from scratch for IceHacks 2026.</span>
+  <a href="/status">Status: live mode, recorded outages, version</a>
+</footer>
+
 <div id="tip" aria-hidden="true" hidden></div>
 
 <script src="/static/shared.js"></script>
@@ -370,6 +420,7 @@ const LEAD_TICKS = 16;             // healthy ticks played before the alarm
 const IDLE_TICK_MS = 700, PLAYBACK_TICK_MS = 180, AFTER_TICK_MS = 1000;
 const STILL_POLL_MS = 200;         // how often a paused playback checks whether to carry on
 const ANNOUNCE_KEEP = 3;           // the hidden announcer keeps only its latest messages
+const TRIAGE_TOP = 5;              // the triage shows as many suspects as the agent may name
 const LEVEL_WORD = { ok: 'normal', warn: 'degraded', bad: 'failing' };
 const ARROWS = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 const UNIT = {
@@ -468,10 +519,11 @@ function showView(name) {
   }
   $('#breakPanel').hidden = name !== 'live';
   $('#replayPanel').hidden = name !== 'replay';
+  $('#dataPanel').hidden = name !== 'data';
   $('#console').hidden = name === 'evidence';
   $('#evidence').hidden = name !== 'evidence';
   placeInks();
-  const cells = { live: '#breakPanel .cell', replay: '#replayGrid .cell' }[name];
+  const cells = { live: '#breakPanel .cell', replay: '#replayGrid .cell', data: '#dataPanel .cell' }[name];
   if (name === 'evidence') return;  // its blocks reveal as they scroll into view
   if (fromEvidence) enter(document.querySelectorAll('#console > .col'), { duration: 500, y: 0 });
   enter(document.querySelectorAll(cells), { duration: 420, stagger: name === 'replay' ? 2 : 6, easing: 'quad', y: 0, scale: .4 });
@@ -878,10 +930,12 @@ function renderVerdict(v) {
   const usage = v.usage
     ? el('p', { class: 'muted small' }, `${(v.route ?? [v.model ?? META.model]).join(' → ')} · ${v.calls} tool calls · ${v.usage.model_calls} model calls · ${(v.usage.input_tokens + v.usage.output_tokens).toLocaleString()} tokens`)
     : null;
-  $('#verdict').replaceChildren(banner, blastNote(v.blast) ?? '', v.causes.length ? suspects : el('p', { class: 'empty' }, 'No suspects were submitted.'), notes, usage ?? '');
+  const rollback = rollbackNote(v.rollback);
+  $('#verdict').replaceChildren(banner, blastNote(v.blast) ?? '', rollback ?? '', v.causes.length ? suspects : el('p', { class: 'empty' }, 'No suspects were submitted.'), notes, usage ?? '');
   setAgent(watching());
   announce(v.answer ? `Verdict: root cause ${v.answer}, ${top.fault_type}, ${pct(top.confidence)} confident, evidence verified.`
     : `Verdict: escalated to a human. ${v.escalation}`);
+  if (rollback) announce(rollback.textContent);
   enter($('#verdict').querySelectorAll(':scope > :not(.suspects):not(.notes), .suspects > li, .notes > *'), { duration: 600, stagger: 50, easing: 'quint', y: 8 });
 }
 
@@ -890,7 +944,9 @@ function blastNote(b) {
   if (!b) return null;
   const callers = b.explained.filter((s) => s !== b.service);
   const ok = !b.unexplained.length && !b.better;
-  const text = b.better
+  const text = !b.abnormal.length
+    ? 'Blast radius: no service stayed abnormal.'  // quiet uploaded telemetry; a simulated outage always has some
+    : b.better
     ? `Blast radius: ${b.better} would explain more of the outage than ${b.service}. Treat this answer with care.`
     : ok
     ? `Blast radius: ${b.service} explains all ${b.abnormal.length} abnormal service${b.abnormal.length === 1 ? '' : 's'}` +
@@ -898,6 +954,31 @@ function blastNote(b) {
     : `Blast radius: ${b.service} explains ${b.explained.length} of ${b.abnormal.length} abnormal services; ` +
       `${b.unexplained.join(', ')} ${b.unexplained.length === 1 ? 'is' : 'are'} abnormal too but cannot be affected by it.`;
   return el('p', { class: `blast ${ok ? 'ok' : 'warn'}` }, text);
+}
+
+/** Services as chips in a sentence ("a, b and c"): red while abnormal, flipping to green if they recover. */
+function chipList(services, recovered) {
+  return services.flatMap((s, i) => [i === 0 ? '' : i === services.length - 1 ? ' and ' : ', ',
+    el('span', { class: `chip${recovered ? ' ok' : ''}`, style: `--i:${i}` }, s)]);
+}
+
+/** Proof by intervention: the same outage replayed with the answer rolled back. Only simulated outages have one. */
+function rollbackNote(r) {
+  if (!r) return null;
+  const are = (list) => (list.length === 1 ? 'is' : 'are');
+  if (!r.proves) {
+    return el('p', { class: 'blast warn' }, `Rollback test: rolling back ${r.service} does not stop the alarm.`,
+      ...(r.still_abnormal.length ? [' Still abnormal: ', ...chipList(r.still_abnormal, false), '.'] : []));
+  }
+  const others = r.cleared.filter((s) => s !== r.service);
+  const recovered = others.length ? others : [r.service];
+  const recover = [...chipList(recovered, true), recovered.length === 1 ? ' recovers.' : ' recover.'];
+  const replayed = `Rollback test: replayed this outage with ${r.service} rolled back.`;
+  if (!r.alarm_after) return el('p', { class: 'blast ok' }, replayed, ' The alarm stops; ', ...recover);
+  // hard mode: the decoy's harmless CPU or memory anomaly keeps the alarm on, though nothing is slow or failing
+  return el('p', { class: 'blast ok' }, replayed, ' ', ...recover, ' The alarm stays on, but only for CPU or memory: ',
+    ...(r.still_abnormal.length ? [...chipList(r.still_abnormal, false), ` ${are(r.still_abnormal)} still abnormal, and `] : []),
+    'nothing is slow or failing.');
 }
 
 function noteCard(title, text) {
@@ -970,8 +1051,9 @@ function end(message = 'Done. Break something else?', tone = 'ok') {
 
 function setBusy(busy) {
   $('#go').disabled = busy || !META.live;
+  $('#investigateBtn').disabled = busy || !META.live;
   $('#randomReplay').disabled = busy || !replayIds.length;
-  for (const b of $('#replayGrid').children) b.disabled = busy;
+  for (const b of [...$('#replayGrid').children, $('#triageBtn'), $('#sampleUse')]) b.disabled = busy;  // each would redraw the charts
 }
 
 async function readStream(res) {
@@ -991,18 +1073,27 @@ async function readStream(res) {
   }
 }
 
-async function runLive() {
-  begin(`Breaking ${pick.service}… waiting for the alarm.`, shortModel(pick.model === 'auto' ? 'haiku' : pick.model));
+/** Why the server refused a request. A proxy in front of it answers without JSON, so its refusals get a plain reason. */
+async function refusal(res) {
+  if (res.headers.get('content-type')?.includes('application/json')) return errorText(res);
+  return res.status === 413 ? 'That file is too big for the server. Trim it to the 10 minutes it needs.' : `Request failed (${res.status}).`;
+}
+
+/** A live investigation: POST `body` to `url`, then stream its events into the flight log and the verdict. */
+async function runStream(url, body, message, doneMessage) {
+  begin(message, shortModel(pick.model === 'auto' ? 'haiku' : pick.model));
   try {
-    const res = await fetch('/api/break', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(pick) });
-    if (!res.ok) throw new Error(await errorText(res));
+    const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(await refusal(res));
     await readStream(res);
     if (!state.verdictShown) throw new Error('The investigation stopped before it finished. Try again, or watch a recorded outage.');
-    end();
+    end(doneMessage);
   } catch (err) {
     end(err.message || 'Something went wrong.', 'bad');
   }
 }
+
+const runLive = () => runStream('/api/break', pick, `Breaking ${pick.service}… waiting for the alarm.`);
 
 async function runReplay(id) {
   const chosen = id ?? replayIds[Math.floor(Math.random() * replayIds.length)];
@@ -1020,6 +1111,90 @@ async function runReplay(id) {
     end(err.message || 'Could not load that outage.', 'bad');
   }
 }
+
+// ---- your data: bring your own outage (docs/bring-your-own.md) ----------------------------
+
+/** The box holds the incident, wherever it came from; new text makes the last triage stale. */
+function setIncidentText(text, message) {
+  $('#dataText').value = text;
+  $('#triage').replaceChildren();
+  setStatus(message);
+}
+
+/** The pasted incident as JSON. Parsed here so a typo is caught before anything is sent. */
+function readIncident() {
+  const text = $('#dataText').value.trim();
+  if (!text) throw new Error('Paste an incident, open a file or use the sample first.');
+  try { return JSON.parse(text); }
+  catch (err) { throw new Error(`That is not valid JSON: ${err.message}`); }
+}
+
+async function useSample() {
+  try {
+    setIncidentText(JSON.stringify(await getJSON('/api/sample-incident')),
+      'Loaded the sample: a simulated outage with its culprit removed. Triage it, or investigate it with Claude.');
+  } catch (err) {
+    setStatus(`Could not load the sample: ${err.message}`, 'bad');
+  }
+}
+
+async function openFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try { setIncidentText(await file.text(), `Opened ${file.name}. Triage it, or investigate it with Claude.`); }
+  catch { setStatus(`Could not read ${file.name}.`, 'bad'); }
+}
+
+/** The no-AI checks on the incident: the server validates it, then its telemetry fills the charts and the map. */
+async function runTriage() {
+  $('#triage').replaceChildren();
+  setBusy(true);
+  try {
+    const doc = readIncident();
+    const res = await fetch('/api/triage', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(doc) });
+    if (!res.ok) throw new Error(await refusal(res));
+    const result = await res.json();
+    showUploaded(doc.series, result);
+    announce(renderTriage(result));
+    setStatus('Triage done.', 'ok');
+    $('#triage').scrollIntoView({ block: 'nearest', behavior: MOTION ? 'smooth' : 'auto' });  // below the fold on a laptop
+  } catch (err) {
+    setStatus(`Triage failed. ${err.message || 'Something went wrong.'}`, 'bad');
+  } finally {
+    setBusy(false);
+  }
+}
+
+/** The whole uploaded window on the charts, alarm marked, on the classic ranking's worst metric unless the viewer chose one. */
+function showUploaded(series, result) {
+  const stats = baselineStats(series);
+  const last = series[META.services[0]][META.metrics[0]].length - 1;
+  if (!view.picked) showMetric(result.zscore_ranking[0].metric);
+  play(last, last, 0, (t) => drawFrame(series, stats, t, result.alarm));
+}
+
+/** The triage card; returns its summary for screen readers. */
+function renderTriage(t) {
+  const alarm = t.alarm === null
+    ? 'No alarm fired, so there is nothing for the agent to investigate. The rankings still order every service.'
+    : `The alarm fired at tick ${t.alarm}, ${clock(t.alarm * t.tick_seconds)} into the recording; the agent would see up to tick ${t.now}.`;
+  const rows = t.zscore_ranking.slice(0, TRIAGE_TOP).map((z, i) => el('tr', {}, el('td', {}, i + 1),
+    el('td', {}, z.service, el('small', {}, `${LABEL[z.metric]} · z ${z.z}`)), el('td', {}, t.robust_ranking[i])));
+  const blast = blastNote(t.blast);
+  $('#triage').replaceChildren(el('div', { class: 'score' }, el('h3', {}, 'Triage · no AI'), el('p', {}, alarm),
+    el('table', { class: 'ranks' },
+      el('thead', {}, el('tr', {}, ['#', 'Classic z-score', 'Robust z-score'].map((h) => el('th', { scope: 'col' }, h)))),
+      el('tbody', {}, rows))), blast);
+  enter($('#triage').children, { duration: 600, stagger: 80, easing: 'quint', y: 8 });
+  return `Triage: ${alarm} Classic ranking: ${t.zscore_ranking[0].service} first; robust ranking: ${t.robust_ranking[0]} first. ${blast.textContent}`;
+}
+
+const runUpload = () => {
+  let incident;
+  try { incident = readIncident(); } catch (err) { setStatus(err.message, 'bad'); return; }
+  runStream('/api/investigate', { incident, model: pick.model }, 'Sending your telemetry to the agent…',
+    'Done. Nobody knows the true culprit of uploaded telemetry, so there is no scoreboard.');
+};
 
 // ---- stats and evidence -----------------------------------------------------------------
 
@@ -1093,13 +1268,14 @@ function renderModels(ev) {
     const s = ev?.[MODEL_VARIANT[k]];
     return [k, MODEL_NAME[k].replace('Claude ', ''), s?.outages ? `${pct(s.agent_ac1)} · ${usd(s.median_cost_usd)}` : 'not benchmarked'];
   });
+  const grids = [$('#modelGrid'), $('#dataModelGrid')];  // Live and Your data share one choice
   const choose = (k) => {
     pick = { ...pick, model: k };
-    press($('#modelGrid'), k);
+    for (const grid of grids) press(grid, k);
     $('#metaModel').textContent = k === 'auto' ? `${META.models.haiku} → ${META.models.opus}` : META.models[k];
     $('#modelDesc').textContent = `${MODEL_HINT[k]} Numbers: cause named first, median cost per outage on the benchmark.`;
   };
-  choiceGrid($('#modelGrid'), items, pick.model, choose);
+  for (const grid of grids) choiceGrid(grid, items, pick.model, choose);
   choose(pick.model);
 }
 
@@ -1153,16 +1329,24 @@ async function init() {
   runIdle();
   $('#go').addEventListener('click', runLive);
   $('#randomReplay').addEventListener('click', () => runReplay(null));
+  $('#sampleUse').addEventListener('click', useSample);
+  $('#dataFile').addEventListener('change', (e) => openFile(e.target));
+  $('#dataText').addEventListener('input', () => $('#triage').replaceChildren());
+  $('#triageBtn').addEventListener('click', runTriage);
+  $('#investigateBtn').addEventListener('click', runUpload);
+  $('#investigateHint').textContent = META.live
+    ? 'Claude investigates with the same read-only tools. It uses one of your live runs; the triage is free.'
+    : 'Live mode is off on this server, so only the triage works here.';
   try { await loadReplays(); } catch { /* replays are optional */ }
   setBusy(false);
   if (!META.live) setStatus('Live mode is off on this server. Open Replay to watch a recorded outage.');
   openFromLink();
 }
 
-/** Links from the story page: /console#replay, #evidence, or #replay/41 to play outage 41. */
+/** Links from the story page and the docs: /console#replay, #evidence, #data, or #replay/41 to play outage 41. */
 function openFromLink() {
   const [view, number] = location.hash.slice(1).split('/');
-  if (!['live', 'replay', 'evidence'].includes(view)) return;
+  if (!['live', 'replay', 'evidence', 'data'].includes(view)) return;
   showView(view);
   if (view === 'replay' && replayIds.includes(Number(number))) runReplay(Number(number));
 }
