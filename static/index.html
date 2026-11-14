@@ -17,9 +17,6 @@
   :root { --bad: #c4221a; --ok: #0b7342; --warn: #8f5500; --axis: #5c5f6e; --signal: #f03a2f; --edge: #7d8191; --accent-text: var(--accent); --guess: #3654c9; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --edge: #62667a; --accent-text: #7c89ff; --guess: #8fa2ff; } }
   :root[data-theme="dark"] { --edge: #62667a; --accent-text: #7c89ff; --guess: #8fa2ff; }
-  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  .skip { position: absolute; z-index: 30; left: 12px; top: -80px; padding: 12px 20px; border-radius: var(--pill); background: var(--ink); color: var(--on-ink); font: 500 14px var(--sans); text-decoration: none; }
-  .skip:focus { top: 8px; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   main:focus { outline: none; }  /* the skip link's target; the ring would just frame the whole page */
   .node:focus-visible rect.box { stroke: var(--accent); stroke-width: 3; }  /* SVG groups draw no outline everywhere */
