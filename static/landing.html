@@ -94,6 +94,20 @@
   .hud.top { top: 22px; align-items: flex-start; }
   .hud.bottom { bottom: 22px; }
   .caption { max-width: 56ch; font: 400 15px/1.45 var(--mono); letter-spacing: 0; text-transform: none; color: #fff; }
+  .hud-end { display: flex; align-items: center; gap: 16px; }
+  /* WCAG 2.2.2: one button pauses everything that moves on its own; the name stays put and aria-pressed says whether it is on */
+  .motion-btn { pointer-events: auto; flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px;
+    border: 1px solid rgba(240, 241, 250, .3); border-radius: var(--pill); background: rgba(12, 13, 18, .55); color: #fff;
+    font: 500 12px var(--sans); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; transition: background-color var(--hover) var(--ease-quad), color var(--hover) var(--ease-quad); }
+  .motion-btn svg { width: 10px; height: 10px; fill: currentColor; }
+  .motion-btn:hover { background: rgba(240, 241, 250, .16); }
+  .motion-btn[aria-pressed="true"] { border-color: #f0f1fa; background: #f0f1fa; color: #000; }
+  .motion-btn:focus-visible { outline-color: #fff; }  /* the blue ring is too dark on the panel */
+  :root[data-motion="paused"] .marquee .track { animation-play-state: paused; }
+  :root[data-motion="paused"] :is(.live-dot, .scroll-hint .arrow, .edge) { animation: none; }
+  :root[data-motion="paused"] .look-hint { display: none; }  /* paused, the shop no longer follows the pointer */
+  /* motion asked for despite a reduced-motion setting: the marquee runs again (the shared reset stops every animation) */
+  @media (prefers-reduced-motion: reduce) { :root[data-motion="on"] .marquee .track { animation: marquee 45s linear infinite !important; } }
   .live-dot { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--signal); animation: beat 1.6s ease-in-out infinite; }
   @keyframes beat { 50% { opacity: .25; } }
   .crosses { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; font: 500 13px var(--sans); letter-spacing: .04em; text-transform: uppercase; }
@@ -222,7 +236,7 @@
   .layer.play .conf span { animation: grow-x .9s var(--ease-glide) backwards; animation-delay: var(--d); }
   .blast-line { margin: 0 0 8px; font: 13px/1.5 var(--mono); color: var(--ok); }
   .blast-map { display: block; width: 100%; max-height: 200px; }
-  .blast-map .node:not(.bad) { opacity: .25; }
+  .blast-map .node:not(.bad, .cleared) { opacity: .25; }
   .blast-map .edge:not(.sick) { opacity: .25; }
   @media (max-width: 900px) { .blast-map { display: none; } }
   .layer.play .blast-line { animation: fade .6s ease 1.6s backwards; }
@@ -235,6 +249,23 @@
   .layer.play .banner { animation: rise .6s var(--ease-glide) backwards; }
   .layer.play .note-card { animation: rise .6s var(--ease-glide) backwards; animation-delay: var(--d); }
   .layer.play .wd { animation: fade .25s ease backwards; animation-delay: var(--d); }
+  /* layer 4: the rollback replay, the red services turning green one after another */
+  .rb-cmd { margin: 0 0 14px; font: 13px/1.5 var(--mono); color: var(--muted); }
+  .rb { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); column-gap: 24px; margin: 0 0 16px; padding: 0; border-top: 1px solid var(--line); }
+  .rb li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .rb .s-name { font: 500 16px var(--sans); }
+  .rb-state { display: grid; justify-items: end; }
+  .rb-state > * { grid-area: 1 / 1; }  /* "abnormal" and "recovered" share one spot, so one can replace the other */
+  .rb .was { opacity: 0; }
+  .layer.play .rb .s-name { animation: was-red .4s ease backwards; animation-delay: var(--d); }
+  .layer.play .rb .was { animation: was-shown .15s ease backwards; animation-delay: var(--d); }
+  .layer.play .rb .now { animation: pop .6s var(--spring) backwards; animation-delay: calc(var(--d) + .15s); }  /* in once "abnormal" is gone */
+  .blast-map .node.cleared rect.box { fill: var(--ok-soft); stroke: var(--ok); }
+  .layer.play .blast-map .node.cleared rect.box { animation: was-bad .4s ease backwards; animation-delay: var(--d); }
+  .layer.play #rbLine { animation-delay: var(--d); }
+  @keyframes was-red { from { color: var(--bad); } }
+  @keyframes was-shown { from { opacity: 1; } }
+  @keyframes was-bad { from { fill: var(--bad-soft); stroke: var(--bad); } }
 
   /* ---- 03 / 04: the numbers ---- */
   .bigstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 64px; }
@@ -256,6 +287,11 @@
   .flag.bad { background: var(--bad-soft); color: var(--bad); }
   @media (max-width: 620px) { .bar-row { grid-template-columns: minmax(0, 1fr) 64px; } .bar-track { grid-column: 1 / -1; grid-row: 2; } }
   .note { margin: 28px 0 0; max-width: 80ch; font-size: 15px; line-height: 1.6; color: var(--muted); }
+  /* hard mode's rollback what-if: two numbers under their own heading */
+  .rb-proof { margin-top: 14vh; }
+  .rb-proof h3 { margin: 0 0 20px; max-width: 18ch; font: 400 clamp(34px, 4.4vw, 68px)/1 var(--sans); letter-spacing: -.04em; }
+  .rb-proof .sub { max-width: 62ch; margin-bottom: 40px; }
+  .bigstats.two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); margin-bottom: 0; }
 
   /* ---- the dark end: hard mode, the call to action, the footer ---- */
   /* the footer sits outside main (so it is the page's contentinfo landmark) but continues the dark end */
@@ -274,7 +310,14 @@
   .cta .ctas { justify-content: center; }
   .end .pbtn.light { background: #f0f1fa; color: #000; }
   footer { position: relative; z-index: 1; border-top: 1px solid var(--line); padding: 28px 0 40px; font: 13px/1.7 var(--sans); color: var(--muted); }
-  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 24px; }
+  footer .wrap + .wrap { margin-top: 16px; }
+  footer a { text-decoration: underline 1px; text-underline-offset: 3px; }
+  footer a:hover { color: var(--text); }
+  .byo { margin: 0; max-width: 72ch; }
+  .byo b { color: var(--text); font-weight: 500; }
+  footer nav { display: flex; gap: 4px; margin: 0 -12px; }  /* the padding makes 44px targets; the margin keeps the words in line */
+  footer nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; }
 </style>
 </head>
 <body>
@@ -301,8 +344,10 @@
     <div class="wrap">
       <p class="hero-intro" id="heroIntro">An AI on-call investigator that has to prove its answer.</p>
       <div class="hero-panel">
-        <div id="hero3d" role="img" aria-label="The simulated shop's 11 services in 3D. One breaks, the failure travels up to its callers, and the agent names the cause."></div>
-        <div class="hud top"><span><span class="live-dot"></span>Outage #41 · replayed from the benchmark</span><span class="hide-sm motion-only">Move to look around</span></div>
+        <div id="hero3d" role="img" aria-label="The simulated shop's 11 services in 3D. One breaks, the failure travels up to its callers, the agent names the cause, and rolling it back clears the outage."></div>
+        <div class="hud top"><span><span class="live-dot"></span>Outage #41 · replayed from the benchmark</span>
+          <span class="hud-end"><span class="hide-sm motion-only look-hint">Move to look around</span>
+            <button type="button" class="motion-btn" id="motionBtn" aria-pressed="false"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0h3v10H1zM6 0h3v10H6z"/></svg>Pause motion</button></span></div>
         <div class="hud bottom"><span class="caption" id="heroCaption">Loading the shop…</span></div>
       </div>
       <div class="crosses" aria-hidden="true"><i>+</i><i>+</i><span class="scroll-hint">Scroll to explore <span class="arrow">↓</span></span><i>+</i><i>+</i></div>
@@ -343,7 +388,7 @@
       <p class="eyebrow"><span class="dot"></span><span class="num">02</span> How it works</p>
       <div class="head2">
         <h2>An investigation you can check.</h2>
-        <p class="sub">The same outage, step by step: what the alarm saw, what Claude asked, what the code checked, and what came out.</p>
+        <p class="sub">The same outage, step by step: what the alarm saw, what Claude asked, what the code checked, what came out, and the replay that proves it.</p>
       </div>
       <div class="story">
         <div class="steps">
@@ -355,15 +400,18 @@
             <p>A suspect counts only if a tool call it cites really showed it abnormal. Then a blast-radius check asks whether the answer explains every red service through the call graph. No second AI, no trust.</p></article>
           <article class="step" data-step="3"><span class="num">Step 4</span><h3>An answer, or a human.</h3>
             <p>Verified and at least 80% confident: Sherlog answers, and drafts the ticket note for engineers and the update for customers. Anything less goes to a person.</p></article>
+          <article class="step" data-step="4"><span class="num">Step 5</span><h3>Prove it: roll it back.</h3>
+            <p>Sherlog replays the same outage, with the same noise, and its answer rolled back. Roll back the cause and the slowness and errors stop. Roll back a victim or a decoy and they carry on, so a decoy that fools every check that only looks cannot fool this one. It works because the shop is simulated; in production the same idea is a canary rollback.</p></article>
         </div>
         <!-- the stage shows one step at a time; screen readers get every step's content in order -->
         <div class="stage">
           <h3 class="sr-only">The recorded outage, step by step</h3>
-          <div class="stage-bar" aria-hidden="true"><span>OUTAGE <b id="stageId">#41</b></span><span id="stageStep">1 / 4 · ALARM</span></div>
+          <div class="stage-bar" aria-hidden="true"><span>OUTAGE <b id="stageId">#41</b></span><span id="stageStep">1 / 5 · ALARM</span></div>
           <div class="layer on" data-layer="0"><svg class="chart" id="alarmChart" viewBox="0 0 560 230" role="img"></svg><p class="zbig" id="alarmZ"></p></div>
           <div class="layer" data-layer="1"><ol class="tlog" id="tlog" aria-label="Claude's tool calls"></ol></div>
           <div class="layer" data-layer="2"><ol class="checks" id="checks" aria-label="What the verifier checked"></ol><p class="blast-line" id="blastLine"></p><svg class="blast-map" id="blastMap" viewBox="0 0 800 340" aria-hidden="true"></svg></div>
           <div class="layer" data-layer="3" id="verdictLayer"></div>
+          <div class="layer" data-layer="4"><p class="rb-cmd" id="rbCmd"></p><ol class="rb" id="rbList" aria-label="What the rollback replay showed"></ol><p class="blast-line" id="rbLine"></p><svg class="blast-map" id="rbMap" viewBox="0 0 800 340" aria-hidden="true"></svg></div>
         </div>
       </div>
     </div>
@@ -392,6 +440,12 @@
         </div>
         <div class="bars" id="hardBars"></div>
         <p class="note" id="hardNote"></p>
+        <div class="rb-proof" id="rbProof">
+          <h3>Then we rolled every answer back.</h3>
+          <p class="sub">Each hard outage replayed with the answer rolled back, as in step 5: if the slowness and errors carry on, the answer was wrong. A what-if on the recorded answers, re-simulated with no API calls; those answers went out without it.</p>
+          <div class="bigstats two" id="rbStats"></div>
+          <p class="note" id="rbNote"></p>
+        </div>
       </div>
     </section>
 
@@ -414,6 +468,10 @@
 
 <footer>
   <div class="wrap">
+    <p class="byo"><b>Bring your own outage.</b> Upload telemetry from your own services in the <a href="/console">console</a> and Sherlog investigates it the same way, short of the rollback, which needs the simulated shop. <a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format and a converter</a></p>
+    <nav aria-label="Pages"><a href="/console">Console</a><a href="/status">Status</a></nav>
+  </div>
+  <div class="wrap">
     <span>Built from scratch for IceHacks 2026 · Claude Haiku, Sonnet and Opus 5.5 · MIT</span>
     <span>The telemetry is simulated, so the numbers are optimistic.</span>
   </div>
@@ -422,9 +480,15 @@
 <script src="/static/shared.js"></script>
 <script>
 const STORY_REPLAY = 41;          // the outage the page tells: cache slows down, the no-AI ranking blames cart
-const STEP_NAMES = ['ALARM', 'INVESTIGATION', 'VERIFIER', 'VERDICT'];
+const STEP_NAMES = ['ALARM', 'INVESTIGATION', 'VERIFIER', 'VERDICT', 'ROLLBACK'];
 const ALARM_WINDOW_TICKS = 36;   // the alarm chart shows 3 minutes before the alarm
+const ROLLBACK_STAGGER_S = 0.45; // one red service recovers after another in the rollback layer
+const MOTION_KEY = 'sherlog-motion';  // 'paused' or 'on': the visitor's choice; without one, the reduced-motion setting decides
+// auto is left out of the rollback totals: it reuses the Haiku and Opus runs, so its answers would count twice
+const CLAUDE_METHODS = { 'one-shot': 'Opus with one prompt', haiku: 'Haiku agent', sonnet: 'Sonnet agent', agent: 'Opus agent' };
+const AND = new Intl.ListFormat('en', { type: 'conjunction' });
 let META = null, STORY = null, guessed = null, activeStep = -1;
+let motionPaused = savedMotionPaused(), heroShop = null, wakeHero = null;
 
 const callersOf = (s) => META.services.filter((x) => s in (META.calls[x] ?? {}));
 
@@ -443,6 +507,32 @@ function byType(events) {
     verdict: events.find((e) => e.type === 'verdict'),
     truth: events.find((e) => e.type === 'truth'),
   };
+}
+
+// ---- motion: one button pauses the hero's shop and captions, the marquee and every looping hint ----
+
+function savedMotionPaused() {
+  try { const saved = localStorage.getItem(MOTION_KEY); if (saved) return saved === 'paused'; } catch { /* storage blocked: the setting decides */ }
+  return !MOTION;
+}
+
+function setMotion(paused) {
+  motionPaused = paused;
+  document.documentElement.dataset.motion = paused ? 'paused' : 'on';  // the CSS pauses the marquee and the hints
+  $('#motionBtn').setAttribute('aria-pressed', String(paused));
+  if (paused) heroShop?.pause();
+  else { heroShop?.play(); wakeHero?.(); }
+}
+
+function toggleMotion() {
+  setMotion(!motionPaused);
+  try { localStorage.setItem(MOTION_KEY, motionPaused ? 'paused' : 'on'); } catch { /* the choice just won't persist */ }
+}
+
+/** Wait `ms`, then for as long as motion is paused: the hero's story moves on only while it plays. */
+async function beat(ms) {
+  await sleep(ms);
+  while (motionPaused) await new Promise((resolve) => { wakeHero = resolve; });
 }
 
 // ---- hero ---------------------------------------------------------------------------------
@@ -502,25 +592,27 @@ function tagNode({ nodes }, service, tags) {
   }
 }
 
-/** The hero's shop: in 3D where WebGL works, a flat map otherwise. Both take setLevel and tag. */
+/** The hero's shop: in 3D where WebGL works, a flat map otherwise. Both take setLevel, tag, pause and play. */
 async function makeHeroShop() {
   const host = $('#hero3d');
   try {
     const { createShop3D } = await import('/static/hero3d.js');
-    return createShop3D(host, META, POS, !MOTION);
+    return createShop3D(host, META, POS, motionPaused);
   } catch {
     host.replaceChildren();
     host.classList.add('flat');
     const map = svg('svg', { id: 'heroMap', viewBox: '0 0 800 340' });
     host.append(map);
     const shop = drawShop(map);
-    return { setLevel: (s, level) => setLevel(shop, s, level), tag: (s, tags) => tagNode(shop, s, tags) };
+    // the flat map's only motion is the flowing calls, which the CSS pauses
+    return { setLevel: (s, level) => setLevel(shop, s, level), tag: (s, tags) => tagNode(shop, s, tags), pause() {}, play() {} };
   }
 }
 
-/** The hero plays the recorded outage on a loop: the fault, the spread, the agent's calls, the verified answer. */
+/** The hero plays the recorded outage on a loop: the fault, the spread, the agent's calls, the verified answer, the rollback. */
 async function heroLoop() {
-  const shop = await makeHeroShop();
+  heroShop = await makeHeroShop();
+  const shop = heroShop;
   const { truth, verdict, tools } = STORY;
   const broken = verdict.blast.abnormal;
   const victims = spreadOrder(truth.root).filter((s) => s !== truth.root && broken.includes(s));
@@ -530,25 +622,47 @@ async function heroLoop() {
     shop.tag(truth.root, [['ai', 'AI', 22], ['verified', 'VERIFIED', 64]]);
     say(`${verdict.answer}: verified, and it explains all ${broken.length} broken services.`);
   };
-  if (!MOTION) { for (const s of broken) shop.setLevel(s, 'bad'); answered(); return; }
+  // paused from the start (reduced motion, or the visitor's choice): show the answer and wait for play
+  if (motionPaused) { for (const s of broken) shop.setLevel(s, 'bad'); answered(); await beat(0); }
   for (;;) {
     for (const s of META.services) shop.setLevel(s, 'ok');
     shop.tag(truth.root, []);
     say(`Watching ${META.services.length} services. Requests flow from callers to the services they call.`);
-    await sleep(3000);
+    await beat(3000);
     shop.setLevel(truth.root, 'bad');
     say(`${truth.root} slows down: ${META.faults[truth.fault]}.`);
-    await sleep(1600);
-    for (const v of victims) { shop.setLevel(v, 'bad'); await sleep(500); }
+    await beat(1600);
+    for (const v of victims) { shop.setLevel(v, 'bad'); await beat(500); }
     say(`Alarm: ${broken.length} services look broken. Which one is the cause?`);
-    await sleep(2400);
+    await beat(2400);
     for (const t of tools) {
       say(`Claude · ${t.id} ${t.name.replace(/_/g, ' ')}${t.args?.service ? ` (${t.args.service})` : ''}`);
-      await sleep(800);
+      await beat(800);
     }
     answered();
-    await sleep(4600);
+    await beat(4000);
+    await heroRollback(shop, say);
   }
+}
+
+/** The proof at the end of the hero's loop: the outage replayed with the answer rolled back, red turning back to normal. */
+async function heroRollback(shop, say) {
+  const { rollback } = STORY.verdict;
+  say(`Proof: replay the outage with ${rollback.service} rolled back.`);
+  await beat(1600);
+  for (const s of recoveryOrder(rollback)) { shop.setLevel(s, 'ok'); await beat(500); }
+  say(rollbackSentence(STORY.verdict));
+  await beat(4000);
+}
+
+/** The services the rollback cleared, in the order they recover: the rolled-back one first, then up the calls. */
+const recoveryOrder = (rollback) => spreadOrder(rollback.service).filter((s) => rollback.cleared.includes(s));
+
+/** What the rollback replay showed, in one sentence. */
+function rollbackSentence({ rollback, blast }) {
+  if (!rollback.proves) return `The alarm stays on after the rollback: ${rollback.service} is not the cause.`;
+  return `${rollback.alarm_after ? 'The slowness and errors stop' : 'No alarm'} after the rollback: ` +
+    `${rollback.cleared.length} of ${blast.abnormal.length} broken services recover. ${rollback.service} is the cause.`;
 }
 
 // ---- 01: the wall of red ------------------------------------------------------------------
@@ -698,6 +812,27 @@ function buildVerdict() {
     el('div', { class: 'note-card', style: '--d:1.4s' }, el('h4', {}, 'Customer update'), el('p', {}, verdict.customer_update)));
 }
 
+function buildRollback() {
+  const { verdict } = STORY, { rollback } = verdict;
+  $('#rbCmd').replaceChildren(el('span', { class: 'cid' }, 'replay'), `${rollback.service} rolled back · the same outage, the same noise`);
+  const shop = drawShop($('#rbMap'));
+  tagNode(shop, rollback.service, [['verified', 'ROLLED BACK', 74]]);
+  shop.nodes[rollback.service].classList.add('culprit');
+  // each cleared service starts red and turns green in turn; anything still abnormal stays red
+  const cleared = recoveryOrder(rollback);
+  const rows = [...cleared, ...rollback.still_abnormal].map((s, i) => {
+    const d = `${0.6 + i * ROLLBACK_STAGGER_S}s`;
+    const ok = cleared.includes(s);
+    if (ok) { shop.nodes[s].classList.add('cleared'); shop.nodes[s].style.setProperty('--d', d); } else setLevel(shop, s, 'bad');
+    return el('li', { style: `--d:${d}` }, el('span', { class: 's-name' }, s), el('span', { class: 'rb-state' }, ok
+      ? [el('span', { class: 'badge bad was', 'aria-hidden': 'true' }, 'abnormal'), el('span', { class: 'badge ok now' }, 'recovered')]
+      : el('span', { class: 'badge bad' }, 'still abnormal')));
+  });
+  $('#rbList').replaceChildren(...rows);
+  $('#rbLine').textContent = rollbackSentence(verdict);
+  $('#rbLine').style.setProperty('--d', `${0.6 + rows.length * ROLLBACK_STAGGER_S}s`);
+}
+
 function activate(step) {
   if (step === activeStep) return;
   activeStep = step;
@@ -708,12 +843,12 @@ function activate(step) {
     layer.classList.remove('play');
     if (on) { void layer.offsetWidth; layer.classList.add('play'); }  // restart its animation
   }
-  $('#stageStep').textContent = `${step + 1} / 4 · ${STEP_NAMES[step]}`;
+  $('#stageStep').textContent = `${step + 1} / ${STEP_NAMES.length} · ${STEP_NAMES[step]}`;
 }
 
 function buildStory() {
   $('#stageId').textContent = `#${STORY_REPLAY}`;
-  buildAlarm(); buildLog(); buildChecks(); buildVerdict();
+  buildAlarm(); buildLog(); buildChecks(); buildVerdict(); buildRollback();
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) if (e.isIntersecting) activate(Number(e.target.dataset.step));
   }, { rootMargin: '-45% 0px -45% 0px' });
@@ -763,8 +898,44 @@ function buildResults() {
     ev.auto && ['Auto · Haiku, then Opus if needed', answeredOf(ev.auto), ev.auto.agent_ac1, 'accent'],
   ].filter(Boolean);
   barRows($('#bars'), rows);
+  const rb = rollbackTotals('');
   $('#resultsNote').textContent = `On the same outages the Opus agent alone was right in ${a.only_agent_right} and the no-AI ranking alone in ${a.only_baseline_right} ` +
-    `(exact McNemar test, ${a.mcnemar_p < 0.001 ? 'p < 0.001' : `p = ${a.mcnemar_p.toFixed(3)}`}). The blast-radius check flags ${a.baseline_wrong_caught} of the ranking's ${a.baseline_wrong} wrong answers.`;
+    `(exact McNemar test, ${a.mcnemar_p < 0.001 ? 'p < 0.001' : `p = ${a.mcnemar_p.toFixed(3)}`}). The blast-radius check flags ${a.baseline_wrong_caught} of the ranking's ${a.baseline_wrong} wrong answers.` +
+    (rb.answers ? ` Replayed with the answer rolled back, ${passedOf(rb)} answers the ${rb.methods.length} Claude methods sent out pass the rollback test of step 5 ` +
+      '(auto aside: it reuses their runs).' : '');
+}
+
+/** The rollback what-if summed over the Claude methods: the answers that went out, the wrong ones, and what the test did with each. */
+function rollbackTotals(prefix) {
+  const methods = Object.keys(CLAUDE_METHODS).map((m) => [m, META.evidence[prefix + m]]).filter(([, s]) => s?.rollback_checked);
+  const sum = (key) => methods.reduce((total, [, s]) => total + s[key], 0);
+  const wrong = sum('rollback_caught') + sum('rollback_gated_wrong');  // a wrong answer either fails the test or slips past it
+  return { methods, answers: sum('rollback_checked'), wrong, right: sum('rollback_checked') - wrong,
+    caught: sum('rollback_caught'), rejected: sum('rollback_wrongly_rejected') };
+}
+
+const passedOf = (rb) => { const passed = rb.answers - rb.caught - rb.rejected; return passed === rb.answers ? `all ${passed}` : `${passed} of the ${rb.answers}`; };
+
+function buildRollbackStats() {
+  const rb = rollbackTotals('hard-');
+  if (!rb.answers) { $('#rbProof').hidden = true; return; }
+  const stats = [
+    [rb.caught, rb.wrong, `wrong answers the rollback test would have caught, of the ${rb.answers} that ${rb.methods.length} Claude methods sent out on their own`],
+    [rb.rejected, rb.right, 'right answers it would have wrongly rejected'],
+  ];
+  const outOf = (total) => (v) => `${Math.round(v)} of ${total}`;
+  const boxes = stats.map(([value, total, text]) => el('div', {}, el('b', {}, outOf(total)(value)), el('span', {}, text)));
+  $('#rbStats').replaceChildren(...boxes);
+  revealOnScroll([$('#rbStats')], () => {
+    enter(boxes, { duration: 1000, stagger: 80, easing: 'glide', y: 30 });
+    boxes.forEach((box, i) => countUp(box.firstChild, stats[i][0], outOf(stats[i][1])));
+  }, { none: true });
+  const wrongOf = (s) => s.rollback_caught + s.rollback_gated_wrong;
+  const caughtBy = rb.methods.filter(([, s]) => wrongOf(s)).map(([m, s]) => `${CLAUDE_METHODS[m]} ${s.rollback_caught} of ${wrongOf(s)}`);
+  const neverWrong = rb.methods.filter(([, s]) => !wrongOf(s)).map(([m]) => CLAUDE_METHODS[m]);
+  $('#rbNote').textContent = (caughtBy.length ? `Wrong answers caught: ${caughtBy.join(', ')}. ` : '') +
+    (neverWrong.length ? `No wrong answers to catch: ${AND.format(neverWrong)}. ` : '') +
+    'Auto is left out: it reuses the Haiku and Opus runs.';
 }
 
 function buildHard() {
@@ -793,13 +964,15 @@ function revealHeadings() {
   const titles = [...document.querySelectorAll('.band h2, .cta h2')];
   const words = new Map(titles.map((h) => [h, splitWords(h)]));
   revealOnScroll(titles, (h) => maskIn(words.get(h)), { none: true });
-  revealOnScroll(document.querySelectorAll('.eyebrow, .head2 .sub, .step, .note, .cta p, .cta .ctas, .marquee'), null, { easing: 'glide', blur: 6 });
+  revealOnScroll(document.querySelectorAll('.eyebrow, .head2 .sub, .step, .note, .rb-proof > h3, .rb-proof > .sub, .cta p, .cta .ctas, .marquee'), null, { easing: 'glide', blur: 6 });
   revealOnScroll([$('.statement .split')], null, { easing: 'glide', y: 30 });
   revealOnScroll([$('#heroTitle')], () => maskIn($('#heroTitle').querySelectorAll('.line > span'), { stagger: 120, duration: 1300 }), { none: true });
 }
 
 async function init() {
   $('#themeBtn').addEventListener('click', () => toggleTheme());
+  setMotion(motionPaused);
+  $('#motionBtn').addEventListener('click', toggleMotion);
   const nav = $('#nav');
   const onScroll = () => nav.classList.toggle('scrolled', scrollY > 8);
   addEventListener('scroll', onScroll, { passive: true });
@@ -822,6 +995,7 @@ async function init() {
   buildStory();
   buildResults();
   buildHard();
+  buildRollbackStats();
 }
 
 init();
