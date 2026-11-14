@@ -344,7 +344,7 @@
 
     <div class="head" id="teleHead">
       <div class="head-l">
-        <h2 class="label" id="h-tele">Telemetry<span class="live" id="live"><i></i><span id="liveText">PAUSED</span></span></h2>
+        <h2 class="label" id="h-tele">Telemetry<span class="live" id="live" hidden><i></i><span id="liveText">PAUSED</span></span></h2>
         <button type="button" class="pause" id="pauseBtn" aria-pressed="false">PAUSE</button>
       </div>
       <div class="mtabs" id="metricTabs" role="group" aria-label="Metric shown"></div>
@@ -822,6 +822,7 @@ function renderTip(i) {
 function setLive(on) {
   playing = on;
   $('#live').classList.toggle('on', on && !still);
+  $('#live').hidden = !on && !still;  // a finished recording or a still upload is not paused: the viewer never pressed Pause
   $('#liveText').textContent = on && !still ? 'LIVE' : 'PAUSED';
 }
 
