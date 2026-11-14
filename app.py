@@ -21,9 +21,10 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 import bench
+import byo
 import investigate
 import sim
 
@@ -251,3 +252,72 @@ def replay(number: int) -> list[dict]:
     # outages are deterministic from their seed, so the ticks after the cut-off can be re-simulated
     incident = sim.simulate(record["root"], record["fault"], record["seed"], record.get("hard", False))
     return list(_enrich(iter(record["events"]), incident))
+
+
+# --- bring your own outage: real telemetry in the shop's format, see docs/bring-your-own.md ------------------
+
+MAX_BODY_MB = 2  # a full incident with every allowed log line fits well inside this
+
+
+class InvestigateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    incident: byo.IncidentDoc
+    model: Literal[(*investigate.MODELS, investigate.AUTO)] = "opus"
+
+
+async def _read_capped(request: Request, schema: type[BaseModel]) -> BaseModel:
+    """Read the body, refusing it with 413 as soon as it passes the cap (never holding more than that), and
+    validate it with the same 422 answer FastAPI gives everywhere else."""
+    too_big = HTTPException(413, f"The request body is over {MAX_BODY_MB} MB.")
+    cap = MAX_BODY_MB * 1_000_000
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > cap:
+        raise too_big
+    body = bytearray()
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > cap:
+            raise too_big
+    try:
+        return schema.model_validate_json(bytes(body))
+    except ValidationError as exc:
+        errors = exc.errors(include_url=False, include_context=False, include_input=False)
+        raise RequestValidationError([{**e, "loc": ("body", *e["loc"])} for e in errors]) from None
+
+
+@lru_cache(maxsize=1)
+def _sample_incident() -> dict:
+    return byo.sample()
+
+
+@app.get("/api/sample-incident")
+def sample_incident() -> dict:
+    """One simulated outage in the bring-your-own format, culprit removed: download it, edit it, send it back."""
+    return _sample_incident()
+
+
+@app.post("/api/triage")
+async def triage(request: Request) -> dict:
+    """The no-AI checks on uploaded telemetry. No key and no live run needed, so no limit beyond the size cap."""
+    return byo.triage(byo.to_incident(await _read_capped(request, byo.IncidentDoc)))
+
+
+@app.post("/api/investigate")
+async def investigate_upload(request: Request) -> StreamingResponse:
+    """The agent on uploaded telemetry: the same events as /api/break, minus the truth nobody knows."""
+    if not _live_enabled():
+        raise HTTPException(503, "Live mode is off on this server. POST the incident to /api/triage for the no-AI checks.")
+    body = await _read_capped(request, InvestigateRequest)
+    incident = byo.to_incident(body.incident)
+    if incident.alarm is None:  # refused before it costs the visitor a live run
+        raise HTTPException(422, "No alarm fired in this telemetry, so there is nothing to investigate.")
+    refusal = _take_live_slot(_client_ip(request))
+    if refusal:
+        raise HTTPException(429, refusal)
+    events = investigate.incident_events(incident, model=investigate.MODELS.get(body.model, investigate.AUTO))
+    untold = (e for e in events if e["type"] != "truth")  # an uploaded outage has no known culprit to reveal
+    return StreamingResponse(
+        _sse(_enrich(untold, incident)),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

@@ -1,0 +1,16 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "matrix",
+    "result": [
+      {
+        "metric": {"service": "cartservice", "metric": "latency_ms"},
+        "values": [[1700000000, "10"], [1700000005, "12"], [1700000015, "16"], [1700000020, "NaN"], [1700000025, "18"]]
+      },
+      {
+        "metric": {"service": "paymentservice", "metric": "cpu_pct"},
+        "values": [[1700000000, "20"], [1700000015, "30"]]
+      }
+    ]
+  }
+}
