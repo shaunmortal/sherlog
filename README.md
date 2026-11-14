@@ -206,12 +206,12 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 - **Recorded outages always work.** All 176 recorded investigations replay with no API key, so the demo still works when live mode is off or the day's live runs are used up.
 - **Clear errors, never a hang.** Every live failure ends the stream with a reason the console shows: a missing or invalid key, a model the key cannot use, the API's rate limit, a timeout, no connection, an API error. The verdict then goes to a human. Each model call gives up after 120 s, with 1 retry.
 - **Limits.** Live runs are limited to 6 an hour per visitor and 200 a day. Over the limit you get a 429, and with live mode off a 503, each saying what to try instead. A bad upload gets a 422 that names the field; a body over 2 MB gets a 413.
-- **Tests.** 159 pytest tests run in CI on every push and pull request:
+- **Tests.** 160 pytest tests run in CI on every push and pull request:
   - 114 in [`test_core.py`](test_core.py): the simulator, the agent loop against a scripted fake model, the verifier, the blast radius, the rollback and the auto route
   - 21 in [`tests/test_api.py`](tests/test_api.py): every route and every failure path of a live run
-  - 24 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
+  - 25 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
 
-  Three browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, a guess reveals the cause, and the console plays a recorded outage to its verdict.
+  Four browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, a guess reveals the cause, the console plays a recorded outage to its verdict, and triaging the sample afterwards replaces that outage on screen, even while paused.
 
 ---
 
@@ -229,7 +229,7 @@ Requires Python 3.13 and uv.
 uv venv --python 3.13 && uv pip install -r requirements.txt
 cp .env.example .env                                  # then put your Anthropic API key in .env
 uv run --env-file .env uvicorn app:app --reload       # http://localhost:8000 (story), /console, /status
-uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 159 tests
+uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 160 tests
 ```
 
 Without an API key everything except live runs works: replays, the Evidence view, triage.

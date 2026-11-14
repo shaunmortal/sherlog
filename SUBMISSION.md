@@ -89,8 +89,8 @@ Opus answer 42 of 44 hard outages instead of 29, still never wrong.
   widths, and Lighthouse scores accessibility 100 on the story page and the console.
 - **Reliability:** a status page and `/api/health`, a 120 s timeout on every model call, a clear reason
   for every failure, and per-visitor and daily limits on live runs.
-- **Tests:** 159 pytest tests in CI (the agent loop and the auto route against a scripted fake model,
-  every API route and failure path, the upload format), plus 3 browser end-to-end checks.
+- **Tests:** 160 pytest tests in CI (the agent loop and the auto route against a scripted fake model,
+  every API route and failure path, the upload format), plus 4 browser end-to-end checks.
 - **AI tools used:** Claude Code as a pair programmer; Claude Haiku, Sonnet and Opus 5.5 inside the product.
 
 ## Challenges we ran into
