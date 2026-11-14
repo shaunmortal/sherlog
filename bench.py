@@ -219,15 +219,46 @@ def rollback_stats(records: list[dict]) -> dict:
     }
 
 
+def _verified_top(record: dict) -> dict | None:
+    """Suspect #1 of the recorded verdict if the verifier accepted it, else None. Only the first counts, as in
+    build_verdict: a lower suspect that verified is never promoted, and a failed run has no suspects at all."""
+    verdict = next((e for e in record["events"] if e["type"] == "verdict"), {})
+    top = (verdict.get("causes") or [None])[0]
+    return top if top and top["verified"] else None
+
+
+def gate_stats(records: list[dict]) -> dict:
+    """Rollback as the answer gate, an offline what-if on the recorded verdicts (re-simulated, no API calls):
+    answer with the verified top suspect whenever rolling it back proves it, whatever its confidence, else
+    escalate; and both gates together, answering when either the 80% confidence gate or the rollback lets it out.
+    Right means the answer is the true cause."""
+    if not records:
+        return {}
+    rows = []  # (answered by the confidence gate, rollback proves the verified top suspect, that suspect is right)
+    for r in records:
+        top = _verified_top(r)
+        proves = top is not None and _rollback_proves(r["root"], r["fault"], r["seed"], r.get("hard", False),
+                                                      top["service"])
+        rows.append((bool(r["truth"]["ai_answer"]), proves, top is not None and top["service"] == r["root"]))
+    return {
+        "rollback_gate_answered": sum(p for _, p, _ in rows),
+        "rollback_gate_right": sum(p and ok for _, p, ok in rows),
+        "confidence_or_rollback_answered": sum(a or p for a, p, _ in rows),
+        "confidence_or_rollback_right": sum((a or p) and ok for a, p, ok in rows),
+    }
+
+
 EVIDENCE = RUNS.with_name("evidence.json")
 
 
 def evidence() -> dict:
     """Everything the console's Evidence view shows: every variant, the auto routes, the deep checks and the
-    rollback what-if."""
+    rollback what-ifs. The gate what-if covers only single-model runs: auto's handoff to Opus itself depends on
+    the confidence gate, so swapping the gate would change which runs it is built from."""
     records = {v: load(runs_path(v)) for v in VARIANTS}
     records.update({f"{p}auto": auto_records(f"{p}haiku", f"{p}agent") for p in ("", "hard-")})
-    out = {v: {"label": VARIANT_LABELS[v], **summarize(rs), **rollback_stats(rs)} for v, rs in records.items()}
+    out = {v: {"label": VARIANT_LABELS[v], **summarize(rs), **rollback_stats(rs),
+               **(gate_stats(rs) if v in VARIANTS else {})} for v, rs in records.items()}
     for prefix in ("", "hard-"):
         if out[f"{prefix}agent"]:
             out[f"{prefix}agent"] = {**out[f"{prefix}agent"], **deep_stats(records[f"{prefix}agent"])}
@@ -277,6 +308,20 @@ def rollback_table(ev: dict) -> str:
     header = ("| Rollback what-if | Answers | Pass | Wrong caught | Right rejected | Wrong left after gate | "
               "Gated cause first |")
     return "\n".join([header, "|---|---:|---:|---:|---:|---:|---:|", *rows])
+
+
+def gate_table(ev: dict) -> str:
+    """The answer gate what-if: answered and right under today's confidence gate, the rollback, and either."""
+    rows = [
+        f"| {v} | {s['outages']} | {s['answered']} / {round((s['right_when_answered'] or 0) * s['answered'])} | "
+        f"{s['rollback_gate_answered']} / {s['rollback_gate_right']} | "
+        f"{s['confidence_or_rollback_answered']} / {s['confidence_or_rollback_right']} |"
+        for v, s in ev.items() if "rollback_gate_answered" in s
+    ]
+    if not rows:
+        return ""
+    header = "| Gate what-if | Outages | 80% confidence: answered / right | Rollback | Either |"
+    return "\n".join([header, "|---|---:|---:|---:|---:|", *rows])
 
 
 def report(summary: dict) -> str:
@@ -332,6 +377,8 @@ def main() -> None:
     ev = evidence()
     print()
     print(rollback_table(ev))
+    print()
+    print(gate_table(ev))
     EVIDENCE.write_text(json.dumps(ev))
 
 
