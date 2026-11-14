@@ -138,13 +138,21 @@ function loadTheme() {
   try { const theme = localStorage.getItem('sherlog-theme'); if (theme) document.documentElement.dataset.theme = theme; } catch { /* default theme */ }
 }
 
+const DARK_QUERY = matchMedia('(prefers-color-scheme: dark)');
+const isDark = () => { const { theme } = document.documentElement.dataset; return theme ? theme === 'dark' : DARK_QUERY.matches; };
+
+/** The theme button (#themeBtn, on both pages) says what pressing it will do, so screen readers hear the current theme. */
+function labelThemeButton() {
+  document.getElementById('themeBtn')?.setAttribute('aria-label', isDark() ? 'Switch to light theme' : 'Switch to dark theme');
+}
+
 /** Flip light/dark with a cross-fade; `after` repaints anything drawn from the colours (canvases). */
 function toggleTheme(after = () => {}) {
   const apply = () => {
     const root = document.documentElement;
-    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-    root.dataset.theme = dark ? 'light' : 'dark';
+    root.dataset.theme = isDark() ? 'light' : 'dark';
     try { localStorage.setItem('sherlog-theme', root.dataset.theme); } catch { /* the choice just won't persist */ }
+    labelThemeButton();
     after();
   };
   if (MOTION && document.startViewTransition) document.startViewTransition(apply);
@@ -152,3 +160,5 @@ function toggleTheme(after = () => {}) {
 }
 
 loadTheme();
+labelThemeButton();
+DARK_QUERY.addEventListener('change', labelThemeButton);  // following the system theme, the label follows too
