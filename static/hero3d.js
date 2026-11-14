@@ -1,5 +1,6 @@
 // The story page's hero: the shop's call graph in 3D, with requests flowing along every call.
-// createShop3D(host, meta, pos, still) -> { setLevel(service, 'ok'|'warn'|'bad'), tag(service, tags) }
+// createShop3D(host, meta, pos, paused) -> { setLevel(service, 'ok'|'warn'|'bad'), tag(service, tags), pause(), play() }
+// Paused (reduced motion, or the page's pause button) it draws only when something changes.
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -13,7 +14,7 @@ const FLASH_MS = 900;
 const PULSES_PER_CALL = 2;
 const BAD = new THREE.Color(COLOR.bad);
 
-export function createShop3D(host, meta, pos, still) {
+export function createShop3D(host, meta, pos, paused) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -69,7 +70,7 @@ export function createShop3D(host, meta, pos, still) {
   }
 
   // pointer parallax, fitted camera, and only rendering while the hero is on screen
-  let pointer = { x: 0, y: 0 }, onScreen = true;
+  let pointer = { x: 0, y: 0 }, onScreen = true, looping = false, t = 0;
   host.addEventListener('pointermove', (e) => {
     const box = host.getBoundingClientRect();
     pointer = { x: (e.clientX - box.left) / box.width - 0.5, y: (e.clientY - box.top) / box.height - 0.5 };
@@ -90,8 +91,8 @@ export function createShop3D(host, meta, pos, still) {
   new IntersectionObserver(([entry]) => { onScreen = entry.isIntersecting; }).observe(host);
 
   function draw(now) {
-    const t = still ? 0 : now / 1000;
-    graph.rotation.y += ((still ? 0 : Math.sin(t * 0.25) * 0.28) + pointer.x * 0.5 - graph.rotation.y) * 0.05;
+    if (!paused) t = now / 1000;  // paused, the scene's clock stands still, so nothing sways, spins or pulses
+    graph.rotation.y += (Math.sin(t * 0.25) * 0.28 + pointer.x * 0.5 - graph.rotation.y) * 0.05;
     graph.rotation.x += (0.06 + pointer.y * 0.25 - graph.rotation.x) * 0.05;
     for (const n of Object.values(nodes)) {
       const sick = n.level !== 'ok';
@@ -115,10 +116,12 @@ export function createShop3D(host, meta, pos, still) {
     labels.render(scene, camera);
   }
   const loop = (now) => {
+    if (paused) { looping = false; return; }  // no frames at all until play()
     if (onScreen && !document.hidden) draw(now);
     requestAnimationFrame(loop);
   };
-  if (!still) requestAnimationFrame(loop);
+  const run = () => { if (!looping) { looping = true; requestAnimationFrame(loop); } };
+  if (!paused) run();
   fit();
 
   return {
@@ -126,13 +129,15 @@ export function createShop3D(host, meta, pos, still) {
       const n = nodes[service];
       if (level !== 'ok' && n.level === 'ok') n.flashAt = performance.now();
       n.level = level;
-      if (still) { n.material.color.set(level === 'ok' ? n.base : COLOR.bad); draw(performance.now()); }
+      if (paused) { n.material.color.set(level === 'ok' ? n.base : COLOR.bad); draw(performance.now()); }
     },
     tag(service, tags) {
       const n = nodes[service];
       n.halo.visible = tags.length > 0;
       n.tags.replaceChildren(...tags.map(([cls, text]) => Object.assign(document.createElement('b'), { className: cls, textContent: text })));
-      if (still) draw(performance.now());
+      if (paused) draw(performance.now());
     },
+    pause() { paused = true; },
+    play() { paused = false; run(); },
   };
 }
