@@ -2,6 +2,8 @@
 
 **Break a service. Guess the culprit. Watch an AI agent find it, and prove it.**
 
+**Live:** https://sherlog-jade.vercel.app (the story) · https://sherlog-jade.vercel.app/console (break something) · **Code:** https://github.com/shaunmortal/sherlog
+
 When one service in a microservice app breaks, everything that calls it breaks too. The on-call
 engineer is woken up by a wall of red and has to work out which service is the *cause* and which
 are just *victims*. Sherlog is an AI on-call investigator for that moment:

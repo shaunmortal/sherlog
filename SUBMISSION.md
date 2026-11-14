@@ -1,6 +1,6 @@
 # Devpost submission kit (for the team, not part of the app)
 
-Paste these sections into Devpost. Replace `LIVE_URL` and `VIDEO_URL` once you have them.
+Paste these sections into Devpost. Replace `VIDEO_URL` once the video is up.
 Tracks to select: **Best AI Hack** (main), **Best Deployed / Shipped App**, **Best Design & UX**.
 
 ---
@@ -129,8 +129,8 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, uv, vercel
 
 ## Links
 
-- Live demo: LIVE_URL
-- Code: GITHUB_URL
+- Live demo: https://sherlog-jade.vercel.app (console: https://sherlog-jade.vercel.app/console)
+- Code: https://github.com/shaunmortal/sherlog
 - Video: VIDEO_URL
 
 ---
