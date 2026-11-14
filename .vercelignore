@@ -8,4 +8,5 @@ __pycache__
 .vercel
 media
 test_core.py
+tests
 SUBMISSION.md
