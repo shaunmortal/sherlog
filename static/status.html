@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sherlog status</title>
+<meta name="description" content="Is Sherlog working? Live investigations, recorded outages, today's live runs and the version the server runs.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='13' cy='13' r='8' fill='none' stroke='%231a2ffb' stroke-width='3.5'/><path d='M19 19l8 8' stroke='%231a2ffb' stroke-width='4' stroke-linecap='square'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css">
+<style>
+  a { color: inherit; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+  @media (max-width: 760px) { .wrap { padding: 0 16px; } }
+
+  /* ---- header: same brand, theme button and pill links as the story page; every target is 48px ---- */
+  header .wrap { display: flex; align-items: center; gap: 8px; padding-top: 20px; padding-bottom: 20px; }
+  .brand { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-right: auto; font: 500 22px/1 var(--sans); letter-spacing: .08em; text-decoration: none; }
+  .brand svg { width: 20px; height: 20px; }
+  .pill { display: inline-flex; align-items: center; min-height: 48px; padding: 0 18px; border-radius: var(--pill); font: 500 13px var(--sans); letter-spacing: .03em; text-transform: uppercase; text-decoration: none; transition: background-color var(--hover) var(--ease-quad); }
+  .pill:hover { background: var(--sunk); }
+  .round { flex: none; width: 48px; height: 48px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--sunk); color: var(--text); font-size: 17px; }
+  @media (max-width: 480px) { .pill { padding: 0 12px; } .brand { font-size: 18px; } }
+  @media (max-width: 400px) { .home { display: none; } }  /* the brand links home too */
+
+  /* ---- the answer first, then one row per thing a visitor relies on ---- */
+  main { padding: 6vh 0 12vh; }
+  h1 { margin: 0 0 12px; font: 500 13px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .summary { display: flex; align-items: baseline; gap: 14px; margin: 0 0 32px; font: 400 clamp(26px, 3.6vw, 40px)/1.15 var(--sans); letter-spacing: -.02em; }
+  .summary .dot { width: 14px; height: 14px; transform: translateY(-.12em); }
+  .rows { margin: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); }
+  .row { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 4px 24px; padding: 20px 24px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  @media (max-width: 600px) { .row { grid-template-columns: minmax(0, 1fr); padding: 18px 16px; } }
+  dt { font-weight: 500; }
+  dd { margin: 0; }
+  .value { display: flex; align-items: center; gap: 10px; font: 500 17px var(--mono); }
+  .why { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  /* the dot repeats what the words say, so colour is never the only signal */
+  .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--line-strong); }
+  .dot.ok { background: var(--ok); } .dot.off { background: var(--warn); } .dot.bad { background: var(--bad); }
+  .dot:not(.ok, .off, .bad) { display: none; }
+  .checked { margin: 16px 0 0; color: var(--muted); font: 13px/1.6 var(--mono); }
+  .checked a { text-underline-offset: 3px; }
+  .notice { margin: 0; padding: 20px 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Sherlog home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13" cy="13" r="8" fill="none" stroke="var(--accent)" stroke-width="4"/><path d="M19 19l8 8" stroke="var(--accent)" stroke-width="4.5" stroke-linecap="square"/></svg>
+      SHERLOG
+    </a>
+    <a class="pill home" href="/">Story</a>
+    <a class="pill" href="/console">Console</a>
+    <button type="button" class="round" id="themeBtn" aria-label="Switch light or dark theme">◐</button>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <h1>Status</h1>
+    <noscript><p class="notice">This page checks the server with JavaScript, which is off. The raw status is at <a href="/api/health">/api/health</a>.</p></noscript>
+    <p class="summary" id="summary" role="status" aria-atomic="true" hidden><span class="dot" aria-hidden="true"></span><span id="summaryText"></span></p>
+    <dl class="rows" id="rows" hidden>
+      <div class="row" id="live"><dt>Live investigations</dt><dd><span class="value"><span class="dot" aria-hidden="true"></span><span class="text"></span></span><p class="why"></p></dd></div>
+      <div class="row" id="recorded"><dt>Recorded outages</dt><dd><span class="value"><span class="dot" aria-hidden="true"></span><span class="text"></span></span><p class="why"></p></dd></div>
+      <div class="row" id="runs"><dt>Today's live runs</dt><dd><span class="value"><span class="dot" aria-hidden="true"></span><span class="text"></span></span><p class="why"></p></dd></div>
+      <div class="row" id="version"><dt>Version</dt><dd><span class="value"><span class="dot" aria-hidden="true"></span><span class="text"></span></span><p class="why"></p></dd></div>
+    </dl>
+    <p class="checked" id="checked" hidden></p>
+  </div>
+</main>
+
+<script src="/static/shared.js"></script>
+<script>
+const REFRESH_MS = 30_000;
+const EVERY = `every ${REFRESH_MS / 1000} seconds`;
+const OR = new Intl.ListFormat('en', { type: 'disjunction' });
+
+// only touch text that changed, so the live summary speaks when the state changes, not on every refresh
+function setText(node, text) {
+  if (node.textContent !== text) node.textContent = text;
+}
+
+function fill(id, tone, value, why) {
+  const row = $(`#${id}`);
+  row.querySelector('.dot').className = `dot ${tone}`;
+  setText(row.querySelector('.text'), value);
+  setText(row.querySelector('.why'), why);
+}
+
+function summarize(tone, text) {
+  $('#summary .dot').className = `dot ${tone}`;
+  setText($('#summaryText'), text);
+  $('#summary').hidden = false;
+}
+
+function liveWhy(h, full) {
+  if (!h.live) return 'This server has no Claude API key, so the console plays recorded outages instead.';
+  if (full) return `Today's ${h.live_runs_per_day} live runs are used up. They come back at midnight UTC.`;
+  const names = h.models.map((m) => (m === 'auto' ? m : m[0].toUpperCase() + m.slice(1)));
+  return `Claude investigates a fresh outage each time you break a service. Pick ${OR.format(names)}.`;
+}
+
+function show(h) {
+  const full = h.live_runs_today >= h.live_runs_per_day;
+  const liveOn = h.live && !full;
+  fill('live', liveOn ? 'ok' : 'off', h.live ? 'On' : 'Off', liveWhy(h, full));
+  fill('recorded', h.ok ? 'ok' : 'bad', String(h.recorded_outages),
+    h.ok ? 'Always available: each one replays a recorded investigation and needs no API key.' : 'None could be loaded on this server.');
+  fill('runs', liveOn ? 'ok' : 'off', `${h.live_runs_today} / ${h.live_runs_per_day}`, h.live
+    ? `Each visitor can start ${h.live_runs_per_visitor_per_hour} an hour. The count starts again at midnight UTC.`
+    : 'None while live investigations are off.');
+  fill('version', '', h.version, 'The commit this server runs.');
+  if (!h.ok) summarize('bad', 'Recorded outages could not be loaded.');
+  else if (liveOn) summarize('ok', 'Everything is working: live investigations and recorded outages.');
+  else summarize('off', `Recorded outages are working. Live investigations are ${h.live ? 'used up for today' : 'off on this server'}.`);
+  $('#checked').replaceChildren(`Server time ${h.server_time.slice(11, 19)} UTC · checked ${EVERY} · `,
+    el('a', { href: '/api/health' }, 'raw status'));
+  $('#rows').hidden = $('#checked').hidden = false;
+}
+
+async function refresh() {
+  try {
+    show(await getJSON('/api/health', { cache: 'no-store' }));
+  } catch {
+    summarize('bad', `The server is not answering right now. Trying again ${EVERY}.`);
+  }
+}
+
+$('#themeBtn').addEventListener('click', () => toggleTheme());
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>

@@ -5,8 +5,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import random
+import subprocess
 import threading
 import time
 from collections import deque
@@ -14,8 +16,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Iterator, Literal
 
+import anthropic
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -28,7 +32,14 @@ LIVE_RUNS_PER_IP_PER_HOUR = 6
 LIVE_RUNS_PER_DAY = 200
 HOUR_SECONDS = 3600
 HEALTHY_SEED = 7
+# a model call that runs longer than this is stuck (recorded calls wrote at most about 1,600 output tokens): fail it,
+# so the stream ends with an error event instead of waiting out the SDK's 10-minute default, three times over
+LIVE_CALL_TIMEOUT_SECONDS = 120
+LIVE_CALL_RETRIES = 1
+STREAM_FAILED = "The investigation hit an unexpected error. Try again, or watch a recorded outage."
+SHORT_SHA = 7
 
+log = logging.getLogger("sherlog")
 app = FastAPI(title="Sherlog")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
@@ -47,6 +58,19 @@ class BreakRequest(BaseModel):
 
 def _live_enabled() -> bool:
     return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+
+
+def _git_version() -> str:
+    """The checked-out commit, read once at start-up. Deploys carry no .git, so they report their sha from the env."""
+    try:
+        done = subprocess.run(["git", "rev-parse", f"--short={SHORT_SHA}", "HEAD"], cwd=STATIC.parent,
+                              capture_output=True, text=True, timeout=2, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return "dev"
+    return done.stdout.strip() or "dev"
+
+
+GIT_VERSION = _git_version()
 
 
 def _client_ip(request: Request) -> str:
@@ -89,9 +113,21 @@ def _load_replays(mtimes: tuple) -> list[dict]:
     return [r for v in REPLAY_VARIANTS for r in bench.load(bench.runs_path(v))]
 
 
+def _live_runs_today() -> int:
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    with _lock:
+        return _runs_today["count"] if _runs_today["day"] == today else 0
+
+
 def _sse(events: Iterator[dict]) -> Iterator[str]:
-    for event in events:
-        yield f"data: {json.dumps(event)}\n\n"
+    try:
+        for event in events:
+            yield f"data: {json.dumps(event)}\n\n"
+    except Exception:
+        # investigate() already turns API errors into events; this catches the rest, so the console gets a
+        # reason instead of a stream that just stops
+        log.exception("live stream failed")
+        yield f"data: {json.dumps({'type': 'error', 'message': STREAM_FAILED})}\n\n"
 
 
 def _enrich(events: Iterator[dict], inc: sim.Incident) -> Iterator[dict]:
@@ -124,6 +160,13 @@ def _healthy_series() -> dict:
     return sim.simulate(None, None, seed=HEALTHY_SEED).series
 
 
+@app.exception_handler(RequestValidationError)
+def bad_input(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """422 with one sentence the console can show, instead of FastAPI's list of error objects."""
+    problems = "; ".join(f"{e['loc'][-1]}: {e['msg']}" for e in exc.errors())
+    return JSONResponse({"detail": f"Bad input. {problems}"}, status_code=422)
+
+
 @app.get("/")
 def story() -> FileResponse:
     """The story page: what Sherlog does, told with a recorded outage and the benchmark."""
@@ -133,6 +176,28 @@ def story() -> FileResponse:
 @app.get("/console")
 def console() -> FileResponse:
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/status")
+def status() -> FileResponse:
+    return FileResponse(STATIC / "status.html")
+
+
+@app.get("/api/health")
+def health() -> dict:
+    """What the status page shows. Local and fast: no API calls, no secrets."""
+    recorded = len(_replays())
+    return {
+        "ok": recorded > 0,
+        "live": _live_enabled(),
+        "models": [*investigate.MODELS, investigate.AUTO],
+        "recorded_outages": recorded,
+        "live_runs_today": _live_runs_today(),
+        "live_runs_per_day": LIVE_RUNS_PER_DAY,
+        "live_runs_per_visitor_per_hour": LIVE_RUNS_PER_IP_PER_HOUR,
+        "server_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "version": os.environ.get("VERCEL_GIT_COMMIT_SHA", "")[:SHORT_SHA] or GIT_VERSION,
+    }
 
 
 @app.get("/api/meta")
@@ -161,8 +226,10 @@ def break_service(body: BreakRequest, request: Request) -> StreamingResponse:
     if refusal:
         raise HTTPException(429, refusal)
     incident = sim.simulate(body.service, body.fault, seed=random.randrange(1_000_000), hard=body.hard)
+    client = anthropic.Anthropic(timeout=LIVE_CALL_TIMEOUT_SECONDS, max_retries=LIVE_CALL_RETRIES)
+    events = investigate.incident_events(incident, client=client, model=investigate.MODELS.get(body.model, investigate.AUTO))
     return StreamingResponse(
-        _sse(_enrich(investigate.incident_events(incident, model=investigate.MODELS.get(body.model, investigate.AUTO)), incident)),
+        _sse(_enrich(events, incident)),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
