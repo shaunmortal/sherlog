@@ -12,3 +12,6 @@ tests
 .github
 requirements-dev.txt
 SUBMISSION.md
+.claude
+docs
+scripts
