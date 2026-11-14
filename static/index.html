@@ -449,6 +449,7 @@ let hover = null;                  // mouse position over the telemetry, for the
 let seenPills = new Set();         // map tags already shown, so a redraw doesn't pop them again
 let still = false;                 // the viewer paused the motion
 let playing = false;               // a playback is running (shown as LIVE unless paused)
+let busyFocus = null;              // the button that had keyboard focus when a run disabled it
 // the flight log and verdict as the page first shows them, for when the console holds no outage again
 const BLANK = { log: $('#log').firstElementChild.cloneNode(true), verdict: $('#verdict').firstElementChild.cloneNode(true) };
 
@@ -1052,10 +1053,16 @@ function end(message = 'Done. Break something else?', tone = 'ok') {
 }
 
 function setBusy(busy) {
+  const focused = document.activeElement;
   $('#go').disabled = busy || !META.live;
   $('#investigateBtn').disabled = busy || !META.live;
   $('#randomReplay').disabled = busy || !replayIds.length;
   for (const b of [...$('#replayGrid').children, $('#triageBtn'), $('#sampleUse')]) b.disabled = busy;  // each would redraw the charts
+  // disabling the focused button drops keyboard focus to the page; once the buttons work again it goes back,
+  // unless the viewer has moved on, and without scrolling, since they may be reading the verdict by then
+  if (busy && focused?.disabled) busyFocus = focused;
+  if (!busy && busyFocus && document.activeElement === document.body) busyFocus.focus({ preventScroll: true });
+  if (!busy) busyFocus = null;
 }
 
 async function readStream(res) {
