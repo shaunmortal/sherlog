@@ -67,7 +67,7 @@
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .grid.four { grid-template-columns: repeat(6, 1fr); gap: 4px; max-height: 420px; overflow-y: auto; padding: 4px; }  /* room for the focus ring */
   .cell { border: 0; border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow); text-align: left; padding: 10px 14px; font: 14px var(--mono); min-width: 0; overflow-wrap: anywhere;
-    transition: background-color .4s ease, color .4s ease, transform .4s var(--ease-lusion); }
+    transition: background-color .4s ease, color .4s ease, transform .4s var(--ease-glide); }
   .grid.four .cell { text-align: center; padding: 8px 4px; font-size: 13px; border-radius: 10px; }
   .cell:hover:not(:disabled, [aria-pressed="true"], [aria-checked="true"]) { background: var(--sunk); }  /* a chosen cell keeps its ink when hovered */
   .cell:is([aria-pressed="true"], [aria-checked="true"]) { background: var(--ink); color: var(--on-ink); }
@@ -124,7 +124,7 @@
   .mtabs button:hover { color: var(--text); }
   .mtabs button[aria-pressed="true"] { color: var(--on-ink); }
   @media (max-width: 440px) { .mtabs button { padding: 6px 10px; } }
-  .mtabs .ink { top: 4px; height: calc(100% - 8px); border-radius: var(--pill); background: var(--ink); transition-duration: .45s; transition-timing-function: var(--ease-lusion); }
+  .mtabs .ink { top: 4px; height: calc(100% - 8px); border-radius: var(--pill); background: var(--ink); transition-duration: .45s; transition-timing-function: var(--ease-glide); }
   .tele { border-top: 1px solid var(--line); }
   .tele-row, .axis { display: grid; grid-template-columns: 168px minmax(0, 1fr) 80px; }
   .tele-row { height: 52px; border-bottom: 1px solid var(--line); cursor: pointer; }

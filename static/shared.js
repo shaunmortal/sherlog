@@ -101,7 +101,7 @@ function splitWords(heading) {
 /** Slide masked words or lines up into view, one after another. */
 function maskIn(nodes, { delay = 0, stagger = 45, duration = 1100 } = {}) {
   if (!MOTION) return;
-  const curve = ease('lusion');
+  const curve = ease('glide');
   [...nodes].forEach((node, i) => node.animate([{ transform: 'translateY(110%)' }, { transform: 'none' }],
     { duration, delay: delay + i * stagger, easing: curve, fill: 'backwards' }));
 }

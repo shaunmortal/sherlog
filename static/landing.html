@@ -39,17 +39,17 @@
   .pbtn:hover::before { transform: none; }
   .pbtn:hover { color: #fff; }
   .pbtn:active { transform: scale(.98); }
-  .pbtn .dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; transition: transform .4s var(--ease-lusion); }
+  .pbtn .dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; transition: transform .4s var(--ease-glide); }
   .pbtn:hover .dot { transform: scale(1.8); }
   .pbtn.light { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
   .pbtn.dark { background: #2b2e3a; color: #fff; }
   .pbtn.sm { height: 44px; padding: 0 20px; font-size: 13px; }
   .roll { position: relative; display: inline-block; overflow: hidden; vertical-align: top; }
-  .roll > span { display: block; transition: transform .5s var(--ease-lusion); }
+  .roll > span { display: block; transition: transform .5s var(--ease-glide); }
   /* the rolling copy is visual only: the empty alt text ("") keeps screen readers from saying the label twice */
-  .roll::after { content: attr(data-text); content: attr(data-text) / ""; position: absolute; left: 0; top: 100%; white-space: nowrap; transition: transform .5s var(--ease-lusion); }
+  .roll::after { content: attr(data-text); content: attr(data-text) / ""; position: absolute; left: 0; top: 100%; white-space: nowrap; transition: transform .5s var(--ease-glide); }
   .pbtn:hover .roll > span, .pbtn:hover .roll::after { transform: translateY(-100%); }
-  .round { width: 46px; height: 46px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--sunk); color: var(--text); font-size: 17px; transition: background-color .4s ease, transform .4s var(--ease-lusion); }
+  .round { width: 46px; height: 46px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--sunk); color: var(--text); font-size: 17px; transition: background-color .4s ease, transform .4s var(--ease-glide); }
   .round:hover { background: var(--card); transform: rotate(180deg); }
   @media (max-width: 760px) { .hide-sm { display: none; } }
   /* with reduced motion the hero stands still and the scroll bar would sit full width, so both hints go */
@@ -57,7 +57,7 @@
   .ctas { display: flex; flex-wrap: wrap; gap: 12px; }
 
   /* ---- header ---- */
-  .nav { position: fixed; z-index: 20; top: 0; left: 0; right: 0; padding: 20px 0; transition: padding .5s var(--ease-lusion), background-color .5s ease; }
+  .nav { position: fixed; z-index: 20; top: 0; left: 0; right: 0; padding: 20px 0; transition: padding .5s var(--ease-glide), background-color .5s ease; }
   .nav.scrolled { padding: 10px 0; background: var(--nav-bg); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); }
   .nav .wrap { display: flex; align-items: center; gap: 12px; }
   .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; padding: 10px 0; font: 500 24px/1 var(--sans); letter-spacing: .08em; }
@@ -131,12 +131,12 @@
   @media (max-width: 960px) { .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 620px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
   .card { position: relative; display: grid; gap: 10px; padding: 18px 18px 14px; border: 0; border-radius: var(--radius); background: var(--card); color: var(--text); box-shadow: var(--shadow);
-    text-align: left; font: inherit; cursor: default; transition: background-color .5s var(--ease-lusion), color .5s ease, transform .5s var(--ease-lusion), opacity .5s ease; }
+    text-align: left; font: inherit; cursor: default; transition: background-color .5s var(--ease-glide), color .5s ease, transform .5s var(--ease-glide), opacity .5s ease; }
   .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .card-head b { font: 500 16px var(--sans); letter-spacing: -.01em; }
   .card svg { width: 100%; height: auto; overflow: visible; }
   .spark { fill: none; stroke: var(--trace); stroke-width: 1.4; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; transition: stroke .5s ease; }
-  .cards.drawn .spark { animation: draw 1.4s var(--ease-lusion) backwards; animation-delay: calc(var(--i) * 45ms); }
+  .cards.drawn .spark { animation: draw 1.4s var(--ease-glide) backwards; animation-delay: calc(var(--i) * 45ms); }
   @keyframes draw { from { stroke-dashoffset: 1; } }
   .card-val { font: 13px var(--mono); color: var(--muted); text-align: right; transition: color .5s ease; }
   .card.lit { background: var(--signal); color: #000; animation: shake .5s var(--ease-quad); }  /* black on the signal red: 6:1, white is only 3:1 */
@@ -165,7 +165,7 @@
   .step { min-height: 72vh; display: flex; flex-direction: column; justify-content: center; }
   .step .num { align-self: flex-start; padding: 4px 12px; border-radius: var(--pill); background: var(--sunk); font: 500 12px var(--sans); letter-spacing: .06em; }
   /* the step being shown stands out because the others' titles go grey, not because they fade below readable contrast */
-  .step h3 { margin: 18px 0 14px; font: 400 clamp(30px, 2.8vw, 44px)/1.05 var(--sans); letter-spacing: -.035em; color: var(--muted); transition: color .6s var(--ease-lusion); }
+  .step h3 { margin: 18px 0 14px; font: 400 clamp(30px, 2.8vw, 44px)/1.05 var(--sans); letter-spacing: -.035em; color: var(--muted); transition: color .6s var(--ease-glide); }
   .step.on h3 { color: var(--text); }
   .step p { margin: 0; max-width: 40ch; font-size: 18px; line-height: 1.55; color: var(--muted); }
   .stage { position: sticky; top: 96px; align-self: start; height: min(560px, calc(100vh - 130px)); margin-top: 14vh; overflow: hidden; border-radius: var(--radius); background: var(--panel); color: var(--on-panel);
@@ -174,7 +174,7 @@
   .stage-bar { display: flex; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--line); font: 500 12px var(--sans); letter-spacing: .06em; color: var(--muted); }
   .stage-bar b { color: var(--text); font-weight: 500; }
   .layer { position: absolute; inset: 47px 0 0; padding: 24px; overflow: hidden; opacity: 0; transform: translateY(16px) scale(.985); filter: blur(6px); pointer-events: none;
-    transition: opacity .6s var(--ease-lusion), transform .7s var(--ease-lusion), filter .6s var(--ease-lusion); }
+    transition: opacity .6s var(--ease-glide), transform .7s var(--ease-glide), filter .6s var(--ease-glide); }
   .layer.on { opacity: 1; transform: none; filter: none; pointer-events: auto; }
   @media (max-width: 900px) {
     .story { grid-template-columns: minmax(0, 1fr); gap: 0; }
@@ -189,9 +189,9 @@
   .chart .alarm-line { stroke: var(--signal); }
   .chart text { font: 11px var(--mono); fill: var(--axis); }
   .chart .alarm-label { font-weight: 600; fill: var(--signal); }
-  .layer.play .trace { animation: draw 1.6s var(--ease-lusion) backwards; }
+  .layer.play .trace { animation: draw 1.6s var(--ease-glide) backwards; }
   .layer.play .limit, .layer.play .limit-label { animation: fade .5s ease 1s backwards; }
-  .layer.play .wash { transform-box: fill-box; transform-origin: left; animation: grow-x .9s var(--ease-lusion) 1.3s backwards; }
+  .layer.play .wash { transform-box: fill-box; transform-origin: left; animation: grow-x .9s var(--ease-glide) 1.3s backwards; }
   .layer.play .alarm-line, .layer.play .alarm-label { animation: fade .3s ease 1.3s backwards; }
   .zbig { margin: 20px 0 0; font: 400 56px/1 var(--sans); letter-spacing: -.04em; }
   .zbig small { display: block; margin-top: 8px; font: 13px var(--mono); color: var(--muted); letter-spacing: 0; }
@@ -203,7 +203,7 @@
   .tlog li small { display: block; color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .tlog li.think { border-color: transparent; font: italic 14px/1.5 var(--sans); color: var(--muted); }
   .cid { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; background: var(--ink); color: var(--on-ink); font: 600 11px var(--mono); }
-  .layer.play .tlog li { animation: rise .5s var(--ease-lusion) backwards; animation-delay: var(--d); }
+  .layer.play .tlog li { animation: rise .5s var(--ease-glide) backwards; animation-delay: var(--d); }
   @keyframes rise { from { opacity: 0; transform: translateY(10px); filter: blur(4px); } }
   /* layer 2: the checks */
   .checks { list-style: none; margin: 0 0 16px; padding: 0; border-top: 1px solid var(--line); }
@@ -219,7 +219,7 @@
   .layer.play .chip { animation: chip .3s ease backwards; animation-delay: var(--d); }
   @keyframes chip { from { background: transparent; color: var(--muted); border-color: var(--line-strong); transform: scale(.8); } }
   .layer.play .badge { animation: pop .6s var(--spring) backwards; animation-delay: var(--d); }
-  .layer.play .conf span { animation: grow-x .9s var(--ease-lusion) backwards; animation-delay: var(--d); }
+  .layer.play .conf span { animation: grow-x .9s var(--ease-glide) backwards; animation-delay: var(--d); }
   .blast-line { margin: 0 0 8px; font: 13px/1.5 var(--mono); color: var(--ok); }
   .blast-map { display: block; width: 100%; max-height: 200px; }
   .blast-map .node:not(.bad) { opacity: .25; }
@@ -232,8 +232,8 @@
   .note-card { margin-bottom: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; font-size: 14px; line-height: 1.55; }
   .note-card h4 { margin: 0 0 6px; font: 500 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   .note-card p { margin: 0; }
-  .layer.play .banner { animation: rise .6s var(--ease-lusion) backwards; }
-  .layer.play .note-card { animation: rise .6s var(--ease-lusion) backwards; animation-delay: var(--d); }
+  .layer.play .banner { animation: rise .6s var(--ease-glide) backwards; }
+  .layer.play .note-card { animation: rise .6s var(--ease-glide) backwards; animation-delay: var(--d); }
   .layer.play .wd { animation: fade .25s ease backwards; animation-delay: var(--d); }
 
   /* ---- 03 / 04: the numbers ---- */
@@ -251,7 +251,7 @@
   .bar-fill.muted { background: var(--line-strong); }
   .bar-fill.accent { background: var(--accent); }
   .bar-val { font: 400 26px var(--sans); letter-spacing: -.03em; text-align: right; font-variant-numeric: tabular-nums; }
-  .bars.play .bar-fill { animation: grow-x 1.2s var(--ease-lusion) backwards; animation-delay: var(--d); }
+  .bars.play .bar-fill { animation: grow-x 1.2s var(--ease-glide) backwards; animation-delay: var(--d); }
   .flag { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: var(--pill); vertical-align: 3px; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; background: var(--ok-soft); color: var(--ok); }
   .flag.bad { background: var(--bad-soft); color: var(--bad); }
   @media (max-width: 620px) { .bar-row { grid-template-columns: minmax(0, 1fr) 64px; } .bar-track { grid-column: 1 / -1; grid-row: 2; } }
@@ -449,7 +449,7 @@ function byType(events) {
 
 function heroIn() {
   enter([$('#heroIntro')], { ...REVEAL, delay: 100 });
-  enter([$('.hero-panel')], { duration: 1400, delay: 250, easing: 'lusion', y: 40, scale: .97, blur: 0 });
+  enter([$('.hero-panel')], { duration: 1400, delay: 250, easing: 'glide', y: 40, scale: .97, blur: 0 });
   enter([$('.crosses')], { duration: 900, delay: 900, y: 0 });
 }
 
@@ -525,7 +525,7 @@ async function heroLoop() {
   const broken = verdict.blast.abnormal;
   const victims = spreadOrder(truth.root).filter((s) => s !== truth.root && broken.includes(s));
   const caption = $('#heroCaption');
-  const say = (text) => { caption.textContent = text; enter([caption], { duration: 500, y: 6, blur: 4, easing: 'lusion' }); };
+  const say = (text) => { caption.textContent = text; enter([caption], { duration: 500, y: 6, blur: 4, easing: 'glide' }); };
   const answered = () => {
     shop.tag(truth.root, [['ai', 'AI', 22], ['verified', 'VERIFIED', 64]]);
     say(`${verdict.answer}: verified, and it explains all ${broken.length} broken services.`);
@@ -571,7 +571,7 @@ function buildCards() {
   });
   $('#cards').replaceChildren(...cards);
   $('#revealBtn').addEventListener('click', solve);
-  revealOnScroll([$('#cards')], () => { enter(cards, { duration: 900, stagger: 40, easing: 'lusion', y: 24 }); cascade(cards); }, { none: true });
+  revealOnScroll([$('#cards')], () => { enter(cards, { duration: 900, stagger: 40, easing: 'glide', y: 24 }); cascade(cards); }, { none: true });
 }
 
 /** What a screen reader hears for a card: the service, its latency, and what the colours and tags show. */
@@ -589,7 +589,7 @@ async function cascade(cards) {
   $('#cards').classList.add('ready');
   $('#revealBtn').hidden = false;
   $('#answerText').textContent = `${lit.length} of ${cards.length} look broken. Pick the one you think broke first.`;
-  enter([$('.answer')], { duration: 600, y: 8, easing: 'lusion' });
+  enter([$('.answer')], { duration: 600, y: 8, easing: 'glide' });
 }
 
 function guess(service) {
@@ -621,7 +621,7 @@ function solve() {
   const ranking = truth.baseline_top1 ? `The no-AI ranking got it too.` : `A classic no-AI ranking blamed ${truth.baseline[0]}, the loudest victim.`;
   $('#answerText').replaceChildren(`${you}The cause was ${truth.root}. ${ranking} Sherlog's agent named ${truth.ai_answer ?? 'no one'} and proved it. `,
     el('a', { href: '#how' }, 'Here is how ', el('span', { 'aria-hidden': 'true' }, '↓')));
-  enter([$('#answerText')], { duration: 600, y: 8, blur: 4, easing: 'lusion' });
+  enter([$('#answerText')], { duration: 600, y: 8, blur: 4, easing: 'glide' });
 }
 
 // ---- 02: the pinned stage ------------------------------------------------------------------
@@ -732,7 +732,7 @@ function barRows(container, rows) {
     el('span', { class: 'bar-val', 'data-v': value ?? '' }, pct(value)))));
   revealOnScroll([container], () => {
     container.classList.add('play');
-    enter(container.children, { duration: 900, stagger: 60, easing: 'lusion', y: 18 });
+    enter(container.children, { duration: 900, stagger: 60, easing: 'glide', y: 18 });
     for (const v of container.querySelectorAll('.bar-val')) countUp(v, v.dataset.v === '' ? null : Number(v.dataset.v), pct, 1300);
   }, { none: true });
 }
@@ -750,7 +750,7 @@ function buildResults() {
   const boxes = stats.map(([value, format, text]) => el('div', {}, el('b', {}, format(value)), el('span', {}, text)));  // real values before any count-up
   $('#bigstats').replaceChildren(...boxes);
   revealOnScroll([$('#bigstats')], () => {
-    enter(boxes, { duration: 1000, stagger: 80, easing: 'lusion', y: 30 });
+    enter(boxes, { duration: 1000, stagger: 80, easing: 'glide', y: 30 });
     boxes.forEach((box, i) => countUp(box.firstChild, stats[i][0], stats[i][1]));
   }, { none: true });
   const rows = [
@@ -793,8 +793,8 @@ function revealHeadings() {
   const titles = [...document.querySelectorAll('.band h2, .cta h2')];
   const words = new Map(titles.map((h) => [h, splitWords(h)]));
   revealOnScroll(titles, (h) => maskIn(words.get(h)), { none: true });
-  revealOnScroll(document.querySelectorAll('.eyebrow, .head2 .sub, .step, .note, .cta p, .cta .ctas, .marquee'), null, { easing: 'lusion', blur: 6 });
-  revealOnScroll([$('.statement .split')], null, { easing: 'lusion', y: 30 });
+  revealOnScroll(document.querySelectorAll('.eyebrow, .head2 .sub, .step, .note, .cta p, .cta .ctas, .marquee'), null, { easing: 'glide', blur: 6 });
+  revealOnScroll([$('.statement .split')], null, { easing: 'glide', y: 30 });
   revealOnScroll([$('#heroTitle')], () => maskIn($('#heroTitle').querySelectorAll('.line > span'), { stagger: 120, duration: 1300 }), { none: true });
 }
 

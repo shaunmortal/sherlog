@@ -13,7 +13,7 @@
   --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
   /* motion: one set of curves and durations for every page (JS reads the curves too) */
   --ease-quad: cubic-bezier(.25, .46, .45, .94);   /* small hovers */
-  --ease-lusion: cubic-bezier(.4, 0, .1, 1);       /* most movement: fast out, long settle */
+  --ease-glide: cubic-bezier(.4, 0, .1, 1);       /* most movement: fast out, long settle */
   --ease-snap: cubic-bezier(.35, 0, 0, 1);         /* fills and wipes */
   --ease-expo: cubic-bezier(.16, 1, .3, 1);        /* things arriving */
   --ease-quint: cubic-bezier(.22, 1, .36, 1);      /* reveals */
