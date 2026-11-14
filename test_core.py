@@ -18,6 +18,8 @@ def test_simulate_rejects_unknown_service_or_half_a_fault():
         sim.simulate("nope", "latency", seed=1)
     with pytest.raises(ValueError):
         sim.simulate("payment", None, seed=1)
+    with pytest.raises(ValueError):
+        sim.simulate("payment", "latency", seed=1, rolled_back="nope")
 
 
 def test_healthy_shop_raises_no_alarm():
@@ -153,7 +155,11 @@ def test_replay_carries_the_ticks_after_the_cutoff_for_the_live_charts():
     if not bench.load():
         pytest.skip("no recorded outages")
     record = bench.load()[0]
-    telemetry = client.get("/api/replays/1").json()[0]
+    events = client.get("/api/replays/1").json()
+    telemetry = events[0]
+    verdict = next(e for e in events if e["type"] == "verdict")
+    # the console also gets the rollback what-if of the recorded answer
+    assert verdict["rollback"]["service"] == verdict["answer"] == record["root"] and verdict["rollback"]["proves"]
     full = sim.simulate(record["root"], record["fault"], record["seed"]).series["cart"]["cpu_pct"]
     # the agent's view plus the rest is exactly the whole simulated window
     assert telemetry["series"]["cart"]["cpu_pct"] + telemetry["rest"]["cart"]["cpu_pct"] == list(full)
@@ -217,6 +223,53 @@ def test_hard_mode_decoy_is_harmless_and_unrelated_to_the_real_fault():
     # normal mode is unchanged by the hard-mode code path: no decoy, same telemetry as always
     assert sim.simulate("cart", "latency", 5).decoy is None
     assert sim.simulate("cart", "latency", 5).series == sim.simulate("cart", "latency", 5).series
+
+
+def _changed(a: sim.Incident, b: sim.Incident) -> set[tuple[str, str]]:
+    return {(s, m) for s in sim.SERVICES for m in sim.METRICS if a.series[s][m] != b.series[s][m]}
+
+
+def test_a_rollback_replays_the_same_noise():
+    # nothing else was broken, so rolling back the root of these faults replays the healthy shop draw for draw
+    for fault in ("latency", "cpu", "memory"):
+        assert sim.simulate("cart", fault, 5, rolled_back="cart").series == sim.simulate(None, None, 5).series
+    # an error fault changes how many failed requests are drawn, but every other reading keeps its noise
+    broken = sim.simulate("payment", "errors", 5)
+    fixed = sim.simulate("payment", "errors", 5, rolled_back="payment")
+    assert _changed(broken, fixed) == {(s, "error_rate") for s in inv.upstream("payment")}
+    # a victim has nothing of its own to roll back; the decoy loses only its own anomaly
+    assert sim.simulate("payment", "errors", 5, rolled_back="checkout").series == broken.series
+    hard = sim.simulate("payment", "errors", 5, hard=True)
+    calm = sim.simulate("payment", "errors", 5, hard=True, rolled_back=hard.decoy)
+    [(service, metric)] = _changed(hard, calm)
+    assert service == hard.decoy and metric in ("cpu_pct", "memory_mb") and calm.decoy is None
+
+
+@pytest.mark.parametrize("service", sim.SERVICES)
+@pytest.mark.parametrize("fault", sim.FAULTS)
+def test_rolling_back_the_cause_ends_the_outage_and_a_victim_or_decoy_does_not(service, fault):
+    for seed in (1, 2, 3):
+        assert sim.simulate(service, fault, seed, rolled_back=service).alarm is None
+        inc = sim.simulate(service, fault, seed)
+        assert not any(inv.rollback_check(inc, victim)["proves"] for victim in sim.CALLERS[service])
+        # hard mode: the decoy's harmless anomaly keeps the alarm on, but nothing is slow or failing any more;
+        # only a leak that never slowed anyone (checkout, seed 3) looks as harmless as the decoy, so it can't prove
+        hard = sim.simulate(service, fault, seed, hard=True)
+        slowed_someone = hard.alarm_on(inv.PROPAGATING) is not None
+        assert inv.rollback_check(hard, service)["proves"] == slowed_someone
+        assert slowed_someone or (service, fault, seed) == ("checkout", "memory", 3)
+        decoy = inv.rollback_check(hard, hard.decoy)
+        assert decoy["alarm_after"] and not decoy["proves"]
+
+
+def test_rollback_check_reports_what_the_rollback_cleared():
+    inc = sim.simulate("cache", "latency", 1041)
+    root, victim = inv.rollback_check(inc, "cache"), inv.rollback_check(inc, "cart")
+    assert set(root) == {"service", "alarm_after", "still_abnormal", "cleared", "proves"}
+    assert root["proves"] and not root["alarm_after"] and root["still_abnormal"] == []
+    assert root["cleared"] == inv.blast_radius(inc, "cache")["abnormal"]
+    assert not victim["proves"] and victim["alarm_after"] and victim["cleared"] == []
+    assert victim["still_abnormal"] == inv.blast_radius(inc, "cart")["abnormal"]
 
 
 def test_hard_mode_callers_complain_less():

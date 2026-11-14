@@ -125,9 +125,13 @@ class Incident:
     @cached_property
     def alarm(self) -> int | None:
         """First tick where any metric stayed ALARM_Z above normal for ALARM_SUSTAIN_TICKS ticks."""
+        return self.alarm_on(METRICS)
+
+    def alarm_on(self, metrics: tuple[str, ...]) -> int | None:
+        """The alarm, watching only these metrics."""
         for t in range(BASELINE_TICKS, WINDOW_TICKS):
             recent = range(t - ALARM_SUSTAIN_TICKS + 1, t + 1)
-            if any(all(self.z(s, m, k) >= ALARM_Z for k in recent) for s in SERVICES for m in METRICS):
+            if any(all(self.z(s, m, k) >= ALARM_Z for k in recent) for s in SERVICES for m in metrics):
                 return t
         return None
 
@@ -170,29 +174,50 @@ def robust_ranking(inc: Incident) -> list[str]:
     return sorted(SERVICES, key=score, reverse=True)
 
 
-def simulate(root: str | None, fault: str | None, seed: int, hard: bool = False) -> Incident:
+def simulate(root: str | None, fault: str | None, seed: int, hard: bool = False,
+             rolled_back: str | None = None) -> Incident:
     """Simulate 10 minutes of the shop; with a root and fault, break that service at a random onset.
 
     Hard mode adds what makes real outages confusing: a decoy (an unrelated service with a harmless anomaly
-    that starts at the same time, like a batch job) and callers that log far fewer complaints."""
+    that starts at the same time, like a batch job) and callers that log far fewer complaints.
+
+    `rolled_back` replays the same outage, with the same noise, as if that service had been rolled back: the
+    root loses its fault, the decoy its anomaly, and any other service had nothing of its own to remove."""
     if (root is None) != (fault is None):
         raise ValueError("give both root and fault, or neither")
     if root is not None and (root not in CALLS or fault not in FAULTS):
         raise ValueError(f"unknown service or fault: {root!r}, {fault!r}")
+    if rolled_back is not None and rolled_back not in CALLS:
+        raise ValueError(f"unknown service to roll back: {rolled_back!r}")
     rng = random.Random(seed)
     onset = rng.randint(*ONSET_RANGE)
     noise = {s: _noise(rng, s) for s in SERVICES}
-    truth = tuple(_true_state(root, fault, t - onset) for t in range(WINDOW_TICKS))
     decoy = _decoy(rng, root, onset) if hard and root is not None else None
-    if decoy:
-        truth = tuple(_with_decoy(state, decoy, t) for t, state in enumerate(truth))
+    truth = _truth(root, fault, onset, decoy)
+    if rolled_back is None:
+        seen = truth
+    else:
+        root, fault = (None, None) if rolled_back == root else (root, fault)
+        decoy = None if decoy and decoy.service == rolled_back else decoy
+        seen = _truth(root, fault, onset, decoy)
     series = {
-        s: {m: _observe(rng, [truth[t][s][m] for t in range(WINDOW_TICKS)], m, noise[s][m], TRAFFIC[s]) for m in METRICS}
+        s: {m: _observe_as(rng, [x[s][m] for x in truth], [x[s][m] for x in seen], m, noise[s][m], TRAFFIC[s])
+            for m in METRICS}
         for s in SERVICES
     }
     complain = HARD_COMPLAIN_SHARE if hard else 1.0
-    logs = _logs(rng, root, fault, onset, truth, complain, decoy)
+    # ponytail: a rollback re-measures the metrics only (logs come last, so skipping them moves no draw);
+    # re-simulate the logs too if a rolled-back outage is ever shown to the agent
+    logs = () if rolled_back else _logs(rng, root, fault, onset, truth, complain, decoy)
     return Incident(root, fault, seed, onset, series, logs, decoy.service if decoy else None)
+
+
+def _truth(root: str | None, fault: str | None, onset: int, decoy: Decoy | None) -> tuple[dict, ...]:
+    """Noise-free metrics of every service at every tick."""
+    truth = tuple(_true_state(root, fault, t - onset) for t in range(WINDOW_TICKS))
+    if decoy:
+        truth = tuple(_with_decoy(state, decoy, t) for t, state in enumerate(truth))
+    return truth
 
 
 @dataclass(frozen=True)
@@ -310,6 +335,18 @@ def _observe(rng: random.Random, truth: list[float], metric: str, tex: Texture, 
     else:
         raw = [v + n for v, n in zip(truth, _noise_track(rng, len(truth), tex))]
     return tuple(round(max(lo, v) if hi is None else min(hi, max(lo, v)), DECIMALS[metric]) for v in raw)
+
+
+def _observe_as(rng: random.Random, truth: list[float], seen: list[float], metric: str, tex: Texture,
+                traffic: int) -> tuple[float, ...]:
+    """Record `seen` with the noise `truth` would have had. The stream then moves on exactly as it does for
+    `truth` (an error count draws more or fewer numbers depending on its rate), so no other metric changes."""
+    if seen == truth:
+        return _observe(rng, truth, metric, tex, traffic)
+    replay = random.Random()
+    replay.setstate(rng.getstate())
+    _observe(rng, truth, metric, tex, traffic)
+    return _observe(replay, seen, metric, tex, traffic)
 
 
 def _noise_track(rng: random.Random, n: int, tex: Texture) -> list[float]:

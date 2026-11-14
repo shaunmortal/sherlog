@@ -465,11 +465,18 @@ def upstream(service: str) -> set[str]:
 PROPAGATING = ("latency_ms", "error_rate")  # only slowness and failures travel up to callers
 
 
-def _sustained(inc: sim.Incident, service: str, metrics: tuple[str, ...] = sim.METRICS) -> bool:
-    """Abnormal for most of the window the agent saw, not just one spike: like the alarm, which needs 15 s."""
+def _window(inc: sim.Incident) -> range:
+    """The ticks the agent saw abnormal: from the alarm to now."""
     start = inc.alarm if inc.alarm is not None else inc.now - sim.LOOKAHEAD_TICKS
-    return any(sum(inc.z(service, m, t) >= EVIDENCE_Z for t in range(start, inc.now + 1)) >= sim.ALARM_SUSTAIN_TICKS
-               for m in metrics)
+    return range(start, inc.now + 1)
+
+
+def _sustained(inc: sim.Incident, service: str, metrics: tuple[str, ...] = sim.METRICS,
+               ticks: range | None = None) -> bool:
+    """Abnormal for most of the window the agent saw (or of `ticks`), not just one spike: like the alarm,
+    which needs 15 s."""
+    ticks = _window(inc) if ticks is None else ticks
+    return any(sum(inc.z(service, m, t) >= EVIDENCE_Z for t in ticks) >= sim.ALARM_SUSTAIN_TICKS for m in metrics)
 
 
 def _explains(inc: sim.Incident, service: str, abnormal: list[str]) -> list[str]:
@@ -491,6 +498,26 @@ def blast_radius(inc: sim.Incident, service: str) -> dict:
         "unexplained": [s for s in abnormal if s not in explained],
         # another service that accounts for strictly more of the outage: the answer may be a decoy
         "better": best if len(_explains(inc, best, abnormal)) > len(explained) else None,
+    }
+
+
+def rollback_check(inc: sim.Incident, service: str) -> dict:
+    """Proof by intervention: replay the same outage, same noise, with the answer rolled back. Rolling back the
+    cause ends the outage; a victim has nothing of its own to roll back, and a decoy loses only its harmless
+    anomaly, so the alarm stays. A check that only looks can be fooled by a decoy; this one cannot. The shop is
+    simulated, so the replay is free; in production the equivalent is a canary rollback or a kill switch."""
+    after = sim.simulate(inc.root, inc.fault, inc.seed, hard=inc.decoy is not None, rolled_back=service)
+    ranked, ticks = sim.zscore_ranking(inc), _window(inc)
+    still = [s for s in ranked if _sustained(after, s, ticks=ticks)]
+    alarm_after = after.alarm is not None
+    # a CPU or memory anomaly elsewhere (hard mode's decoy) can keep the alarm on while it slows no one down
+    harm_ended = inc.alarm_on(PROPAGATING) is not None and after.alarm_on(PROPAGATING) is None
+    return {
+        "service": service,
+        "alarm_after": alarm_after,
+        "still_abnormal": still,
+        "cleared": [s for s in ranked if _sustained(inc, s) and s not in still],
+        "proves": not alarm_after or harm_ended,
     }
 
 
