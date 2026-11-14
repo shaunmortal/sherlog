@@ -1,0 +1,3 @@
+# for running the tests only; the deploy installs requirements.txt alone
+pytest
+httpx
