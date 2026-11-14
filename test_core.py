@@ -1,6 +1,7 @@
 """Core checks: simulator, alarm, tools, verifier and the agent loop (with a fake model)."""
 from types import SimpleNamespace as NS
 
+import anthropic
 import pytest
 
 import investigate as inv
@@ -138,6 +139,12 @@ def test_unexpected_error_still_ends_with_an_escalated_verdict():
     events = list(inv.investigate(sim.simulate("payment", "errors", seed=3), client=Broken()))
     assert [e["type"] for e in events][-2:] == ["error", "verdict"]
     assert events[-1]["answer"] is None and "unexpected" in events[-1]["escalation"]
+
+
+def test_a_timeout_says_the_api_was_slow_not_unreachable():
+    # the SDK's timeout is a subclass of its connection error, so the order of the checks matters
+    assert inv._api_error_message(anthropic.APITimeoutError(request=None)) == "The Claude API took too long to answer."
+    assert inv._api_error_message(anthropic.APIConnectionError(request=None)) == "Could not reach the Claude API."
 
 
 def test_replay_carries_the_ticks_after_the_cutoff_for_the_live_charts():

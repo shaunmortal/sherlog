@@ -358,6 +358,9 @@ def _api_error_message(exc: Exception) -> str:
         return "The Claude API key is not allowed to use this model."
     if isinstance(exc, anthropic.RateLimitError):
         return "Claude API rate limit reached; try again in a minute."
+    # before the connection check: the SDK makes a timeout a kind of connection error, which would hide it
+    if isinstance(exc, anthropic.APITimeoutError):
+        return "The Claude API took too long to answer."
     if isinstance(exc, anthropic.APIConnectionError):
         return "Could not reach the Claude API."
     if isinstance(exc, anthropic.APIStatusError):
