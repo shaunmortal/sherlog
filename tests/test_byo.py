@@ -142,7 +142,7 @@ def test_investigate_refuses_bad_or_quiet_telemetry_without_spending_a_run(live)
 
 def test_investigate_streams_the_agent_on_uploaded_telemetry_with_no_truth_reveal(live, monkeypatch):
     fake = FakeClient([_submit(byo.SAMPLE[0], 0.9, ["c0"])])
-    monkeypatch.setattr(inv.anthropic, "Anthropic", lambda: fake)
+    monkeypatch.setattr(inv.anthropic, "Anthropic", lambda **_: fake)
     res = _investigate(byo.sample())
     events = [json.loads(chunk.removeprefix("data: ")) for chunk in res.text.split("\n\n") if chunk]
     kinds = [e["type"] for e in events]
@@ -150,6 +150,7 @@ def test_investigate_streams_the_agent_on_uploaded_telemetry_with_no_truth_revea
     assert res.status_code == 200 and kinds[0] == "telemetry" and "truth" not in kinds
     assert verdict["type"] == "verdict" and verdict["answer"] == "cache"
     assert verdict["blast"]["unexplained"] == [] and app._runs_today["count"] == 1
+    assert "rollback" not in verdict  # no seed to replay real telemetry from, so no made-up proof
 
 
 # --- the Prometheus converter ----------------------------------------------------------------

@@ -139,10 +139,15 @@ def _enrich(events: Iterator[dict], inc: sim.Incident) -> Iterator[dict]:
         if event["type"] == "telemetry":
             yield {**event, "rest": rest}
         elif event["type"] == "verdict" and event.get("answer"):
-            yield {**event, "blast": investigate.blast_radius(inc, event["answer"]),
-                   "rollback": investigate.rollback_check(inc, event["answer"])}
+            # only a simulated outage can be replayed with the answer rolled back; uploaded telemetry has no seed
+            rollback = {"rollback": investigate.rollback_check(inc, event["answer"])} if inc.root else {}
+            yield {**event, "blast": investigate.blast_radius(inc, event["answer"]), **rollback}
         else:
             yield event
+
+
+def _live_client() -> anthropic.Anthropic:
+    return anthropic.Anthropic(timeout=LIVE_CALL_TIMEOUT_SECONDS, max_retries=LIVE_CALL_RETRIES)
 
 
 def _evidence() -> dict:
@@ -230,8 +235,8 @@ def break_service(body: BreakRequest, request: Request) -> StreamingResponse:
     if refusal:
         raise HTTPException(429, refusal)
     incident = sim.simulate(body.service, body.fault, seed=random.randrange(1_000_000), hard=body.hard)
-    client = anthropic.Anthropic(timeout=LIVE_CALL_TIMEOUT_SECONDS, max_retries=LIVE_CALL_RETRIES)
-    events = investigate.incident_events(incident, client=client, model=investigate.MODELS.get(body.model, investigate.AUTO))
+    events = investigate.incident_events(incident, client=_live_client(),
+                                         model=investigate.MODELS.get(body.model, investigate.AUTO))
     return StreamingResponse(
         _sse(_enrich(events, incident)),
         media_type="text/event-stream",
@@ -316,7 +321,8 @@ async def investigate_upload(request: Request) -> StreamingResponse:
     refusal = _take_live_slot(_client_ip(request))
     if refusal:
         raise HTTPException(429, refusal)
-    events = investigate.incident_events(incident, model=investigate.MODELS.get(body.model, investigate.AUTO))
+    events = investigate.incident_events(incident, client=_live_client(),
+                                         model=investigate.MODELS.get(body.model, investigate.AUTO))
     untold = (e for e in events if e["type"] != "truth")  # an uploaded outage has no known culprit to reveal
     return StreamingResponse(
         _sse(_enrich(untold, incident)),
