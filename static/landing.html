@@ -46,18 +46,21 @@
   .pbtn.sm { height: 44px; padding: 0 20px; font-size: 13px; }
   .roll { position: relative; display: inline-block; overflow: hidden; vertical-align: top; }
   .roll > span { display: block; transition: transform .5s var(--ease-lusion); }
-  .roll::after { content: attr(data-text); position: absolute; left: 0; top: 100%; white-space: nowrap; transition: transform .5s var(--ease-lusion); }
+  /* the rolling copy is visual only: the empty alt text ("") keeps screen readers from saying the label twice */
+  .roll::after { content: attr(data-text); content: attr(data-text) / ""; position: absolute; left: 0; top: 100%; white-space: nowrap; transition: transform .5s var(--ease-lusion); }
   .pbtn:hover .roll > span, .pbtn:hover .roll::after { transform: translateY(-100%); }
   .round { width: 46px; height: 46px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--sunk); color: var(--text); font-size: 17px; transition: background-color .4s ease, transform .4s var(--ease-lusion); }
   .round:hover { background: var(--card); transform: rotate(180deg); }
   @media (max-width: 760px) { .hide-sm { display: none; } }
+  /* with reduced motion the hero stands still and the scroll bar would sit full width, so both hints go */
+  @media (prefers-reduced-motion: reduce) { .motion-only, .progress { display: none; } }
   .ctas { display: flex; flex-wrap: wrap; gap: 12px; }
 
   /* ---- header ---- */
   .nav { position: fixed; z-index: 20; top: 0; left: 0; right: 0; padding: 20px 0; transition: padding .5s var(--ease-lusion), background-color .5s ease; }
   .nav.scrolled { padding: 10px 0; background: var(--nav-bg); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); }
   .nav .wrap { display: flex; align-items: center; gap: 12px; }
-  .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; font: 500 24px/1 var(--sans); letter-spacing: .08em; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; padding: 10px 0; font: 500 24px/1 var(--sans); letter-spacing: .08em; }
   .brand svg { width: 20px; height: 20px; }
   .links { display: flex; gap: 2px; padding: 4px; border-radius: var(--pill); background: var(--sunk); }
   .links a { padding: 10px 16px; border-radius: var(--pill); font: 500 13px var(--sans); letter-spacing: .03em; text-transform: uppercase; transition: background-color .4s ease; }
@@ -136,9 +139,9 @@
   .cards.drawn .spark { animation: draw 1.4s var(--ease-lusion) backwards; animation-delay: calc(var(--i) * 45ms); }
   @keyframes draw { from { stroke-dashoffset: 1; } }
   .card-val { font: 13px var(--mono); color: var(--muted); text-align: right; transition: color .5s ease; }
-  .card.lit { background: var(--signal); color: #fff; animation: shake .5s var(--ease-quad); }
-  .card.lit .spark { stroke: #fff; }
-  .card.lit .card-val { color: #fff; }
+  .card.lit { background: var(--signal); color: #000; animation: shake .5s var(--ease-quad); }  /* black on the signal red: 6:1, white is only 3:1 */
+  .card.lit .spark { stroke: #000; }
+  .card.lit .card-val { color: #000; }
   @keyframes shake { 20% { transform: translateX(-4px); } 45% { transform: translateX(4px); } 70% { transform: translateX(-1px); } }
   .cards.ready .card { cursor: pointer; }
   .cards.ready:not(.solved) .card:hover { transform: translateY(-4px); }
@@ -148,20 +151,22 @@
   .card.cause .tag { background: #000; color: #fff; }
   .card.victim { background: var(--bad-soft); color: var(--bad); }
   .card.victim .spark { stroke: var(--bad); } .card.victim .card-val { color: var(--bad); }
-  .card.victim .tag { background: var(--bad); color: #fff; }
-  .cards.solved .card:not(.cause):not(.victim) { opacity: .35; }
+  .card.victim .tag { background: var(--bad); color: var(--card); }
+  .cards.solved .card:not(.cause):not(.victim):not(.guessed) { opacity: .35; }  /* your pick stays readable, whatever it was */
   .card.guessed::after { content: "your guess"; position: absolute; left: 18px; bottom: 0; transform: translateY(50%); padding: 2px 9px; border-radius: var(--pill);
     background: var(--accent); color: #fff; font: 600 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
   .answer { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 32px; min-height: 44px; max-width: 70ch; font-size: 18px; line-height: 1.5; }
-  .answer a { color: var(--accent); }
+  /* an underline marks the link in the sentence; text in the body colour keeps 4.5:1 in both themes */
+  .answer a { text-decoration: underline 2px var(--accent); text-underline-offset: 4px; }
 
   /* ---- 02: how it works, a dark stage pinned beside the steps ---- */
   .story { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 4vw; }
   .steps { padding-bottom: 18vh; }  /* room for the stage to stay pinned while the last step is read */
-  .step { min-height: 72vh; display: flex; flex-direction: column; justify-content: center; opacity: .25; transition: opacity .6s var(--ease-lusion); }
-  .step.on { opacity: 1; }
+  .step { min-height: 72vh; display: flex; flex-direction: column; justify-content: center; }
   .step .num { align-self: flex-start; padding: 4px 12px; border-radius: var(--pill); background: var(--sunk); font: 500 12px var(--sans); letter-spacing: .06em; }
-  .step h3 { margin: 18px 0 14px; font: 400 clamp(30px, 2.8vw, 44px)/1.05 var(--sans); letter-spacing: -.035em; }
+  /* the step being shown stands out because the others' titles go grey, not because they fade below readable contrast */
+  .step h3 { margin: 18px 0 14px; font: 400 clamp(30px, 2.8vw, 44px)/1.05 var(--sans); letter-spacing: -.035em; color: var(--muted); transition: color .6s var(--ease-lusion); }
+  .step.on h3 { color: var(--text); }
   .step p { margin: 0; max-width: 40ch; font-size: 18px; line-height: 1.55; color: var(--muted); }
   .stage { position: sticky; top: 96px; align-self: start; height: min(560px, calc(100vh - 130px)); margin-top: 14vh; overflow: hidden; border-radius: var(--radius); background: var(--panel); color: var(--on-panel);
     --text: #f0f1fa; --muted: #9599a8; --line: #262a36; --line-strong: #3a3f50; --ink: #f0f1fa; --on-ink: #0c0d12; --trace: #f0f1fa; --axis: #7d8193;
@@ -253,7 +258,9 @@
   .note { margin: 28px 0 0; max-width: 80ch; font-size: 15px; line-height: 1.6; color: var(--muted); }
 
   /* ---- the dark end: hard mode, the call to action, the footer ---- */
-  .end { background: #000; color: #f0f1fa; border-radius: calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0;
+  /* the footer sits outside main (so it is the page's contentinfo landmark) but continues the dark end */
+  .end { border-radius: calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0; }
+  .end, footer { background: #000; color: #f0f1fa;
     --text: #f0f1fa; --muted: #8e92a3; --line: #1d2029; --line-strong: #3a3e4c; --sunk: #15171e; --card: #101219;
     --ok: var(--lime); --ok-soft: rgba(193, 255, 0, .12); --bad: #ff6a60; --bad-soft: rgba(255, 76, 65, .18); --accent: #4b5dff; }
   .end .band { padding-bottom: 10vh; }
@@ -266,11 +273,12 @@
   .cta p { margin: 0 auto 40px; max-width: 46ch; font-size: 19px; line-height: 1.5; color: var(--muted); }
   .cta .ctas { justify-content: center; }
   .end .pbtn.light { background: #f0f1fa; color: #000; }
-  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; font: 13px/1.7 var(--sans); color: var(--muted); }
+  footer { position: relative; z-index: 1; border-top: 1px solid var(--line); padding: 28px 0 40px; font: 13px/1.7 var(--sans); color: var(--muted); }
   footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <div class="progress" aria-hidden="true"></div>
 <canvas class="backdrop" id="ribbon" aria-hidden="true"></canvas>
 
@@ -288,13 +296,13 @@
   </div>
 </header>
 
-<main>
-  <section class="hero" aria-labelledby="heroTitle">
+<main id="main">
+  <section class="hero" aria-labelledby="heroIntro">
     <div class="wrap">
       <p class="hero-intro" id="heroIntro">An AI on-call investigator that has to prove its answer.</p>
       <div class="hero-panel">
         <div id="hero3d" role="img" aria-label="The simulated shop's 11 services in 3D. One breaks, the failure travels up to its callers, and the agent names the cause."></div>
-        <div class="hud top"><span><span class="live-dot"></span>Outage #41 · replayed from the benchmark</span><span class="hide-sm">Move to look around</span></div>
+        <div class="hud top"><span><span class="live-dot"></span>Outage #41 · replayed from the benchmark</span><span class="hide-sm motion-only">Move to look around</span></div>
         <div class="hud bottom"><span class="caption" id="heroCaption">Loading the shop…</span></div>
       </div>
       <div class="crosses" aria-hidden="true"><i>+</i><i>+</i><span class="scroll-hint">Scroll to explore <span class="arrow">↓</span></span><i>+</i><i>+</i></div>
@@ -326,7 +334,7 @@
         <p class="sub">A real recorded outage: the latency of all eleven services, up to the moment the alarm called the agent. Several look broken. Only one of them is. Which?</p>
       </div>
       <div class="cards" id="cards"></div>
-      <div class="answer" aria-live="polite"><button type="button" class="pbtn light sm" id="revealBtn" hidden><span class="roll" data-text="Show me"><span>Show me</span></span><span class="dot"></span></button><span id="answerText"></span></div>
+      <div class="answer"><button type="button" class="pbtn light sm" id="revealBtn" hidden><span class="roll" data-text="Show me"><span>Show me</span></span><span class="dot"></span></button><span id="answerText" role="status"></span></div>
     </div>
   </section>
 
@@ -348,11 +356,13 @@
           <article class="step" data-step="3"><span class="num">Step 4</span><h3>An answer, or a human.</h3>
             <p>Verified and at least 80% confident: Sherlog answers, and drafts the ticket note for engineers and the update for customers. Anything less goes to a person.</p></article>
         </div>
-        <div class="stage" aria-hidden="true">
-          <div class="stage-bar"><span>OUTAGE <b id="stageId">#41</b></span><span id="stageStep">1 / 4 · ALARM</span></div>
-          <div class="layer on" data-layer="0"><svg class="chart" id="alarmChart" viewBox="0 0 560 230"></svg><p class="zbig" id="alarmZ"></p></div>
-          <div class="layer" data-layer="1"><ol class="tlog" id="tlog"></ol></div>
-          <div class="layer" data-layer="2"><ol class="checks" id="checks"></ol><p class="blast-line" id="blastLine"></p><svg class="blast-map" id="blastMap" viewBox="0 0 800 340"></svg></div>
+        <!-- the stage shows one step at a time; screen readers get every step's content in order -->
+        <div class="stage">
+          <h3 class="sr-only">The recorded outage, step by step</h3>
+          <div class="stage-bar" aria-hidden="true"><span>OUTAGE <b id="stageId">#41</b></span><span id="stageStep">1 / 4 · ALARM</span></div>
+          <div class="layer on" data-layer="0"><svg class="chart" id="alarmChart" viewBox="0 0 560 230" role="img"></svg><p class="zbig" id="alarmZ"></p></div>
+          <div class="layer" data-layer="1"><ol class="tlog" id="tlog" aria-label="Claude's tool calls"></ol></div>
+          <div class="layer" data-layer="2"><ol class="checks" id="checks" aria-label="What the verifier checked"></ol><p class="blast-line" id="blastLine"></p><svg class="blast-map" id="blastMap" viewBox="0 0 800 340" aria-hidden="true"></svg></div>
           <div class="layer" data-layer="3" id="verdictLayer"></div>
         </div>
       </div>
@@ -399,15 +409,15 @@
         </div>
       </div>
     </section>
-
-    <footer>
-      <div class="wrap">
-        <span>Built from scratch for IceHacks 2026 · Claude Haiku, Sonnet and Opus 5.5 · MIT</span>
-        <span>The telemetry is simulated, so the numbers are optimistic.</span>
-      </div>
-    </footer>
   </div>
 </main>
+
+<footer>
+  <div class="wrap">
+    <span>Built from scratch for IceHacks 2026 · Claude Haiku, Sonnet and Opus 5.5 · MIT</span>
+    <span>The telemetry is simulated, so the numbers are optimistic.</span>
+  </div>
+</footer>
 
 <script src="/static/shared.js"></script>
 <script>
@@ -552,14 +562,21 @@ function buildCards() {
     const points = values.map((v, k) => `${((k / (values.length - 1)) * 200).toFixed(1)},${(44 - ((v - lo) / span) * 40).toFixed(1)}`).join(' ');
     const chart = svg('svg', { viewBox: '0 0 200 48', 'aria-hidden': 'true' });
     chart.append(svg('polyline', { points, pathLength: 1, class: 'spark', style: `--i:${i}` }));
-    return el('button', { type: 'button', class: 'card', 'data-service': s, 'data-level': levelOf(z[s]), onclick: () => guess(s),
-      'aria-label': `${s}, latency ${Math.round(values[values.length - 1])} ms` },
+    const ms = Math.round(values[values.length - 1]);
+    const card = el('button', { type: 'button', class: 'card', 'data-service': s, 'data-ms': ms, 'data-level': levelOf(z[s]), onclick: () => guess(s) },
       el('span', { class: 'card-head' }, el('b', {}, s), el('span', { class: 'tag' })),
-      chart, el('span', { class: 'card-val' }, `${Math.round(values[values.length - 1])} ms`));
+      chart, el('span', { class: 'card-val' }, `${ms} ms`));
+    labelCard(card);
+    return card;
   });
   $('#cards').replaceChildren(...cards);
   $('#revealBtn').addEventListener('click', solve);
   revealOnScroll([$('#cards')], () => { enter(cards, { duration: 900, stagger: 40, easing: 'lusion', y: 24 }); cascade(cards); }, { none: true });
+}
+
+/** What a screen reader hears for a card: the service, its latency, and what the colours and tags show. */
+function labelCard(card, ...notes) {
+  card.setAttribute('aria-label', [`${card.dataset.service}, latency ${card.dataset.ms} ms`, ...notes].filter(Boolean).join(', '));
 }
 
 async function cascade(cards) {
@@ -568,10 +585,10 @@ async function cascade(cards) {
   const order = spreadOrder(STORY.truth.root);
   const lit = cards.filter((c) => c.dataset.level !== 'ok')
     .sort((a, b) => order.indexOf(a.dataset.service) - order.indexOf(b.dataset.service));
-  for (const c of lit) { c.classList.add('lit'); if (MOTION) await sleep(280); }
+  for (const c of lit) { c.classList.add('lit'); labelCard(c, 'looks broken'); if (MOTION) await sleep(280); }
   $('#cards').classList.add('ready');
   $('#revealBtn').hidden = false;
-  $('#answerText').textContent = `${lit.length} of ${cards.length} look broken. Click the one you think broke first.`;
+  $('#answerText').textContent = `${lit.length} of ${cards.length} look broken. Pick the one you think broke first.`;
   enter([$('.answer')], { duration: 600, y: 8, easing: 'lusion' });
 }
 
@@ -586,18 +603,24 @@ function solve() {
   const grid = $('#cards');
   if (grid.classList.contains('solved')) return;
   grid.classList.add('solved');
+  const fromButton = document.activeElement === $('#revealBtn');
+  let guessedRole = null;
   for (const card of grid.children) {
     const s = card.dataset.service;
     const role = s === truth.root ? 'cause' : card.dataset.level !== 'ok' ? 'victim' : null;
     if (role) { card.classList.remove('lit'); card.classList.add(role, ...(role === 'cause' ? ['lit'] : [])); card.querySelector('.tag').textContent = role; }
-    if (s === guessed) card.classList.add('guessed');
+    if (s === guessed) { card.classList.add('guessed'); guessedRole = role; }
+    labelCard(card, role ?? 'healthy', s === guessed ? 'your guess' : null);
+    card.setAttribute('aria-disabled', 'true');  // the guess is over: the cards stay readable but do nothing
   }
   enter(grid.querySelectorAll('.cause .tag, .victim .tag'), { duration: 600, easing: 'spring', y: 0, scale: .5, stagger: 90 });
   $('#revealBtn').hidden = true;
-  const you = guessed ? (guessed === truth.root ? `You picked ${guessed}: right. ` : `You picked ${guessed}: a victim. `) : '';
+  if (fromButton) grid.querySelector('.cause')?.focus();  // the button just vanished: keep keyboard focus on the answer
+  const verdictOn = { cause: 'right', victim: 'a victim' };
+  const you = guessed ? `You picked ${guessed}: ${verdictOn[guessedRole] ?? 'it was healthy'}. ` : '';
   const ranking = truth.baseline_top1 ? `The no-AI ranking got it too.` : `A classic no-AI ranking blamed ${truth.baseline[0]}, the loudest victim.`;
   $('#answerText').replaceChildren(`${you}The cause was ${truth.root}. ${ranking} Sherlog's agent named ${truth.ai_answer ?? 'no one'} and proved it. `,
-    el('a', { href: '#how' }, 'Here is how ↓'));
+    el('a', { href: '#how' }, 'Here is how ', el('span', { 'aria-hidden': 'true' }, '↓')));
   enter([$('#answerText')], { duration: 600, y: 8, blur: 4, easing: 'lusion' });
 }
 
@@ -626,6 +649,8 @@ function buildAlarm() {
     label({ class: 'alarm-label', x: x(alarmAt) - 6, y: 14, 'text-anchor': 'end' }, 'ALARM'),
     label({ x: 0, y: H + 22 }, `${truth.root} · latency`),
     label({ x: W, y: H + 22, 'text-anchor': 'end' }, `${Math.round(values[values.length - 1])} ms`));
+  $('#alarmChart').setAttribute('aria-label', `${truth.root} latency: normally about ${Math.round(mean)} ms, alarm threshold ${Math.round(limit)} ms ` +
+    `(normal + ${ALARM_Z}σ), ${Math.round(values[alarmAt])} ms when the alarm fired, ${Math.round(values[values.length - 1])} ms at the end.`);
   const z = zAt(telemetry.series, 'latency_ms', telemetry.alarm, META.baseline_ticks, META.std_floor)[truth.root];
   $('#alarmZ').replaceChildren(`${Math.round(z)}σ`, el('small', {}, `above normal when the alarm fired · threshold ${ALARM_Z}σ for 15 s`));
 }
@@ -650,7 +675,7 @@ function buildChecks() {
     d += 0.2;
     return el('li', {},
       el('span', { class: 's-name' }, c.service),
-      el('span', { class: 'chips' }, chips.length ? chips : el('span', { class: 'chip' }, 'no evidence')),
+      el('span', { class: 'chips' }, el('span', { class: 'sr-only' }, 'cites'), chips.length ? chips : el('span', { class: 'chip' }, 'no evidence')),
       el('span', { class: `badge ${c.verified ? 'ok' : 'bad'}`, style: `--d:${d}s` }, c.verified ? 'verified' : 'rejected'),
       el('span', { class: 'conf', role: 'img', 'aria-label': `confidence ${pct(c.confidence)}` }, el('span', { style: `width:${pct(c.confidence)};--d:${d}s` })));
   }));
@@ -698,9 +723,12 @@ function buildStory() {
 // ---- 03 / 04: the numbers -----------------------------------------------------------------
 
 function barRows(container, rows) {
-  container.replaceChildren(...rows.map(([label, sub, value, tone, flag], i) => el('div', { class: 'bar-row' },
+  // a list for screen readers: each row names its value in words, the bar itself is only the picture of it
+  container.setAttribute('role', 'list');
+  container.replaceChildren(...rows.map(([label, sub, value, tone, flag], i) => el('div', { class: 'bar-row', role: 'listitem' },
     el('span', { class: 'bar-label' }, label, flag ?? '', el('small', {}, sub)),
-    el('span', { class: 'bar-track' }, el('span', { class: `bar-fill ${tone}`, style: `--v:${value ?? 0};--d:${i * 0.08}s` })),
+    el('span', { class: 'bar-track', 'aria-hidden': 'true' }, el('span', { class: `bar-fill ${tone}`, style: `--v:${value ?? 0};--d:${i * 0.08}s` })),
+    el('span', { class: 'sr-only' }, 'cause first:'),
     el('span', { class: 'bar-val', 'data-v': value ?? '' }, pct(value)))));
   revealOnScroll([container], () => {
     container.classList.add('play');
@@ -719,7 +747,7 @@ function buildResults() {
     [a.baseline_ac1, pct, 'the classic no-AI ranking, same outages'],
     [ev.auto?.median_cost_usd ?? a.median_cost_usd, usd, ev.auto ? `per outage on auto: Haiku first, Opus in ${ev.auto.escalated_to_strong} of ${ev.auto.outages}` : 'median cost per outage'],
   ];
-  const boxes = stats.map(([, , text]) => el('div', {}, el('b', {}, '–'), el('span', {}, text)));
+  const boxes = stats.map(([value, format, text]) => el('div', {}, el('b', {}, format(value)), el('span', {}, text)));  // real values before any count-up
   $('#bigstats').replaceChildren(...boxes);
   revealOnScroll([$('#bigstats')], () => {
     enter(boxes, { duration: 1000, stagger: 80, easing: 'lusion', y: 30 });
