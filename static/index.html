@@ -255,7 +255,8 @@
   .ev-table th:not(:first-child), .ev-table td:not(:first-child) { text-align: right; white-space: nowrap; }
   .ev-table tbody tr:last-child td { font-weight: 600; }
 
-  .foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 24px; padding: 16px 22px 24px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0 24px; padding: 10px 22px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .foot a { display: inline-flex; align-items: center; min-height: 44px; }  /* a whole touch target, as in the story page's footer */
 </style>
 </head>
 <body>
