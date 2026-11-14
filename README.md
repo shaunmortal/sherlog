@@ -75,7 +75,7 @@ flowchart LR
 2. **Investigate.** The agent starts from the top anomalies and works through at most 8 rounds of read-only tools (`get_metric`, `get_logs`, `get_dependencies`), then submits up to five suspects, each with a fault type, one sentence of reasoning, a confidence and the ids of the tool calls that support it. It is never told what broke.
 3. **Verify.** Every tool call records which services its result showed abnormal (z ≥ 3, or at least two warning lines implicating the service). A suspect is accepted only if a call it cites really showed it abnormal.
 4. **Answer, or hand over.** If suspect #1 is verified and at least 80% confident, Sherlog answers and drafts the ticket note and the customer update. Anything less goes to a human; on the auto route, a doubtful Haiku answer goes to a fresh Opus investigation first.
-5. **Check the answer.** The **blast-radius check** asks whether the answer explains every service that stayed abnormal: each must be the answer or one of its callers, and only slowness and failures travel to callers. The **rollback replay** re-runs the outage from its seed with the answer rolled back and reports whether the alarm stops and which services recover. In hard mode the decoy's harmless CPU or memory anomaly can keep the alarm on, so the replay also counts as proof when every latency and error alarm ends. Both results are shown next to the verdict; neither changes it.
+5. **Check the answer.** The **blast-radius check** asks whether the answer explains every service that stayed abnormal: each must be the answer or one of its callers, and only slowness and failures travel to callers. The **rollback replay** re-runs the outage from its seed with the answer rolled back and reports whether the alarm stops and which services recover. In hard mode the decoy's harmless CPU or memory anomaly can keep the alarm on, so the replay also counts as proof when every latency and error alarm ends. Both results are shown next to the verdict and neither changes it, with one exception: on the auto route, a Haiku answer that another service would explain better goes to Opus first.
 
 <p align="center"><img src="media/console.jpg" alt="The console after replaying outage 41: telemetry for all eleven services with the alarm marked, the flight log of the agent's tool calls c0 to c4, the scoreboard (you guessed cart, wrong; the Sherlog agent said cache, right; the z-score ranking said cart, wrong), the verdict with root cause cache at 90% confidence and verified, the blast-radius line, and the service map tagged YOU, AI and CULPRIT." width="900"></p>
 <p align="center"><em>Outage #41 in the console: the slowdown in <code>cache</code> makes cart, checkout and frontend look broken too. The classic ranking blames <code>cart</code>; the agent names <code>cache</code> and proves it.</em></p>
@@ -84,7 +84,7 @@ flowchart LR
 
 ## Results
 
-**132 normal outages**, three for every service and fault type (seeds 1000–1131), and **44 hard-mode outages** with a decoy (seeds 2000–2043). None were looked at while the prompt and tools were built. "Cause first" means the true cause was ranked first *and* passed the verifier. Every figure is in [`runs/evidence.json`](runs/evidence.json), computed from the recorded runs in [`runs/`](runs).
+**132 normal outages**, three for every service and fault type (seeds 1000–1131), and **44 hard-mode outages** with a decoy (seeds 2000–2043). None were looked at while the prompt and tools were built. "Cause first" means the true cause was ranked first *and* passed the verifier. Every figure in the tables is in [`runs/evidence.json`](runs/evidence.json), computed from the recorded runs in [`runs/`](runs).
 
 <p align="center"><img src="media/results.svg" alt="Named the true cause first. Normal, 132 outages: no-AI z-score ranking 83%, robust z-score 78%, Opus with one prompt 100%, Haiku agent 100%, Sonnet agent 100%, Opus agent 100%, auto 100%. Hard mode with a decoy, 44 outages: z-score 66%, robust z-score 57%, Opus one prompt 80%, Haiku agent 86%, Sonnet agent 86%, Opus agent 98%, auto 91%." width="900"></p>
 
@@ -98,7 +98,7 @@ flowchart LR
 | **Sherlog agent on Claude Opus 5.5** | **100% · 98%** | **132 · 29** | **0** | $0.047 |
 | **Sherlog auto** (Haiku first, then Opus) | 100% · 91% | 132 · 34 | 4 | **$0.0015** |
 
-No method answered a normal outage wrong. Median cost is per normal outage.
+No method answered a normal outage wrong. Median cost is per normal outage. Auto was not run on its own: its rows apply the live route's handoff rule to the recorded Haiku and Opus runs on the same outages, paying for both when Haiku hands over.
 
 - **The agent beats the classic ranking.** The Opus agent was right where the ranking was wrong in 23 normal and 14 hard outages, never the reverse (exact McNemar test, p = 2.4e-7 and p = 0.0001).
 - **Investigation turns a guess into an answer.** One prompt with no tools was as accurate on normal outages, but sure enough to answer only 107 of 132, and 4 of 44 hard ones.
@@ -174,7 +174,7 @@ The z-score ranking's 15 misses name the decoy 7 times. Opus was right where Hai
 
 **Why the classic ranking fails.** Ranking services by how far their metrics moved (z-score) is the standard baseline. It breaks when a victim is *quieter* than the cause: if `cart` normally has very steady latency and `cache` is noisy, a slowdown in `cache` makes `cart` look more abnormal than `cache` itself. It also cannot tell a decoy from a cause. The agent follows the call graph and the callers' logs instead.
 
-**Scoring.** A wrong or rejected top suspect, no submission or a failed run is a miss. "Answered alone" and "right when it answered" report the answer-or-escalate decision separately. Each method is compared with the z-score ranking on the same outages by an exact McNemar test; Claude variants are not tested against each other. Every outage is reproducible from its seed.
+**Scoring.** A wrong or rejected top suspect, no submission or a failed run is a miss. "Answered alone" and "right when it answered" report the answer-or-escalate decision separately. Each method is compared with the z-score ranking on the same outages by an exact McNemar test; Claude variants are compared with each other only once, Opus against Haiku and Sonnet in hard mode, by the same test. Every outage is reproducible from its seed.
 
 </details>
 
@@ -194,7 +194,7 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 **How it was measured**
 
 - **axe-core 4.10.2**, with the WCAG 2.0, 2.1 and 2.2 A and AA rules plus best practices: **0 violations** on `/`, `/console` and `/status`, in light and dark, at 1440×900 and 390×844. The story page was also checked scrolled through, at the bottom and after a guess. The console was checked idle, on the replay list, after a replay's verdict, on the Evidence view and after triaging the sample in Your data.
-- **Lighthouse accessibility: 100** on the story page and the console.
+- **Lighthouse accessibility: 100** on the story page, the console and the status page, with its mobile and desktop settings.
 
 **Not covered:** forced-colors (high contrast) mode was not tested, and no one who relies on a screen reader or other assistive technology has tested the pages. Automated checks find only some kinds of barrier.
 
@@ -211,7 +211,7 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
   - 21 in [`tests/test_api.py`](tests/test_api.py): every route and every failure path of a live run
   - 25 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
 
-  Four browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, a guess reveals the cause, the console plays a recorded outage to its verdict, and triaging the sample afterwards replaces that outage on screen, even while paused.
+  Five browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, a guess reveals the cause, the console plays a recorded outage to its verdict, triaging the sample afterwards replaces that outage on screen, even while paused, and a triage started from the keyboard keeps focus on its button.
 
 ---
 
@@ -223,7 +223,7 @@ Real telemetry, in the same shape as the shop: 10 minutes of the 4 metrics for 1
 
 ## Reproduce
 
-Requires Python 3.13 and uv.
+Requires Python 3.12 or newer (CI runs 3.12) and uv.
 
 ```bash
 uv venv --python 3.13 && uv pip install -r requirements.txt

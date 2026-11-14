@@ -46,8 +46,9 @@ how hard it is, and break it.
   investigations replay for free whenever it is not.
 
 **Results.** On 132 benchmark outages the agent named the true cause first in every one (100%, 95%
-interval 97-100%), against 83% and 78% for two standard no-AI rankings (McNemar p < 0.001). The auto
-route got the same 100% for a median $0.0015 per outage, needing Opus in only 4 of 132. In hard mode
+interval 97-100%), against 83% and 78% for two standard no-AI rankings (McNemar p < 0.001 against the
+z-score ranking). Applied to the recorded Haiku and Opus runs, the auto route got the same 100% for a median
+$0.0015 per outage, needing Opus in only 4 of 132. In hard mode
 (44 outages with a decoy), the no-AI ranking fell to 66%; Haiku and Sonnet were fooled by the decoy a
 few times, while Opus named the cause first in 43 of 44 and never gave a wrong answer: it handed the
 outages it wasn't sure about to a human. Applied offline to every recorded answer, the rollback replay
@@ -86,11 +87,11 @@ Opus answer 42 of 44 hard outages instead of 29, still never wrong.
 - **Accessibility:** built to WCAG 2.2 AA: skip links, radio groups and tabs with arrow keys, guessing
   by keyboard, a live region that announces each step, AA contrast in light and dark, a pause control and
   reduced motion. axe-core 4.10.2 finds 0 violations on all three pages in both themes at desktop and phone
-  widths, and Lighthouse scores accessibility 100 on the story page and the console.
+  widths, and Lighthouse scores accessibility 100 on all three.
 - **Reliability:** a status page and `/api/health`, a 120 s timeout on every model call, a clear reason
   for every failure, and per-visitor and daily limits on live runs.
 - **Tests:** 160 pytest tests in CI (the agent loop and the auto route against a scripted fake model,
-  every API route and failure path, the upload format), plus 4 browser end-to-end checks.
+  every API route and failure path, the upload format), plus 5 browser end-to-end checks.
 - **AI tools used:** Claude Code as a pair programmer; Claude Haiku, Sonnet and Opus 5.5 inside the product.
 
 ## Challenges we ran into
@@ -125,7 +126,8 @@ Opus answer 42 of 44 hard outages instead of 29, still never wrong.
   answer and rejected no right one.
 - Opus-level accuracy for $0.0015 an outage on normal outages, by letting Haiku go first and checking its answer.
 - A benchmark with two baselines, three models, ablations, a hard mode, intervals and a significance
-  test, all reproducible with one command and replayable in the browser.
+  test: one command recomputes every table from the recorded runs, and the Opus agent's 176
+  investigations replay in the browser.
 - Turning incident response into a game anyone can play, even without knowing what a microservice is,
   built to WCAG 2.2 AA, with 0 axe-core violations.
 
