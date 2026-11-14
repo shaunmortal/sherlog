@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sherlog</title>
+<title>Sherlog console</title>
 <meta name="description" content="Break a service in a simulated shop, guess the culprit, and watch an AI agent find it and prove it.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='13' cy='13' r='8' fill='none' stroke='%231a2ffb' stroke-width='3.5'/><path d='M19 19l8 8' stroke='%231a2ffb' stroke-width='4' stroke-linecap='square'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,13 +11,29 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/shared.css">
 <style>
+  /* ---- accessibility: WCAG 2.2 AA ---- */
+  /* the shared tokens, retuned for this page so every text colour reaches 4.5:1 and every graphic 3:1 in both themes
+     (a plain :root rule only beats shared.css's light theme; its dark selectors are more specific) */
+  :root { --bad: #c4221a; --ok: #0b7342; --warn: #8f5500; --axis: #5c5f6e; --signal: #f03a2f; --edge: #7d8191; --accent-text: var(--accent); --guess: #3654c9; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --edge: #62667a; --accent-text: #7c89ff; --guess: #8fa2ff; } }
+  :root[data-theme="dark"] { --edge: #62667a; --accent-text: #7c89ff; --guess: #8fa2ff; }
+  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .skip { position: absolute; z-index: 30; left: 12px; top: -80px; padding: 12px 20px; border-radius: var(--pill); background: var(--ink); color: var(--on-ink); font: 500 14px var(--sans); text-decoration: none; }
+  .skip:focus { top: 8px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  main:focus { outline: none; }  /* the skip link's target; the ring would just frame the whole page */
+  .node:focus-visible rect.box { stroke: var(--accent); stroke-width: 3; }  /* SVG groups draw no outline everywhere */
+  /* the viewer's pause (WCAG 2.2.2): every looping animation holds still */
+  .still *, .still *::before, .still *::after { animation-play-state: paused !important; }
+
   /* ---- top bar ---- */
   .top { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); min-height: 48px; }
   .brand { display: flex; align-items: center; gap: 10px; padding: 0 22px; border-right: 1px solid var(--line); font: 600 17px var(--mono); letter-spacing: .16em; color: inherit; text-decoration: none; }
   .brand svg { width: 16px; height: 16px; }
   .meta { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; padding: 8px 22px; font: 13px var(--mono); }
   .meta span { color: var(--muted); margin-right: 6px; }
-  .views { display: flex; position: relative; }
+  .views, .views [role="tablist"] { display: flex; }
+  .views { position: relative; }
   .views button { border: 0; border-left: 1px solid var(--line); background: none; padding: 0 22px; font: 500 13px var(--mono); letter-spacing: .1em; color: var(--muted); transition: color var(--hover) var(--ease-quad); }
   .views button:hover, .views button[aria-selected="true"] { color: var(--text); }
   .ink { position: absolute; top: 0; left: 0; pointer-events: none; transition: transform .5s var(--ease-drawer), width .5s var(--ease-drawer); }
@@ -39,21 +55,28 @@
     .brand { padding: 0 16px; border-right: 0; margin-right: auto; }
     .views button { padding: 0 12px; font-size: 12px; }
   }
+  @media (max-width: 440px) {  /* reflow: the top bar wraps onto two rows instead of scrolling sideways */
+    .top { flex-wrap: wrap; }
+    .brand { min-height: 48px; }
+    .views { flex: 1 0 100%; min-height: 48px; border-top: 1px solid var(--line); }
+    .views [role="tablist"], .views [role="tab"] { flex: 1; }
+    .views [role="tab"]:first-child { border-left: 0; }
+  }
   .pad { padding: 20px 22px; }
   .label { margin: 0 0 12px; font: 500 12px var(--sans); letter-spacing: .11em; text-transform: uppercase; color: var(--muted); }
   .sub { margin: 18px 0 8px; font: 500 12px var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
 
   /* ---- left: choices ---- */
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .grid.four { grid-template-columns: repeat(6, 1fr); gap: 4px; max-height: 420px; overflow-y: auto; padding: 2px; }
+  .grid.four { grid-template-columns: repeat(6, 1fr); gap: 4px; max-height: 420px; overflow-y: auto; padding: 4px; }  /* room for the focus ring */
   .cell { border: 0; border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow); text-align: left; padding: 10px 14px; font: 14px var(--mono); min-width: 0; overflow-wrap: anywhere;
     transition: background-color .4s ease, color .4s ease, transform .4s var(--ease-lusion); }
   .grid.four .cell { text-align: center; padding: 8px 4px; font-size: 13px; border-radius: 10px; }
-  .cell:hover:not(:disabled) { background: var(--sunk); }
-  .cell[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+  .cell:hover:not(:disabled, [aria-pressed="true"], [aria-checked="true"]) { background: var(--sunk); }  /* a chosen cell keeps its ink when hovered */
+  .cell:is([aria-pressed="true"], [aria-checked="true"]) { background: var(--ink); color: var(--on-ink); }
   .cell b { display: block; font: 600 13px var(--mono); letter-spacing: .07em; text-transform: uppercase; }
   .cell small { display: block; font: 13px var(--sans); color: var(--muted); }
-  .cell[aria-pressed="true"] small { color: inherit; opacity: .75; }
+  .cell:is([aria-pressed="true"], [aria-checked="true"]) small { color: inherit; opacity: .75; }
   .desc { margin: 10px 0 0; font-size: 14px; color: var(--muted); min-height: 3em; }
   .act { position: relative; isolation: isolate; overflow: hidden; margin-top: 18px; height: 52px; padding: 0 28px; border: 0; border-radius: var(--pill); background: var(--accent); color: var(--on-accent);
     font: 500 14px var(--sans); letter-spacing: .03em; text-transform: uppercase; transition: color .4s ease, transform var(--hover) var(--ease-quad); }
@@ -64,7 +87,7 @@
   .act.ghost { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
   .hint { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
   .status { margin: 0; padding: 14px 22px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); min-height: 1.5em; }
-  .status:empty { display: none; }
+  .status:empty { padding: 0; border: 0; min-height: 0; }  /* stays in the page so screen readers hear its first message */
   .status.bad { color: var(--bad); } .status.ok { color: var(--ok); }
 
   /* ---- middle: stats ---- */
@@ -84,6 +107,7 @@
   .map-wrap { padding: 0 22px 14px; border-bottom: 1px solid var(--line); }
   #map { width: 100%; height: auto; display: block; max-height: 320px; }
   #map.focus .edge:not(.hot), #map.focus .node:not(.near) { opacity: .2; }
+  #map .edge:not(.sick) { stroke: var(--edge); } #map #arrowHead { fill: var(--edge); }
   #map .edge.hot:not(.sick) { stroke: var(--text); }
   .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 12px var(--mono); color: var(--muted); }
   .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--line-strong); background: var(--bg); }
@@ -92,18 +116,23 @@
   /* ---- middle: telemetry ---- */
   .live { display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; font: 600 11px var(--mono); letter-spacing: .1em; color: var(--muted); vertical-align: 1px; }
   .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
-  .live.on { color: var(--accent); } .live.on i { background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
+  .live.on { color: var(--accent-text); } .live.on i { background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .25; } }
+  .head-l { display: flex; align-items: center; gap: 10px; }
+  .pause { min-height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--pill); background: none; font: 600 11px var(--mono); letter-spacing: .1em; color: var(--muted); }
+  .pause:hover { color: var(--text); }
+  .pause[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--on-ink); }
   .mtabs { display: flex; position: relative; padding: 4px; border-radius: var(--pill); background: var(--sunk); }
   .mtabs button { position: relative; z-index: 1; border: 0; border-radius: var(--pill); background: none; padding: 6px 14px; font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); transition: color var(--hover) var(--ease-quad); }
   .mtabs button:hover { color: var(--text); }
   .mtabs button[aria-pressed="true"] { color: var(--on-ink); }
+  @media (max-width: 440px) { .mtabs button { padding: 6px 10px; } }
   .mtabs .ink { top: 4px; height: calc(100% - 8px); border-radius: var(--pill); background: var(--ink); transition-duration: .45s; transition-timing-function: var(--ease-lusion); }
   .tele { border-top: 1px solid var(--line); }
   .tele-row, .axis { display: grid; grid-template-columns: 168px minmax(0, 1fr) 80px; }
   .tele-row { height: 52px; border-bottom: 1px solid var(--line); cursor: pointer; }
   .tele-row:hover .tele-name { background: var(--sunk); }
-  .tele-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tele-row:focus-visible { outline-offset: -2px; }
   .tele-name { padding: 7px 12px 0 22px; border-right: 1px solid var(--line); font: 14px/1.35 var(--mono); overflow: hidden; white-space: nowrap; transition: background-color var(--fast) var(--ease-quad); }
   .tele-name small { display: block; color: var(--muted); font-size: 13px; }
   .tele-row canvas { width: 100%; height: 51px; display: block; }
@@ -151,11 +180,11 @@
   .log-item.tool { border-color: var(--text); }
   .log-item.thinking { border-color: transparent; color: var(--muted); font-style: italic; }
   .log-item.alarm, .log-item.error { border-color: var(--accent); }
-  .log-item.guess { border-color: #3654c9; color: #3654c9; font-weight: 600; }
+  .log-item.guess { border-color: var(--guess); color: var(--guess); font-weight: 600; }
   .log-title { font: 13px var(--mono); overflow-wrap: anywhere; }
   .log-item.thinking .log-title, .log-item.alarm .log-title, .log-item.guess .log-title, .log-item.error .log-title { font: 14px var(--sans); }
   .cid { display: inline-block; border-radius: 6px; background: var(--ink); color: var(--on-ink); padding: 0 6px; margin-right: 6px; font: 600 11px var(--mono); }
-  details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 2px; transition: color var(--fast) var(--ease-quad); }
+  details summary { cursor: pointer; padding: 4px 0; color: var(--muted); font-size: 12px; transition: color var(--fast) var(--ease-quad); }
   details summary:hover { color: var(--text); }
   pre { margin: 6px 0 0; padding: 10px; border-radius: 10px; background: var(--sunk); border: 1px solid var(--line); font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
@@ -173,7 +202,8 @@
   .banner.warn { border-color: var(--warn); background: var(--warn-soft); } .banner.warn strong { color: var(--warn); }
   .suspects { list-style: none; margin: 0 0 14px; padding: 0; border-top: 1px solid var(--line); counter-reset: rank; }
   .suspects li { border-bottom: 1px solid var(--line); padding: 10px 0; counter-increment: rank; }
-  .suspects li.rejected { opacity: .7; }
+  .suspects li.rejected :is(.s-name, .s-reason) { color: var(--muted); }  /* dimmed by colour, not opacity, so text keeps its contrast */
+  .suspects li.rejected .bar span { opacity: .5; }
   .s-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .s-head::before { content: counter(rank); font: 600 12px var(--mono); color: var(--muted); }
   .s-name { font: 600 15px var(--mono); }
@@ -190,7 +220,7 @@
   .notes { display: grid; gap: 10px; }
   .note-card { padding: 12px 14px; border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow); font-size: 14px; }
   .note-card h3 { margin: 0 0 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px; font: 500 11px var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-  .note-card h3 button { border: 1px solid var(--line); background: none; padding: 2px 8px; font: 11px var(--mono); transition: border-color var(--hover) var(--ease-quad); }
+  .note-card h3 button { min-height: 28px; border: 1px solid var(--line); background: none; padding: 2px 10px; font: 11px var(--mono); transition: border-color var(--hover) var(--ease-quad); }
   .note-card h3 button:hover { border-color: var(--line-strong); }
   .note-card p { margin: 0; }
   .yes { color: var(--ok); } .no { color: var(--bad); } .score .yes, .score .no { display: inline-block; } .muted { color: var(--muted); } .small { font-size: 12px; }
@@ -209,6 +239,7 @@
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top">
   <a class="brand" href="/" aria-label="Sherlog home">
     <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13" cy="13" r="8" fill="none" stroke="var(--accent)" stroke-width="4"/><path d="M19 19l8 8" stroke="var(--accent)" stroke-width="4.5" stroke-linecap="square"/></svg>
@@ -220,39 +251,44 @@
     <div><span>SOURCES</span>metrics · logs · call graph</div>
     <div><span>MODE</span><b id="metaMode" style="font-weight:400">…</b></div>
   </div>
-  <nav class="views" role="tablist" aria-label="Views">
-    <button type="button" role="tab" data-view="live" aria-selected="true">LIVE</button>
-    <button type="button" role="tab" data-view="replay" aria-selected="false">REPLAY</button>
-    <button type="button" role="tab" data-view="evidence" aria-selected="false">EVIDENCE</button>
+  <div class="views">
+    <div role="tablist" aria-label="Views">
+      <button type="button" role="tab" id="tab-live" aria-controls="breakPanel" data-view="live" aria-selected="true">LIVE</button>
+      <button type="button" role="tab" id="tab-replay" aria-controls="replayPanel" data-view="replay" aria-selected="false" tabindex="-1">REPLAY</button>
+      <button type="button" role="tab" id="tab-evidence" aria-controls="evidence" data-view="evidence" aria-selected="false" tabindex="-1">EVIDENCE</button>
+    </div>
     <button type="button" class="theme" id="themeBtn" aria-label="Switch light or dark theme">◐</button>
     <span class="ink" aria-hidden="true"></span>
-  </nav>
+  </div>
 </header>
 
-<main class="layout" id="console">
+<main id="main" tabindex="-1">
+<div class="layout" id="console">
+  <h1 class="sr-only">Sherlog console</h1>
   <section class="col" id="left" aria-label="Controls">
-    <div class="pad" id="breakPanel">
-      <p class="label">Break something</p>
+    <div class="pad" id="breakPanel" role="tabpanel" aria-labelledby="tab-live">
+      <h2 class="label">Break something</h2>
       <p class="sub">1 · Service</p>
-      <div class="grid" id="svcGrid" role="group" aria-label="Service to break"></div>
+      <div class="grid" id="svcGrid" role="radiogroup" aria-label="Service to break"></div>
       <p class="sub">2 · Fault</p>
-      <div class="grid" id="faultGrid" role="group" aria-label="Fault to inject"></div>
+      <div class="grid" id="faultGrid" role="radiogroup" aria-label="Fault to inject"></div>
       <p class="desc" id="faultDesc"></p>
       <p class="sub">3 · Who investigates</p>
-      <div class="grid" id="modelGrid" role="group" aria-label="Model that investigates"></div>
+      <div class="grid" id="modelGrid" role="radiogroup" aria-label="Model that investigates"></div>
       <p class="desc" id="modelDesc" style="min-height:0"></p>
       <p class="sub">4 · Difficulty</p>
-      <div class="grid" id="modeGrid" role="group" aria-label="Difficulty"></div>
+      <div class="grid" id="modeGrid" role="radiogroup" aria-label="Difficulty"></div>
       <button type="button" class="act" id="go">Break it live</button>
       <p class="hint">Claude investigates live, never told what you broke. Live runs are limited per visitor; replays are free.</p>
     </div>
-    <div class="pad" id="replayPanel" hidden>
-      <p class="label">Recorded outages</p>
+    <div class="pad" id="replayPanel" role="tabpanel" aria-labelledby="tab-replay" hidden>
+      <h2 class="label">Recorded outages</h2>
       <p class="hint" style="margin:0 0 14px"><span id="replayCount">0</span> investigations recorded from the benchmark. The culprit stays hidden until the end, so you can still guess.</p>
       <div class="grid four" id="replayGrid" role="group" aria-label="Recorded outages"></div>
       <button type="button" class="act ghost" id="randomReplay">Random outage</button>
     </div>
-    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <p class="status" id="status" role="status"></p>
+    <p class="status bad" id="alert" role="alert"></p>
   </section>
 
   <section class="col" id="middle" aria-label="The shop">
@@ -264,19 +300,22 @@
     <p class="note">Benchmark on simulated telemetry, so the numbers are optimistic. Details under Evidence.</p>
 
     <div class="head" id="teleHead">
-      <p class="label" id="h-tele">Telemetry<span class="live" id="live"><i></i><span id="liveText">PAUSED</span></span></p>
+      <div class="head-l">
+        <h2 class="label" id="h-tele">Telemetry<span class="live" id="live"><i></i><span id="liveText">PAUSED</span></span></h2>
+        <button type="button" class="pause" id="pauseBtn" aria-pressed="false">PAUSE</button>
+      </div>
       <div class="mtabs" id="metricTabs" role="group" aria-label="Metric shown"></div>
     </div>
     <div id="telemetry"><p class="empty" style="padding:0 22px 16px">Loading the shop's metrics…</p></div>
 
-    <div class="head" id="mapHead"><p class="label">Who did it?</p><p class="hint">Click the service you suspect, here or on its telemetry row, before the agent answers.</p></div>
+    <div class="head" id="mapHead"><h2 class="label">Who did it?</h2><p class="hint" id="guessHint">Click the service you suspect, here or on its telemetry row, before the agent answers.</p></div>
     <div class="map-wrap">
       <svg id="map" viewBox="0 0 800 340" role="group" aria-label="Service map"></svg>
       <div class="legend"><span><i></i>normal</span><span><i class="warn"></i>degraded</span><span><i class="bad"></i>failing</span><span>arrows: caller → callee</span></div>
     </div>
 
     <div class="how">
-      <p class="label">How an outage works</p>
+      <h2 class="label">How an outage works</h2>
       <ol>
         <li><b>You pick a service and a fault</b>, and it goes into a simulated shop of 11 services. The charts above are its telemetry, played faster than real time.</li>
         <li><b>The alarm fires</b> when a metric stays 4σ above normal for 15 s. No AI is involved yet.</li>
@@ -290,32 +329,34 @@
   </section>
 
   <section class="col" id="right" aria-label="Investigation">
-    <p class="label side-head">Flight log
-      <span class="agent" id="agent" role="status" hidden><span class="dots" id="agentDots" aria-hidden="true"></span><span class="agent-label" id="agentLabel"></span></span>
-    </p>
-    <ol class="log" id="log" aria-live="polite"><li class="empty">Nothing yet. Break a service or replay a recorded outage, and every tool call the agent makes will appear here.</li></ol>
-    <p class="label side-head">Verdict</p>
+    <h2 class="label side-head" id="h-log">Flight log
+      <span class="agent" id="agent" hidden><span class="dots" id="agentDots" aria-hidden="true"></span><span class="agent-label" id="agentLabel"></span></span>
+    </h2>
+    <ol class="log" id="log" tabindex="0" aria-labelledby="h-log"><li class="empty">Nothing yet. Break a service or replay a recorded outage, and every tool call the agent makes will appear here.</li></ol>
+    <h2 class="label side-head">Verdict</h2>
     <div id="verdict"><p class="empty">The ranked suspects appear here once the agent finishes.</p></div>
   </section>
-</main>
+</div>
 
-<main class="evidence" id="evidence" hidden>
+<div class="evidence" id="evidence" role="tabpanel" aria-labelledby="tab-evidence" hidden>
   <h1>How well does the agent work?</h1>
   <p><span class="evN">132</span> outages, three for every service × fault type, on seeds that were never looked at while the agent was built. "Named the cause first" means the true cause was ranked first <i>and</i> accepted by the verifier. Every run, with each tool call and the model's reasoning, can be replayed under Replay.</p>
   <p>The telemetry is simulated: caller logs name the failing service and faults are single and clean, so the absolute numbers are optimistic. The no-AI baseline runs on exactly the same data, so the comparison is fair.</p>
-  <p class="sub">What each capability and model adds · <span class="evN">132</span> outages · [95% interval]</p>
-  <div class="table-wrap" id="evMethods"></div>
+  <h2 class="sub" id="h-methods">What each capability and model adds · <span class="evN">132</span> outages · [95% interval]</h2>
+  <div class="table-wrap" id="evMethods" role="region" tabindex="0" aria-labelledby="h-methods"></div>
   <p id="evTest" style="margin-top:12px"></p>
-  <p class="sub">Robustness · one input taken away</p>
-  <div class="table-wrap" id="evRobust"></div>
-  <p class="sub">Hard mode · a decoy anomaly at the same time, callers log 60% fewer complaints · <span id="hardN">44</span> outages</p>
-  <div class="table-wrap" id="evHard"></div>
+  <h2 class="sub" id="h-robust">Robustness · one input taken away</h2>
+  <div class="table-wrap" id="evRobust" role="region" tabindex="0" aria-labelledby="h-robust"></div>
+  <h2 class="sub" id="h-hard">Hard mode · a decoy anomaly at the same time, callers log 60% fewer complaints · <span id="hardN">44</span> outages</h2>
+  <div class="table-wrap" id="evHard" role="region" tabindex="0" aria-labelledby="h-hard"></div>
   <p id="evHardTest" style="margin-top:12px"></p>
-  <p class="sub">By fault type · Claude Opus 5.5 agent</p>
-  <div class="table-wrap" id="evFaults"></div>
+  <h2 class="sub" id="h-faults">By fault type · Claude Opus 5.5 agent</h2>
+  <div class="table-wrap" id="evFaults" role="region" tabindex="0" aria-labelledby="h-faults"></div>
+</div>
+<div class="sr-only" id="announce" role="log"></div><!-- each step of an investigation, read out politely -->
 </main>
 
-<div id="tip" hidden></div>
+<div id="tip" aria-hidden="true" hidden></div>
 
 <script src="/static/shared.js"></script>
 <script>
@@ -330,6 +371,10 @@ const MINUTE_TICKS = 60 / TICK_SECONDS;
 const RECENT_TICKS = 3;            // the z-score shown is the mean over the last 15 s, like the alarm
 const LEAD_TICKS = 16;             // healthy ticks played before the alarm
 const IDLE_TICK_MS = 700, PLAYBACK_TICK_MS = 180, AFTER_TICK_MS = 1000;
+const STILL_POLL_MS = 200;         // how often a paused playback checks whether to carry on
+const ANNOUNCE_KEEP = 3;           // the hidden announcer keeps only its latest messages
+const LEVEL_WORD = { ok: 'normal', warn: 'degraded', bad: 'failing' };
+const ARROWS = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 const UNIT = {
   latency_ms: (v) => `${Math.round(v)} ms`, error_rate: (v) => `${(v * 100).toFixed(1)}%`,
   cpu_pct: (v) => `${Math.round(v)}%`, memory_mb: (v) => `${Math.round(v)} MB`,
@@ -354,15 +399,38 @@ let axisCanvas = null;
 let playId = 0;                    // bumping it stops the running playback
 let hover = null;                  // mouse position over the telemetry, for the cursor and tooltip
 let seenPills = new Set();         // map tags already shown, so a redraw doesn't pop them again
+let still = false;                 // the viewer paused the motion
+let playing = false;               // a playback is running (shown as LIVE unless paused)
 
 function freshState() {
   return { running: false, incident: false, health: {}, guess: null, ai: null, root: null, verdictShown: false, investigator: 'Claude' };
 }
 
+/** Errors go to the alert line, read out at once; everything else to the polite status line. */
 function setStatus(message, tone = '') {
-  const node = $('#status');
-  node.textContent = message;
-  node.className = `status ${tone}`;
+  const isError = tone === 'bad';
+  $('#alert').textContent = isError ? message : '';
+  $('#status').textContent = isError ? '' : message;
+  $('#status').className = `status ${tone}`;
+}
+
+/** Tell screen readers about one step of the investigation, without reading the whole flight log. */
+function announce(text) {
+  const box = $('#announce');
+  box.append(el('p', {}, text));
+  while (box.children.length > ANNOUNCE_KEEP) box.firstChild.remove();
+}
+
+/** Arrow keys walk a row of radios or tabs, wrapping round (Home and End jump to the ends), and choose where they land. */
+function arrowKeys(container, items, keys = ARROWS) {
+  container.onkeydown = (e) => {
+    const i = items.indexOf(e.target), n = items.length;
+    const to = { Home: 0, End: n - 1 }[e.key] ?? (e.key in keys ? (i + keys[e.key] + n) % n : null);
+    if (i < 0 || to === null) return;
+    e.preventDefault();
+    items[to].focus();
+    items[to].click();
+  };
 }
 
 // ---- motion ---------------------------------------------------------------------------
@@ -397,7 +465,10 @@ const watching = () => (META ? `Watching ${META.services.length} services` : 'Wa
 
 function showView(name) {
   const fromEvidence = $('#console').hidden;
-  for (const b of document.querySelectorAll('[data-view]')) b.setAttribute('aria-selected', String(b.dataset.view === name));
+  for (const b of document.querySelectorAll('[data-view]')) {
+    b.setAttribute('aria-selected', String(b.dataset.view === name));
+    b.tabIndex = b.dataset.view === name ? 0 : -1;  // one tab stop; the arrow keys move between tabs
+  }
   $('#breakPanel').hidden = name !== 'live';
   $('#replayPanel').hidden = name !== 'replay';
   $('#console').hidden = name === 'evidence';
@@ -409,14 +480,24 @@ function showView(name) {
   enter(document.querySelectorAll(cells), { duration: 420, stagger: name === 'replay' ? 2 : 6, easing: 'quad', y: 0, scale: .4 });
 }
 
+const isRadioGroup = (container) => container.getAttribute('role') === 'radiogroup';
+
+/** A grid of choices: a radio group (one tab stop, arrow keys) if its container says so, else toggle buttons. */
 function choiceGrid(container, items, selected, onPick) {
-  container.replaceChildren(...items.map(([value, title, small]) => el('button', {
-    type: 'button', class: 'cell', 'data-value': value, 'aria-pressed': String(value === selected), onclick: () => onPick(value),
-  }, small ? [el('b', {}, title), el('small', {}, small)] : title)));
+  const cells = items.map(([value, title, small]) => el('button', {
+    type: 'button', class: 'cell', 'data-value': value, ...(isRadioGroup(container) && { role: 'radio' }), onclick: () => onPick(value),
+  }, small ? [el('b', {}, title), el('small', {}, small)] : title));
+  container.replaceChildren(...cells);
+  press(container, selected);
+  if (isRadioGroup(container)) arrowKeys(container, cells);
 }
 
 function press(container, value) {
-  for (const b of container.children) b.setAttribute('aria-pressed', String(b.dataset.value === value));
+  const radio = isRadioGroup(container);
+  for (const b of container.children) {
+    b.setAttribute(radio ? 'aria-checked' : 'aria-pressed', String(b.dataset.value === value));
+    if (radio) b.tabIndex = b.dataset.value === value ? 0 : -1;
+  }
 }
 
 function describeFault() {
@@ -428,6 +509,7 @@ function describeFault() {
 
 function drawMap() {
   const map = $('#map');
+  const focused = map.contains(document.activeElement) ? document.activeElement.dataset.service : null;  // a redraw must not drop keyboard focus
   map.replaceChildren();
   const defs = svg('defs');
   const marker = svg('marker', { id: 'arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' });
@@ -445,6 +527,7 @@ function drawMap() {
   }
   for (const service of META.services) map.append(drawNode(service));
   focusMap(mapFocus);
+  if (focused) map.querySelector(`[data-service="${focused}"]`)?.focus();
 }
 
 let mapFocus = null;
@@ -467,15 +550,18 @@ function drawNode(service) {
     state.ai === service && ['ai', 'AI', 22],
     state.root === service && ['culprit', 'CULPRIT', 54],
   ].filter(Boolean);
-  const described = [service, level === 'ok' ? 'normal' : level === 'warn' ? 'degraded' : 'failing', ...tags.map((t) => t[1].toLowerCase())];
+  const callees = Object.keys(META.calls[service] ?? {});
+  const described = [service, LEVEL_WORD[level], ...tags.map((t) => t[1].toLowerCase()), callees.length ? `calls ${callees.join(', ')}` : 'calls no one'];
 
   const g = svg('g', {
     class: `node ${level}${state.root === service ? ' culprit' : ''}`,
     transform: `translate(${cx - NODE_W / 2},${cy - NODE_H / 2})`,
-    tabindex: 0, role: 'button', 'aria-label': described.join(', '), 'data-service': service,
+    tabindex: 0, role: 'button', 'aria-label': described.join(', '), 'aria-describedby': 'guessHint', 'data-service': service,
   });
   g.addEventListener('mouseenter', () => focusMap(service));
   g.addEventListener('mouseleave', () => focusMap(null));
+  g.addEventListener('focus', () => focusMap(service));  // the keyboard gets the same highlight as the mouse
+  g.addEventListener('blur', () => focusMap(null));
   g.append(svg('rect', { class: 'box', width: NODE_W, height: NODE_H }));
   const label = svg('text', { x: NODE_W / 2, y: NODE_H / 2 + 4.5, 'text-anchor': 'middle' });
   label.textContent = service;
@@ -507,6 +593,7 @@ function lockGuess(service) {
   state = { ...state, guess: service };
   drawMap();
   logItem('guess', [`You guessed ${service}. Let's see if the agent agrees.`]);
+  announce(`You guessed ${service}.`);
 }
 
 // ---- telemetry ----------------------------------------------------------------------
@@ -517,15 +604,15 @@ function buildTelemetry() {
   const rows = META.services.map((s) => {
     const canvas = el('canvas', { 'aria-hidden': 'true' });
     const metric = el('span'), value = el('div', { class: 'tele-val' });
-    const row = el('div', { class: 'tele-row', role: 'button', tabindex: 0, onclick: () => lockGuess(s),
+    const row = el('div', { class: 'tele-row', role: 'button', tabindex: 0, 'aria-describedby': 'guessHint', onclick: () => lockGuess(s),
       onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); lockGuess(s); } } },
-      el('div', { class: 'tele-name' }, metric, el('small', {}, s)), canvas, value);
+      el('div', { class: 'tele-name' }, metric, ' ', el('small', {}, s), ' '), canvas, value);  // spaces: the row's text reads as words
     teleRows[s] = { row, canvas, metric, value };
     return row;
   });
   axisCanvas = el('canvas', { 'aria-hidden': 'true' });
   const wrap = el('div', {
-    class: 'tele',
+    class: 'tele', role: 'group', 'aria-labelledby': 'h-tele',
     onmousemove: (e) => { hover = { x: e.clientX, y: e.clientY }; paint(); },
     onmouseleave: () => { hover = null; paint(); },
   }, rows, el('div', { class: 'axis' }, el('div'), axisCanvas, el('div')));
@@ -604,7 +691,7 @@ function paint() {
   const { series, t, alarm, looped, d0, d1 } = frame;
   const css = getComputedStyle(document.documentElement);
   const color = (name) => css.getPropertyValue(name).trim();
-  const ink = { trace: color('--trace'), signal: color('--signal'), wash: color('--signal-wash'), cursor: color('--cursor'), axis: color('--axis') };
+  const ink = { trace: color('--trace'), signal: color('--signal'), wash: color('--signal-wash'), cursor: color('--cursor'), axis: color('--axis'), alarm: color('--bad') };
   const cursor = hoverTick();
   const showAlarm = alarm !== null && alarm >= d0 && alarm <= t;
   for (const s of META.services) {
@@ -615,8 +702,8 @@ function paint() {
     if (showAlarm) { ctx.fillStyle = ink.wash; ctx.fillRect(x(alarm), 0, x(t) - x(alarm), h); }
     const values = [];
     for (let i = d0; i <= t; i++) values.push(valueAt(series[s][view.metric], i, looped));
-    let lo = Math.min(...values), hi = Math.max(...values);
-    if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
+    const [low, high] = [Math.min(...values), Math.max(...values)];
+    const [lo, hi] = high - low < 1e-9 ? [low - 1, high + 1] : [low, high];
     const y = (v) => h - 6 - ((v - lo) / (hi - lo)) * (h - 12);
     ctx.strokeStyle = ink.trace;
     ctx.lineWidth = 1.25;
@@ -629,7 +716,13 @@ function paint() {
     const now = UNIT[view.metric](values[values.length - 1]);
     r.metric.textContent = LABEL[view.metric];
     r.value.textContent = now;
-    r.row.setAttribute('aria-label', `${s} ${LABEL[view.metric]} ${now}`);
+    // the chart's text alternative; left alone while focused, so a screen reader isn't re-reading it every tick
+    if (document.activeElement !== r.row) {
+      const fmt = UNIT[view.metric];
+      // starts with the row's visible words in their order, so voice control can say what it sees
+      r.row.setAttribute('aria-label', `${LABEL[view.metric]} ${s} ${now}: ${LEVEL_WORD[levelOf(state.health[s] ?? 0)]}, ` +
+        `between ${fmt(low)} and ${fmt(high)} on the chart`);
+    }
   }
   paintAxis(ink, showAlarm);
   renderTip(cursor);
@@ -654,7 +747,7 @@ function paintAxis(ink, showAlarm) {
     lastLabel = px;
   }
   if (showAlarm) {
-    ctx.fillStyle = ink.signal;
+    ctx.fillStyle = ink.alarm;  // text, so it takes the text-contrast red, not the line's
     ctx.font = '600 10px "Geist", ui-sans-serif, sans-serif';
     ctx.fillText('ALARM', Math.min(x(alarm) + 4, w - 40), 13);
   }
@@ -675,8 +768,17 @@ function renderTip(i) {
 }
 
 function setLive(on) {
-  $('#live').classList.toggle('on', on);
-  $('#liveText').textContent = on ? 'LIVE' : 'PAUSED';
+  playing = on;
+  $('#live').classList.toggle('on', on && !still);
+  $('#liveText').textContent = on && !still ? 'LIVE' : 'PAUSED';
+}
+
+/** Pause or resume everything that moves on its own: the charts' clock and the looping animations. */
+function toggleStill() {
+  still = !still;
+  document.documentElement.classList.toggle('still', still);
+  $('#pauseBtn').setAttribute('aria-pressed', String(still));
+  setLive(playing);
 }
 
 /** Draw ticks from..to, one every `ms`. Returns false if a newer playback took over. */
@@ -684,6 +786,7 @@ async function play(from, to, ms, draw) {
   const id = ++playId;
   setLive(MOTION);
   for (let t = from; t <= to; t++) {
+    while (still && id === playId) await sleep(STILL_POLL_MS);
     if (id !== playId) return false;
     draw(t);
     if (ms) await sleep(ms);
@@ -743,6 +846,7 @@ function logTool(ev) {
   const args = Object.values(ev.args || {}).join(', ');
   const name = ev.id === 'c0' ? 'top anomalies (sent with the alert)' : `${ev.name}(${args})`;
   logItem(ev.error ? 'error' : 'tool', [el('span', { class: 'cid' }, ev.id), name], rest.join('\n'));
+  announce(`${ev.error ? 'Tool call failed' : 'Tool call'} ${ev.id}: ${name}`);
 }
 
 function logThinking(text) {
@@ -779,6 +883,8 @@ function renderVerdict(v) {
     : null;
   $('#verdict').replaceChildren(banner, blastNote(v.blast) ?? '', v.causes.length ? suspects : el('p', { class: 'empty' }, 'No suspects were submitted.'), notes, usage ?? '');
   setAgent(watching());
+  announce(v.answer ? `Verdict: root cause ${v.answer}, ${top.fault_type}, ${pct(top.confidence)} confident, evidence verified.`
+    : `Verdict: escalated to a human. ${v.escalation}`);
   enter($('#verdict').querySelectorAll(':scope > :not(.suspects):not(.notes), .suspects > li, .notes > *'), { duration: 600, stagger: 50, easing: 'quint', y: 8 });
 }
 
@@ -822,6 +928,8 @@ function renderTruth(t) {
       (t.decoy ? ` Hard mode: ${t.decoy} had a harmless anomaly at the same time (a batch job or a cache warm-up).` : '')),
     el('table', {}, el('tbody', {}, rows.map(([who, guess, ok]) => el('tr', {}, el('td', {}, who), el('td', {}, guess), el('td', {}, mark(ok)))))));
   $('#verdict').prepend(board);
+  announce(`Scoreboard: the culprit was ${t.root}. ` +
+    rows.map(([who, guess, ok]) => `${who}: ${guess}${ok === null ? '' : ok ? ', right' : ', wrong'}.`).join(' '));
   enter([board], { duration: 600, easing: 'spring', y: 8, scale: .98 });
   enter(board.querySelectorAll('td:last-child > span'), { delay: 250, stagger: 160, duration: 600, easing: 'spring', y: 0, scale: .5 });  // you, agent, no AI: one by one
 }
@@ -835,9 +943,10 @@ async function handle(ev) {
     case 'thinking': logThinking(ev.text); break;
     case 'verdict': renderVerdict(ev); break;
     case 'truth': renderTruth(ev); break;
-    case 'error': logItem('error', [ev.message]); break;
+    case 'error': logItem('error', [ev.message]); setStatus(ev.message, 'bad'); break;
     case 'handoff':
       logItem('alarm', [`${ev.from} could not give a verified, confident answer (${ev.reason}). ${ev.to} takes over with a fresh investigation.`]);
+      announce(`${ev.from} could not give a verified answer. ${ev.to} takes over.`);
       setAgent(`${shortModel(ev.to)} investigating`, true);
       break;
   }
@@ -1018,6 +1127,10 @@ async function init() {
   addEventListener('resize', placeInks);
   $('#themeBtn').addEventListener('click', () => toggleTheme(paint));  // the charts read their colours from the theme
   for (const b of document.querySelectorAll('[data-view]')) b.addEventListener('click', () => showView(b.dataset.view));
+  arrowKeys($('[role="tablist"]'), [...document.querySelectorAll('[role="tab"]')], { ArrowRight: 1, ArrowLeft: -1 });
+  $('#pauseBtn').hidden = !MOTION;  // with reduced motion nothing moves, so there is nothing to pause
+  $('#pauseBtn').addEventListener('click', toggleStill);
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && hover) { hover = null; paint(); } });  // Esc hides the chart readout
   try {
     META = await getJSON('/api/meta');
   } catch (err) {
