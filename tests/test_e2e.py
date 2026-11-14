@@ -61,3 +61,20 @@ def test_console_plays_a_recorded_outage_to_its_verdict(page, errors):
     sync_api.expect(page.locator("#status")).to_contain_text("Done.", timeout=REPLAY_TIMEOUT_MS)
     sync_api.expect(page.locator("#verdict")).to_contain_text("The culprit was")
     assert errors == []
+
+
+def test_triage_replaces_the_last_outage_on_screen_even_while_paused(page, errors):
+    sample = page.request.get(f"{URL}/api/sample-incident").json()
+    alarm = page.request.post(f"{URL}/api/triage", data=sample).json()["alarm"]
+    page.goto(f"{URL}/console#replay/41")
+    sync_api.expect(page.locator("#status")).to_contain_text("Done.", timeout=REPLAY_TIMEOUT_MS)
+    page.locator("#pauseBtn").click()  # a paused console must still show what the triage is about
+    page.get_by_role("tab", name="YOUR DATA").click()
+    page.locator("#sampleUse").click()
+    sync_api.expect(page.locator("#status")).to_contain_text("Loaded the sample")
+    page.locator("#triageBtn").click()
+    sync_api.expect(page.locator("#status")).to_contain_text("Triage done.")
+    assert page.evaluate("frame.alarm") == alarm  # the charts show the upload, not the replay
+    sync_api.expect(page.locator("#map .pill")).to_have_count(0)  # no YOU, AI or CULPRIT from outage 41
+    sync_api.expect(page.locator("#verdict")).not_to_contain_text("The culprit was")
+    assert errors == []

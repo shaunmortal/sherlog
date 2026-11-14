@@ -449,6 +449,8 @@ let hover = null;                  // mouse position over the telemetry, for the
 let seenPills = new Set();         // map tags already shown, so a redraw doesn't pop them again
 let still = false;                 // the viewer paused the motion
 let playing = false;               // a playback is running (shown as LIVE unless paused)
+// the flight log and verdict as the page first shows them, for when the console holds no outage again
+const BLANK = { log: $('#log').firstElementChild.cloneNode(true), verdict: $('#verdict').firstElementChild.cloneNode(true) };
 
 function freshState() {
   return { running: false, incident: false, health: {}, guess: null, ai: null, root: null, verdictShown: false, investigator: 'Claude' };
@@ -1167,10 +1169,19 @@ async function runTriage() {
 
 /** The whole uploaded window on the charts, alarm marked, on the classic ranking's worst metric unless the viewer chose one. */
 function showUploaded(series, result) {
+  // the charts now hold the upload, so the last outage's map tags, flight log and verdict go too
+  state = freshState();
+  seenPills = new Set();
+  $('#log').replaceChildren(BLANK.log.cloneNode(true));
+  $('#verdict').replaceChildren(BLANK.verdict.cloneNode(true));
+  drawMap();
   const stats = baselineStats(series);
   const last = series[META.services[0]][META.metrics[0]].length - 1;
   if (!view.picked) showMetric(result.zscore_ranking[0].metric);
-  play(last, last, 0, (t) => drawFrame(series, stats, t, result.alarm));
+  // one still frame, drawn at once even while the motion is paused; bumping playId stops any playback still running
+  ++playId;
+  setLive(false);
+  drawFrame(series, stats, last, result.alarm);
 }
 
 /** The triage card; returns its summary for screen readers. */
