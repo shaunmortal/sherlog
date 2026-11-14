@@ -87,8 +87,8 @@ jq '{incident: ., model: "opus"}' incident.json | curl -N -X POST localhost:8000
 
 Anything else is refused with 422, and the message points at the problem. Two examples:
 `series.cart.cpu_pct: Value error, tick 3 is 140, but cpu_pct must be between 0 and 100`, and
-`series.email: Field required`. `detail` joins every problem into one sentence; `errors` lists each one with
-its `loc` and `msg`. Unknown fields are refused too, so a typo cannot be silently dropped.
+`series.email: Field required`. `detail` names the first three problems in one sentence and counts the rest;
+`errors` lists every one with its `loc` and `msg`. Unknown fields are refused too, so a typo cannot be silently dropped.
 Bodies over 2 MB get a 413.
 
 ## From Prometheus

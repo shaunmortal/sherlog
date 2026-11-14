@@ -39,6 +39,9 @@ LIVE_CALL_TIMEOUT_SECONDS = 120
 LIVE_CALL_RETRIES = 1
 STREAM_FAILED = "The investigation hit an unexpected error. Try again, or watch a recorded outage."
 SHORT_SHA = 7
+# a 422's detail names only the first few problems: one wrong field in every log line of an upload is thousands
+# of errors, too many for the console's alert line to read out; `errors` still lists every one for a script
+SHOWN_PROBLEMS = 3
 
 log = logging.getLogger("sherlog")
 app = FastAPI(title="Sherlog")
@@ -172,8 +175,10 @@ def bad_input(request: Request, exc: RequestValidationError) -> JSONResponse:
     """422 with one sentence the console can show, plus each error's location for an uploader's script.
     The path skips the leading body/path/query, so a nested field reads series.cart.cpu_pct.3, not just 3."""
     errors = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
-    problems = "; ".join(f"{'.'.join(map(str, e['loc'][1:])) or e['loc'][0]}: {e['msg']}" for e in errors)
-    return JSONResponse({"detail": f"Bad input. {problems}", "errors": errors}, status_code=422)
+    problems = "; ".join(f"{'.'.join(map(str, e['loc'][1:])) or e['loc'][0]}: {e['msg']}"
+                         for e in errors[:SHOWN_PROBLEMS])
+    more = f"; and {len(errors) - SHOWN_PROBLEMS} more." if len(errors) > SHOWN_PROBLEMS else ""
+    return JSONResponse({"detail": f"Bad input. {problems}{more}", "errors": errors}, status_code=422)
 
 
 @app.get("/")

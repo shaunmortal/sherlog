@@ -94,6 +94,16 @@ def test_invalid_documents_are_refused_with_a_useful_422(change, loc, message):
     assert f"{'.'.join(map(str, loc[1:]))}: " in res.json()["detail"]
 
 
+def test_a_422_with_many_problems_keeps_its_detail_short_and_every_error_listed():
+    # a whole export with one wrong level name: the console shows the detail, a script reads `errors`
+    every_line_wrong = _sample_with(lambda d: [line.update(level="DEBUG") for line in d["logs"]])
+    body = _post("/api/triage", every_line_wrong).json()
+    lines = len(byo.sample()["logs"])
+    assert len(body["errors"]) == lines
+    assert body["detail"].count("logs.") == app.SHOWN_PROBLEMS
+    assert body["detail"].endswith(f"; and {lines - app.SHOWN_PROBLEMS} more.")
+
+
 def test_bodies_over_the_cap_are_refused_with_413_declared_or_streamed():
     too_big = b" " * (app.MAX_BODY_MB * 1_000_000 + 1)
     assert client.post("/api/triage", content=too_big).status_code == 413
