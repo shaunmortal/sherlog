@@ -78,3 +78,14 @@ def test_triage_replaces_the_last_outage_on_screen_even_while_paused(page, error
     sync_api.expect(page.locator("#map .pill")).to_have_count(0)  # no YOU, AI or CULPRIT from outage 41
     sync_api.expect(page.locator("#verdict")).not_to_contain_text("The culprit was")
     assert errors == []
+
+
+def test_a_keyboard_triage_keeps_focus_on_its_button(page, errors):
+    # the button is disabled while the triage runs, which on its own would drop focus to the page
+    page.goto(f"{URL}/console#data", wait_until="networkidle")  # the buttons listen once the console has its data
+    page.locator("#sampleUse").press("Enter")
+    sync_api.expect(page.locator("#status")).to_contain_text("Loaded the sample")
+    page.locator("#triageBtn").press("Enter")
+    sync_api.expect(page.locator("#status")).to_contain_text("Triage done.")
+    sync_api.expect(page.locator("#triageBtn")).to_be_focused()
+    assert errors == []
