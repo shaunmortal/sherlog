@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sherlog</title>
+<meta name="description" content="An AI on-call investigator that has to prove its answer: break a service, guess the culprit, and watch Claude find it.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='13' cy='13' r='8' fill='none' stroke='%231a2ffb' stroke-width='3.5'/><path d='M19 19l8 8' stroke='%231a2ffb' stroke-width='4' stroke-linecap='square'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css">
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
+                 "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+</script>
+<style>
+  html { scroll-behavior: smooth; scroll-padding-top: 90px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 0 max(5vw, 24px); }
+  @media (max-width: 760px) { .wrap { padding: 0 16px; } }
+  .mono { font-family: var(--mono); }
+  /* the ribbon and the liquid live on a fixed canvas behind everything */
+  .backdrop { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none; }
+  main { position: relative; z-index: 1; }
+
+  /* ---- scroll progress (where scroll-driven animations exist) ---- */
+  @supports (animation-timeline: scroll()) {
+    .progress { position: fixed; z-index: 30; top: 0; left: 0; right: 0; height: 2px; background: var(--accent); transform-origin: left;
+      animation: progress linear both; animation-timeline: scroll(root); }
+    @keyframes progress { from { transform: scaleX(0); } }
+  }
+
+  /* ---- pills: a fill wipes up from below, the label rolls ---- */
+  .pbtn { --fill: var(--accent); position: relative; isolation: isolate; overflow: hidden; display: inline-flex; align-items: center; gap: 14px; height: 52px; padding: 0 26px;
+    border: 0; border-radius: var(--pill); font: 500 14px var(--sans); letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; cursor: pointer; transition: color .4s ease; }
+  .pbtn::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--fill); transform: translateY(102%); transition: transform .5s var(--ease-snap); }
+  .pbtn:hover::before { transform: none; }
+  .pbtn:hover { color: #fff; }
+  .pbtn:active { transform: scale(.98); }
+  .pbtn .dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; transition: transform .4s var(--ease-lusion); }
+  .pbtn:hover .dot { transform: scale(1.8); }
+  .pbtn.light { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+  .pbtn.dark { background: #2b2e3a; color: #fff; }
+  .pbtn.sm { height: 44px; padding: 0 20px; font-size: 13px; }
+  .roll { position: relative; display: inline-block; overflow: hidden; vertical-align: top; }
+  .roll > span { display: block; transition: transform .5s var(--ease-lusion); }
+  .roll::after { content: attr(data-text); position: absolute; left: 0; top: 100%; white-space: nowrap; transition: transform .5s var(--ease-lusion); }
+  .pbtn:hover .roll > span, .pbtn:hover .roll::after { transform: translateY(-100%); }
+  .round { width: 46px; height: 46px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--sunk); color: var(--text); font-size: 17px; transition: background-color .4s ease, transform .4s var(--ease-lusion); }
+  .round:hover { background: var(--card); transform: rotate(180deg); }
+  @media (max-width: 760px) { .hide-sm { display: none; } }
+  .ctas { display: flex; flex-wrap: wrap; gap: 12px; }
+
+  /* ---- header ---- */
+  .nav { position: fixed; z-index: 20; top: 0; left: 0; right: 0; padding: 20px 0; transition: padding .5s var(--ease-lusion), background-color .5s ease; }
+  .nav.scrolled { padding: 10px 0; background: var(--nav-bg); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); }
+  .nav .wrap { display: flex; align-items: center; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; font: 500 24px/1 var(--sans); letter-spacing: .08em; }
+  .brand svg { width: 20px; height: 20px; }
+  .links { display: flex; gap: 2px; padding: 4px; border-radius: var(--pill); background: var(--sunk); }
+  .links a { padding: 10px 16px; border-radius: var(--pill); font: 500 13px var(--sans); letter-spacing: .03em; text-transform: uppercase; transition: background-color .4s ease; }
+  .links a:hover { background: var(--card); }
+  @media (max-width: 980px) { .links { display: none; } }
+
+  /* ---- hero: a sentence, a dark panel with the shop in 3D, a scroll hint ---- */
+  .hero { padding-top: 104px; }
+  .hero-intro { margin: 0 0 32px 25%; max-width: 21ch; font: 400 clamp(26px, 2.9vw, 44px)/1.1 var(--sans); letter-spacing: -.025em; }
+  @media (max-width: 860px) { .hero-intro { margin-left: 0; } }
+  @media (max-width: 760px) {
+    .hero .hero-panel { height: 400px; min-height: 0; }
+    .lbl3d .name { display: none; }  /* too small to read on a phone; the tags stay */
+    .nav .pbtn.sm { padding: 0 16px; font-size: 12px; gap: 10px; }
+    .brand { font-size: 20px; }
+  }
+  .hero-panel { position: relative; height: min(74vh, 760px); min-height: 440px; overflow: hidden; border-radius: var(--radius);
+    background: radial-gradient(120% 100% at 72% 18%, #1c2148 0%, #0c0d12 58%); color: var(--on-panel);
+    --bg: #12141c; --text: #f0f1fa; --line-strong: #3a3f50; }
+  #hero3d { position: absolute; inset: 0; cursor: grab; }
+  #hero3d canvas { display: block; }
+  #hero3d.flat svg { position: absolute; inset: 70px 24px 80px; width: calc(100% - 48px); height: calc(100% - 150px); }
+  .labels3d { position: absolute; inset: 0; pointer-events: none; }
+  .lbl3d { display: flex; flex-direction: column; align-items: center; gap: 5px; padding-top: 22px; font: 500 11px var(--mono); letter-spacing: .04em; color: rgba(240, 241, 250, .72); }
+  .lbl3d .name { padding: 2px 8px; border-radius: var(--pill); background: rgba(12, 13, 18, .72); }
+  .tags3d { display: flex; gap: 4px; }
+  .tags3d b { padding: 2px 8px; border-radius: var(--pill); font: 600 10px var(--mono); letter-spacing: .06em; animation: pop .6s var(--spring); }
+  .tags3d .ai { background: var(--lime); color: #000; } .tags3d .verified { background: #1a2ffb; color: #fff; }
+  .hud { position: absolute; left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; pointer-events: none;
+    font: 500 12px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: rgba(240, 241, 250, .62); }
+  .hud.top { top: 22px; align-items: flex-start; }
+  .hud.bottom { bottom: 22px; }
+  .caption { max-width: 56ch; font: 400 15px/1.45 var(--mono); letter-spacing: 0; text-transform: none; color: #fff; }
+  .live-dot { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--signal); animation: beat 1.6s ease-in-out infinite; }
+  @keyframes beat { 50% { opacity: .25; } }
+  .crosses { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; font: 500 13px var(--sans); letter-spacing: .04em; text-transform: uppercase; }
+  .crosses i { font: 300 24px/1 var(--sans); font-style: normal; }
+  .scroll-hint { display: inline-flex; align-items: center; gap: 10px; }
+  .scroll-hint .arrow { animation: bob 3s cubic-bezier(.1, 0, .1, 1) infinite; }
+  @keyframes bob { 0%, 100% { transform: translateY(-3px); opacity: .35; } 50% { transform: translateY(4px); opacity: 1; } }
+  @media (max-width: 760px) { .crosses i:nth-child(2), .crosses i:nth-child(4) { display: none; } }
+
+  /* ---- the statement ---- */
+  .statement { padding: 18vh 0 16vh; }
+  .display { margin: 0; font: 400 clamp(58px, 10.4vw, 156px)/.96 var(--sans); letter-spacing: -.05em; }
+  .display .line { display: block; overflow: hidden; padding-bottom: .07em; }
+  .display .line > span { display: inline-block; }
+  .display .indent { padding-left: 15%; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2vw; margin-top: 7vh; }
+  .lede { margin: 0 0 36px; max-width: 34ch; font: 400 clamp(19px, 1.6vw, 24px)/1.4 var(--sans); letter-spacing: -.01em; }
+  .fine { margin: 18px 0 0; font: 13px var(--mono); color: var(--muted); }
+  @media (max-width: 860px) { .split { grid-template-columns: minmax(0, 1fr); } .split > :first-child { display: none; } .display .indent { padding-left: 0; } }
+
+  /* ---- section heads ---- */
+  .band { padding: 15vh 0; }
+  .eyebrow { display: flex; align-items: center; gap: 10px; margin: 0 0 28px; font: 500 13px var(--sans); letter-spacing: .04em; text-transform: uppercase; }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .eyebrow .num { color: var(--muted); }
+  .head2 { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); align-items: end; gap: 2vw; margin-bottom: 64px; }
+  h2 { margin: 0; font: 400 clamp(42px, 6.6vw, 104px)/.98 var(--sans); letter-spacing: -.045em; }
+  .w { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .08em; margin-bottom: -.08em; }
+  .w > span { display: inline-block; }
+  .sub { margin: 0; font: 400 clamp(17px, 1.3vw, 20px)/1.5 var(--sans); color: var(--muted); }
+  @media (max-width: 860px) { .head2 { grid-template-columns: minmax(0, 1fr); gap: 24px; margin-bottom: 40px; } }
+
+  /* ---- 01: the wall of red ---- */
+  .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 960px) { .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 620px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
+  .card { position: relative; display: grid; gap: 10px; padding: 18px 18px 14px; border: 0; border-radius: var(--radius); background: var(--card); color: var(--text); box-shadow: var(--shadow);
+    text-align: left; font: inherit; cursor: default; transition: background-color .5s var(--ease-lusion), color .5s ease, transform .5s var(--ease-lusion), opacity .5s ease; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .card-head b { font: 500 16px var(--sans); letter-spacing: -.01em; }
+  .card svg { width: 100%; height: auto; overflow: visible; }
+  .spark { fill: none; stroke: var(--trace); stroke-width: 1.4; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; transition: stroke .5s ease; }
+  .cards.drawn .spark { animation: draw 1.4s var(--ease-lusion) backwards; animation-delay: calc(var(--i) * 45ms); }
+  @keyframes draw { from { stroke-dashoffset: 1; } }
+  .card-val { font: 13px var(--mono); color: var(--muted); text-align: right; transition: color .5s ease; }
+  .card.lit { background: var(--signal); color: #fff; animation: shake .5s var(--ease-quad); }
+  .card.lit .spark { stroke: #fff; }
+  .card.lit .card-val { color: #fff; }
+  @keyframes shake { 20% { transform: translateX(-4px); } 45% { transform: translateX(4px); } 70% { transform: translateX(-1px); } }
+  .cards.ready .card { cursor: pointer; }
+  .cards.ready:not(.solved) .card:hover { transform: translateY(-4px); }
+  .tag { padding: 2px 9px; border-radius: var(--pill); font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+  .tag:empty { display: none; }
+  .card.cause { box-shadow: 0 0 0 3px var(--text); }
+  .card.cause .tag { background: #000; color: #fff; }
+  .card.victim { background: var(--bad-soft); color: var(--bad); }
+  .card.victim .spark { stroke: var(--bad); } .card.victim .card-val { color: var(--bad); }
+  .card.victim .tag { background: var(--bad); color: #fff; }
+  .cards.solved .card:not(.cause):not(.victim) { opacity: .35; }
+  .card.guessed::after { content: "your guess"; position: absolute; left: 18px; bottom: 0; transform: translateY(50%); padding: 2px 9px; border-radius: var(--pill);
+    background: var(--accent); color: #fff; font: 600 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+  .answer { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 32px; min-height: 44px; max-width: 70ch; font-size: 18px; line-height: 1.5; }
+  .answer a { color: var(--accent); }
+
+  /* ---- 02: how it works, a dark stage pinned beside the steps ---- */
+  .story { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 4vw; }
+  .steps { padding-bottom: 18vh; }  /* room for the stage to stay pinned while the last step is read */
+  .step { min-height: 72vh; display: flex; flex-direction: column; justify-content: center; opacity: .25; transition: opacity .6s var(--ease-lusion); }
+  .step.on { opacity: 1; }
+  .step .num { align-self: flex-start; padding: 4px 12px; border-radius: var(--pill); background: var(--sunk); font: 500 12px var(--sans); letter-spacing: .06em; }
+  .step h3 { margin: 18px 0 14px; font: 400 clamp(30px, 2.8vw, 44px)/1.05 var(--sans); letter-spacing: -.035em; }
+  .step p { margin: 0; max-width: 40ch; font-size: 18px; line-height: 1.55; color: var(--muted); }
+  .stage { position: sticky; top: 96px; align-self: start; height: min(560px, calc(100vh - 130px)); margin-top: 14vh; overflow: hidden; border-radius: var(--radius); background: var(--panel); color: var(--on-panel);
+    --text: #f0f1fa; --muted: #9599a8; --line: #262a36; --line-strong: #3a3f50; --ink: #f0f1fa; --on-ink: #0c0d12; --trace: #f0f1fa; --axis: #7d8193;
+    --ok: var(--lime); --ok-soft: rgba(193, 255, 0, .12); --bad: #ff6a60; --bad-soft: rgba(255, 76, 65, .2); --bg: var(--panel); --signal-wash: rgba(255, 76, 65, .16); }
+  .stage-bar { display: flex; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--line); font: 500 12px var(--sans); letter-spacing: .06em; color: var(--muted); }
+  .stage-bar b { color: var(--text); font-weight: 500; }
+  .layer { position: absolute; inset: 47px 0 0; padding: 24px; overflow: hidden; opacity: 0; transform: translateY(16px) scale(.985); filter: blur(6px); pointer-events: none;
+    transition: opacity .6s var(--ease-lusion), transform .7s var(--ease-lusion), filter .6s var(--ease-lusion); }
+  .layer.on { opacity: 1; transform: none; filter: none; pointer-events: auto; }
+  @media (max-width: 900px) {
+    .story { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .stage { order: -1; top: 70px; height: 390px; margin-top: 0; z-index: 2; }
+    .step { min-height: 62vh; }
+  }
+  /* layer 0: the alarm */
+  .chart { width: 100%; height: auto; overflow: visible; }
+  .chart .trace { fill: none; stroke: var(--trace); stroke-width: 1.6; stroke-linejoin: round; stroke-dasharray: 1; }
+  .chart .limit { stroke: var(--axis); stroke-dasharray: 4 4; }
+  .chart .wash { fill: var(--signal-wash); }
+  .chart .alarm-line { stroke: var(--signal); }
+  .chart text { font: 11px var(--mono); fill: var(--axis); }
+  .chart .alarm-label { font-weight: 600; fill: var(--signal); }
+  .layer.play .trace { animation: draw 1.6s var(--ease-lusion) backwards; }
+  .layer.play .limit, .layer.play .limit-label { animation: fade .5s ease 1s backwards; }
+  .layer.play .wash { transform-box: fill-box; transform-origin: left; animation: grow-x .9s var(--ease-lusion) 1.3s backwards; }
+  .layer.play .alarm-line, .layer.play .alarm-label { animation: fade .3s ease 1.3s backwards; }
+  .zbig { margin: 20px 0 0; font: 400 56px/1 var(--sans); letter-spacing: -.04em; }
+  .zbig small { display: block; margin-top: 8px; font: 13px var(--mono); color: var(--muted); letter-spacing: 0; }
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes grow-x { from { transform: scaleX(0); } }
+  /* layer 1: the flight log */
+  .tlog { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .tlog li { border-left: 2px solid var(--text); padding: 1px 0 1px 12px; font: 13px/1.45 var(--mono); }
+  .tlog li small { display: block; color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .tlog li.think { border-color: transparent; font: italic 14px/1.5 var(--sans); color: var(--muted); }
+  .cid { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; background: var(--ink); color: var(--on-ink); font: 600 11px var(--mono); }
+  .layer.play .tlog li { animation: rise .5s var(--ease-lusion) backwards; animation-delay: var(--d); }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); filter: blur(4px); } }
+  /* layer 2: the checks */
+  .checks { list-style: none; margin: 0 0 16px; padding: 0; border-top: 1px solid var(--line); }
+  .checks li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .checks .s-name { font: 500 16px var(--sans); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { padding: 0 6px; border-radius: 6px; border: 1px solid var(--line-strong); font: 600 11px var(--mono); color: var(--muted); }
+  .chip.ok { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+  .badge { padding: 3px 10px; border-radius: var(--pill); font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+  .badge.ok { background: var(--ok); color: #000; } .badge.bad { background: var(--bad-soft); color: var(--bad); }
+  .conf { grid-column: 1 / -1; height: 3px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .conf span { display: block; height: 100%; background: var(--text); transform-origin: left; }
+  .layer.play .chip { animation: chip .3s ease backwards; animation-delay: var(--d); }
+  @keyframes chip { from { background: transparent; color: var(--muted); border-color: var(--line-strong); transform: scale(.8); } }
+  .layer.play .badge { animation: pop .6s var(--spring) backwards; animation-delay: var(--d); }
+  .layer.play .conf span { animation: grow-x .9s var(--ease-lusion) backwards; animation-delay: var(--d); }
+  .blast-line { margin: 0 0 8px; font: 13px/1.5 var(--mono); color: var(--ok); }
+  .blast-map { display: block; width: 100%; max-height: 200px; }
+  .blast-map .node:not(.bad) { opacity: .25; }
+  .blast-map .edge:not(.sick) { opacity: .25; }
+  @media (max-width: 900px) { .blast-map { display: none; } }
+  .layer.play .blast-line { animation: fade .6s ease 1.6s backwards; }
+  /* layer 3: the verdict */
+  .banner { margin-bottom: 16px; padding: 14px 16px; border-radius: 12px; background: var(--ok-soft); font-size: 15px; }
+  .banner strong { color: var(--ok); font-weight: 500; }
+  .note-card { margin-bottom: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; font-size: 14px; line-height: 1.55; }
+  .note-card h4 { margin: 0 0 6px; font: 500 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .note-card p { margin: 0; }
+  .layer.play .banner { animation: rise .6s var(--ease-lusion) backwards; }
+  .layer.play .note-card { animation: rise .6s var(--ease-lusion) backwards; animation-delay: var(--d); }
+  .layer.play .wd { animation: fade .25s ease backwards; animation-delay: var(--d); }
+
+  /* ---- 03 / 04: the numbers ---- */
+  .bigstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 64px; }
+  .bigstats div { padding: 28px 28px 24px; border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); }
+  .bigstats b { display: block; font: 400 clamp(52px, 6.4vw, 104px)/1 var(--sans); letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+  .bigstats span { display: block; margin-top: 14px; font: 13px/1.5 var(--mono); color: var(--muted); }
+  @media (max-width: 760px) { .bigstats { grid-template-columns: minmax(0, 1fr); } }
+  .bars { display: grid; }
+  .bar-row { display: grid; grid-template-columns: minmax(150px, 300px) minmax(0, 1fr) 80px; gap: 6px 24px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .bar-label { font-size: 17px; letter-spacing: -.01em; }
+  .bar-label small { display: block; margin-top: 2px; font: 12px var(--mono); color: var(--muted); }
+  .bar-track { height: 12px; overflow: hidden; border-radius: var(--pill); background: var(--sunk); }
+  .bar-fill { display: block; width: calc(var(--v) * 100%); height: 100%; border-radius: var(--pill); background: var(--text); transform-origin: left; }
+  .bar-fill.muted { background: var(--line-strong); }
+  .bar-fill.accent { background: var(--accent); }
+  .bar-val { font: 400 26px var(--sans); letter-spacing: -.03em; text-align: right; font-variant-numeric: tabular-nums; }
+  .bars.play .bar-fill { animation: grow-x 1.2s var(--ease-lusion) backwards; animation-delay: var(--d); }
+  .flag { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: var(--pill); vertical-align: 3px; font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; background: var(--ok-soft); color: var(--ok); }
+  .flag.bad { background: var(--bad-soft); color: var(--bad); }
+  @media (max-width: 620px) { .bar-row { grid-template-columns: minmax(0, 1fr) 64px; } .bar-track { grid-column: 1 / -1; grid-row: 2; } }
+  .note { margin: 28px 0 0; max-width: 80ch; font-size: 15px; line-height: 1.6; color: var(--muted); }
+
+  /* ---- the dark end: hard mode, the call to action, the footer ---- */
+  .end { background: #000; color: #f0f1fa; border-radius: calc(var(--radius) * 2) calc(var(--radius) * 2) 0 0;
+    --text: #f0f1fa; --muted: #8e92a3; --line: #1d2029; --line-strong: #3a3e4c; --sunk: #15171e; --card: #101219;
+    --ok: var(--lime); --ok-soft: rgba(193, 255, 0, .12); --bad: #ff6a60; --bad-soft: rgba(255, 76, 65, .18); --accent: #4b5dff; }
+  .end .band { padding-bottom: 10vh; }
+  .marquee { overflow: hidden; padding: 6vh 0 2vh; white-space: nowrap; }
+  .marquee .track { display: inline-flex; animation: marquee 45s linear infinite; }
+  .marquee span { padding-right: .35em; font: 400 clamp(72px, 12vw, 200px)/1 var(--sans); letter-spacing: -.05em; color: transparent; -webkit-text-stroke: 1px rgba(240, 241, 250, .35); }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  .cta { padding: 4vh 0 16vh; text-align: center; }
+  .cta h2 { margin: 0 auto 20px; font-size: clamp(56px, 9vw, 140px); }
+  .cta p { margin: 0 auto 40px; max-width: 46ch; font-size: 19px; line-height: 1.5; color: var(--muted); }
+  .cta .ctas { justify-content: center; }
+  .end .pbtn.light { background: #f0f1fa; color: #000; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; font: 13px/1.7 var(--sans); color: var(--muted); }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
+</style>
+</head>
+<body>
+<div class="progress" aria-hidden="true"></div>
+<canvas class="backdrop" id="ribbon" aria-hidden="true"></canvas>
+
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Sherlog home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13" cy="13" r="8" fill="none" stroke="var(--accent)" stroke-width="4"/><path d="M19 19l8 8" stroke="var(--accent)" stroke-width="4.5" stroke-linecap="square"/></svg>
+      SHERLOG
+    </a>
+    <nav class="links" aria-label="Sections">
+      <a href="#problem">Problem</a><a href="#how">How it works</a><a href="#results">Results</a><a href="#hard">Hard mode</a>
+    </nav>
+    <button type="button" class="round" id="themeBtn" aria-label="Switch light or dark theme">◐</button>
+    <a class="pbtn dark sm" href="/console"><span class="roll" data-text="Open console"><span>Open console</span></span><span class="dot"></span></a>
+  </div>
+</header>
+
+<main>
+  <section class="hero" aria-labelledby="heroTitle">
+    <div class="wrap">
+      <p class="hero-intro" id="heroIntro">An AI on-call investigator that has to prove its answer.</p>
+      <div class="hero-panel">
+        <div id="hero3d" role="img" aria-label="The simulated shop's 11 services in 3D. One breaks, the failure travels up to its callers, and the agent names the cause."></div>
+        <div class="hud top"><span><span class="live-dot"></span>Outage #41 · replayed from the benchmark</span><span class="hide-sm">Move to look around</span></div>
+        <div class="hud bottom"><span class="caption" id="heroCaption">Loading the shop…</span></div>
+      </div>
+      <div class="crosses" aria-hidden="true"><i>+</i><i>+</i><span class="scroll-hint">Scroll to explore <span class="arrow">↓</span></span><i>+</i><i>+</i></div>
+    </div>
+  </section>
+
+  <section class="statement">
+    <div class="wrap">
+      <h1 class="display" id="heroTitle"><span class="line indent"><span>Find the cause,</span></span><span class="line"><span>not the victims.</span></span></h1>
+      <div class="split">
+        <div></div>
+        <div>
+          <p class="lede">When one service breaks, everything that calls it breaks too. Sherlog sends a Claude agent to investigate with real tools, and plain code checks every piece of evidence before it answers.</p>
+          <div class="ctas">
+            <a class="pbtn light" href="/console"><span class="dot"></span><span class="roll" data-text="Break something"><span>Break something</span></span></a>
+            <a class="pbtn dark" href="/console#replay/41"><span class="roll" data-text="Watch an outage"><span>Watch an outage</span></span><span class="dot"></span></a>
+          </div>
+          <p class="fine">No sign-up. Recorded outages replay for free.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="problem">
+    <div class="wrap">
+      <p class="eyebrow"><span class="dot"></span><span class="num">01</span> The problem</p>
+      <div class="head2">
+        <h2>One broken service. A wall of red.</h2>
+        <p class="sub">A real recorded outage: the latency of all eleven services, up to the moment the alarm called the agent. Several look broken. Only one of them is. Which?</p>
+      </div>
+      <div class="cards" id="cards"></div>
+      <div class="answer" aria-live="polite"><button type="button" class="pbtn light sm" id="revealBtn" hidden><span class="roll" data-text="Show me"><span>Show me</span></span><span class="dot"></span></button><span id="answerText"></span></div>
+    </div>
+  </section>
+
+  <section class="band" id="how">
+    <div class="wrap">
+      <p class="eyebrow"><span class="dot"></span><span class="num">02</span> How it works</p>
+      <div class="head2">
+        <h2>An investigation you can check.</h2>
+        <p class="sub">The same outage, step by step: what the alarm saw, what Claude asked, what the code checked, and what came out.</p>
+      </div>
+      <div class="story">
+        <div class="steps">
+          <article class="step" data-step="0"><span class="num">Step 1</span><h3>The alarm fires.</h3>
+            <p>A metric stays 4σ above its normal level for 15 seconds. That part is plain statistics, no AI, so what the AI adds can be measured on its own.</p></article>
+          <article class="step" data-step="1"><span class="num">Step 2</span><h3>Claude investigates.</h3>
+            <p>With read-only tools: metrics, logs and the call graph. Nobody tells it what broke. Every tool result gets an id like <span class="mono">c3</span>, so each claim it makes can be traced.</p></article>
+          <article class="step" data-step="2"><span class="num">Step 3</span><h3>Code checks the evidence.</h3>
+            <p>A suspect counts only if a tool call it cites really showed it abnormal. Then a blast-radius check asks whether the answer explains every red service through the call graph. No second AI, no trust.</p></article>
+          <article class="step" data-step="3"><span class="num">Step 4</span><h3>An answer, or a human.</h3>
+            <p>Verified and at least 80% confident: Sherlog answers, and drafts the ticket note for engineers and the update for customers. Anything less goes to a person.</p></article>
+        </div>
+        <div class="stage" aria-hidden="true">
+          <div class="stage-bar"><span>OUTAGE <b id="stageId">#41</b></span><span id="stageStep">1 / 4 · ALARM</span></div>
+          <div class="layer on" data-layer="0"><svg class="chart" id="alarmChart" viewBox="0 0 560 230"></svg><p class="zbig" id="alarmZ"></p></div>
+          <div class="layer" data-layer="1"><ol class="tlog" id="tlog"></ol></div>
+          <div class="layer" data-layer="2"><ol class="checks" id="checks"></ol><p class="blast-line" id="blastLine"></p><svg class="blast-map" id="blastMap" viewBox="0 0 800 340"></svg></div>
+          <div class="layer" data-layer="3" id="verdictLayer"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="results">
+    <div class="wrap">
+      <p class="eyebrow"><span class="dot"></span><span class="num">03</span> Results</p>
+      <div class="head2">
+        <h2>Tested on <span class="evN">132</span> outages it had never seen.</h2>
+        <p class="sub">Three outages for every service and fault type, on seeds kept apart while the agent was built. "Cause first": the true cause ranked first and accepted by the verifier.</p>
+      </div>
+      <div class="bigstats" id="bigstats"></div>
+      <div class="bars" id="bars"></div>
+      <p class="note" id="resultsNote"></p>
+    </div>
+  </section>
+
+  <div class="end">
+    <section class="band" id="hard">
+      <div class="wrap">
+        <p class="eyebrow"><span class="dot"></span><span class="num">04</span> Hard mode</p>
+        <div class="head2">
+          <h2>Then we planted a decoy.</h2>
+          <p class="sub">An unrelated service gets a harmless anomaly at the same moment as the real fault (a batch job pinning a CPU, a cache warm-up filling a heap), and callers log 60% fewer complaints. This is where the models separate.</p>
+        </div>
+        <div class="bars" id="hardBars"></div>
+        <p class="note" id="hardNote"></p>
+      </div>
+    </section>
+
+    <div class="marquee" aria-hidden="true"><div class="track">
+      <span>Break something · Guess the culprit · Watch Claude prove it ·</span><span>Break something · Guess the culprit · Watch Claude prove it ·</span>
+    </div></div>
+
+    <section class="cta">
+      <div class="wrap">
+        <h2>Your turn.</h2>
+        <p>Break a service, lock in your guess, and see who wins: you, Claude, or the classic no-AI ranking.</p>
+        <div class="ctas">
+          <a class="pbtn light" href="/console"><span class="dot"></span><span class="roll" data-text="Open the console"><span>Open the console</span></span></a>
+          <a class="pbtn dark" href="/console#evidence"><span class="roll" data-text="Every number"><span>Every number</span></span><span class="dot"></span></a>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <span>Built from scratch for IceHacks 2026 · Claude Haiku, Sonnet and Opus 5.5 · MIT</span>
+        <span>The telemetry is simulated, so the numbers are optimistic.</span>
+      </div>
+    </footer>
+  </div>
+</main>
+
+<script src="/static/shared.js"></script>
+<script>
+const STORY_REPLAY = 41;          // the outage the page tells: cache slows down, the no-AI ranking blames cart
+const STEP_NAMES = ['ALARM', 'INVESTIGATION', 'VERIFIER', 'VERDICT'];
+const ALARM_WINDOW_TICKS = 36;   // the alarm chart shows 3 minutes before the alarm
+let META = null, STORY = null, guessed = null, activeStep = -1;
+
+const callersOf = (s) => META.services.filter((x) => s in (META.calls[x] ?? {}));
+
+/** The cause first, then its callers, then theirs: the order a fault spreads. */
+function spreadOrder(root) {
+  const order = [root];
+  for (let i = 0; i < order.length; i++) order.push(...callersOf(order[i]).filter((c) => !order.includes(c)));
+  return order;
+}
+
+function byType(events) {
+  return {
+    telemetry: events.find((e) => e.type === 'telemetry'),
+    tools: events.filter((e) => e.type === 'tool'),
+    thinking: events.find((e) => e.type === 'thinking')?.text ?? '',
+    verdict: events.find((e) => e.type === 'verdict'),
+    truth: events.find((e) => e.type === 'truth'),
+  };
+}
+
+// ---- hero ---------------------------------------------------------------------------------
+
+function heroIn() {
+  enter([$('#heroIntro')], { ...REVEAL, delay: 100 });
+  enter([$('.hero-panel')], { duration: 1400, delay: 250, easing: 'lusion', y: 40, scale: .97, blur: 0 });
+  enter([$('.crosses')], { duration: 900, delay: 900, y: 0 });
+}
+
+/** A flat map of the shop in `map`: the fallback hero, and the verifier's blast map. */
+function drawShop(map) {
+  map.replaceChildren();
+  const marker = svg('marker', { id: `${map.id}Arrow`, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' });
+  marker.append(svg('path', { d: 'M0,0 L10,5 L0,10 z', class: 'arrow-head' }));
+  const defs = svg('defs');
+  defs.append(marker);
+  map.append(defs);
+  const edges = {}, nodes = {};
+  for (const [caller, callees] of Object.entries(META.calls)) {
+    for (const callee of Object.keys(callees)) {
+      edges[`${caller}>${callee}`] = svg('line', { ...edgeEnds(POS[caller], POS[callee]), class: 'edge', 'marker-end': `url(#${map.id}Arrow)` });
+      map.append(edges[`${caller}>${callee}`]);
+    }
+  }
+  for (const s of META.services) {
+    const [cx, cy] = POS[s];
+    const g = svg('g', { class: 'node', transform: `translate(${cx - NODE_W / 2},${cy - NODE_H / 2})` });
+    const label = svg('text', { x: NODE_W / 2, y: NODE_H / 2 + 4.5, 'text-anchor': 'middle' });
+    label.textContent = s;
+    g.append(svg('rect', { class: 'halo', width: NODE_W, height: NODE_H }), svg('rect', { class: 'box', width: NODE_W, height: NODE_H }), label);
+    nodes[s] = g;
+    map.append(g);
+  }
+  return { nodes, edges };
+}
+
+function setLevel({ nodes, edges }, service, level) {
+  const g = nodes[service];
+  g.classList.remove('warn', 'bad', 'flash');
+  if (level !== 'ok') { g.classList.add(level); void g.getBoundingClientRect(); g.classList.add('flash'); }
+  for (const [key, line] of Object.entries(edges)) if (key.endsWith(`>${service}`)) line.classList.toggle('sick', level !== 'ok');
+}
+
+function tagNode({ nodes }, service, tags) {
+  nodes[service].querySelectorAll('.pill').forEach((p) => p.remove());
+  let x = 0;
+  for (const [cls, text, width] of tags) {
+    const pill = svg('g', { class: `pill ${cls}`, transform: `translate(${x},-17)` });
+    const body = svg('g', { class: 'pop' });
+    const label = svg('text', { x: width / 2, y: 10, 'text-anchor': 'middle' });
+    label.textContent = text;
+    body.append(svg('rect', { width, height: 14 }), label);
+    pill.append(body);
+    nodes[service].append(pill);
+    x += width + 4;
+  }
+}
+
+/** The hero's shop: in 3D where WebGL works, a flat map otherwise. Both take setLevel and tag. */
+async function makeHeroShop() {
+  const host = $('#hero3d');
+  try {
+    const { createShop3D } = await import('/static/hero3d.js');
+    return createShop3D(host, META, POS, !MOTION);
+  } catch {
+    host.replaceChildren();
+    host.classList.add('flat');
+    const map = svg('svg', { id: 'heroMap', viewBox: '0 0 800 340' });
+    host.append(map);
+    const shop = drawShop(map);
+    return { setLevel: (s, level) => setLevel(shop, s, level), tag: (s, tags) => tagNode(shop, s, tags) };
+  }
+}
+
+/** The hero plays the recorded outage on a loop: the fault, the spread, the agent's calls, the verified answer. */
+async function heroLoop() {
+  const shop = await makeHeroShop();
+  const { truth, verdict, tools } = STORY;
+  const broken = verdict.blast.abnormal;
+  const victims = spreadOrder(truth.root).filter((s) => s !== truth.root && broken.includes(s));
+  const caption = $('#heroCaption');
+  const say = (text) => { caption.textContent = text; enter([caption], { duration: 500, y: 6, blur: 4, easing: 'lusion' }); };
+  const answered = () => {
+    shop.tag(truth.root, [['ai', 'AI', 22], ['verified', 'VERIFIED', 64]]);
+    say(`${verdict.answer}: verified, and it explains all ${broken.length} broken services.`);
+  };
+  if (!MOTION) { for (const s of broken) shop.setLevel(s, 'bad'); answered(); return; }
+  for (;;) {
+    for (const s of META.services) shop.setLevel(s, 'ok');
+    shop.tag(truth.root, []);
+    say(`Watching ${META.services.length} services. Requests flow from callers to the services they call.`);
+    await sleep(3000);
+    shop.setLevel(truth.root, 'bad');
+    say(`${truth.root} slows down: ${META.faults[truth.fault]}.`);
+    await sleep(1600);
+    for (const v of victims) { shop.setLevel(v, 'bad'); await sleep(500); }
+    say(`Alarm: ${broken.length} services look broken. Which one is the cause?`);
+    await sleep(2400);
+    for (const t of tools) {
+      say(`Claude · ${t.id} ${t.name.replace(/_/g, ' ')}${t.args?.service ? ` (${t.args.service})` : ''}`);
+      await sleep(800);
+    }
+    answered();
+    await sleep(4600);
+  }
+}
+
+// ---- 01: the wall of red ------------------------------------------------------------------
+
+function buildCards() {
+  const { series, now } = STORY.telemetry;
+  const z = zAt(series, 'latency_ms', now, META.baseline_ticks, META.std_floor);
+  const cards = META.services.map((s, i) => {
+    const values = series[s].latency_ms.slice(0, now + 1);
+    const lo = Math.min(...values), span = (Math.max(...values) - lo) || 1;
+    const points = values.map((v, k) => `${((k / (values.length - 1)) * 200).toFixed(1)},${(44 - ((v - lo) / span) * 40).toFixed(1)}`).join(' ');
+    const chart = svg('svg', { viewBox: '0 0 200 48', 'aria-hidden': 'true' });
+    chart.append(svg('polyline', { points, pathLength: 1, class: 'spark', style: `--i:${i}` }));
+    return el('button', { type: 'button', class: 'card', 'data-service': s, 'data-level': levelOf(z[s]), onclick: () => guess(s),
+      'aria-label': `${s}, latency ${Math.round(values[values.length - 1])} ms` },
+      el('span', { class: 'card-head' }, el('b', {}, s), el('span', { class: 'tag' })),
+      chart, el('span', { class: 'card-val' }, `${Math.round(values[values.length - 1])} ms`));
+  });
+  $('#cards').replaceChildren(...cards);
+  $('#revealBtn').addEventListener('click', solve);
+  revealOnScroll([$('#cards')], () => { enter(cards, { duration: 900, stagger: 40, easing: 'lusion', y: 24 }); cascade(cards); }, { none: true });
+}
+
+async function cascade(cards) {
+  $('#cards').classList.add('drawn');
+  await sleep(MOTION ? 1500 : 0);
+  const order = spreadOrder(STORY.truth.root);
+  const lit = cards.filter((c) => c.dataset.level !== 'ok')
+    .sort((a, b) => order.indexOf(a.dataset.service) - order.indexOf(b.dataset.service));
+  for (const c of lit) { c.classList.add('lit'); if (MOTION) await sleep(280); }
+  $('#cards').classList.add('ready');
+  $('#revealBtn').hidden = false;
+  $('#answerText').textContent = `${lit.length} of ${cards.length} look broken. Click the one you think broke first.`;
+  enter([$('.answer')], { duration: 600, y: 8, easing: 'lusion' });
+}
+
+function guess(service) {
+  if (guessed || !$('#cards').classList.contains('ready') || $('#cards').classList.contains('solved')) return;
+  guessed = service;
+  solve();
+}
+
+function solve() {
+  const { truth } = STORY;
+  const grid = $('#cards');
+  if (grid.classList.contains('solved')) return;
+  grid.classList.add('solved');
+  for (const card of grid.children) {
+    const s = card.dataset.service;
+    const role = s === truth.root ? 'cause' : card.dataset.level !== 'ok' ? 'victim' : null;
+    if (role) { card.classList.remove('lit'); card.classList.add(role, ...(role === 'cause' ? ['lit'] : [])); card.querySelector('.tag').textContent = role; }
+    if (s === guessed) card.classList.add('guessed');
+  }
+  enter(grid.querySelectorAll('.cause .tag, .victim .tag'), { duration: 600, easing: 'spring', y: 0, scale: .5, stagger: 90 });
+  $('#revealBtn').hidden = true;
+  const you = guessed ? (guessed === truth.root ? `You picked ${guessed}: right. ` : `You picked ${guessed}: a victim. `) : '';
+  const ranking = truth.baseline_top1 ? `The no-AI ranking got it too.` : `A classic no-AI ranking blamed ${truth.baseline[0]}, the loudest victim.`;
+  $('#answerText').replaceChildren(`${you}The cause was ${truth.root}. ${ranking} Sherlog's agent named ${truth.ai_answer ?? 'no one'} and proved it. `,
+    el('a', { href: '#how' }, 'Here is how ↓'));
+  enter([$('#answerText')], { duration: 600, y: 8, blur: 4, easing: 'lusion' });
+}
+
+// ---- 02: the pinned stage ------------------------------------------------------------------
+
+function buildAlarm() {
+  const { telemetry, truth } = STORY;
+  const full = telemetry.series[truth.root].latency_ms.slice(0, telemetry.now + 1);
+  const base = full.slice(0, META.baseline_ticks);
+  const from = Math.max(0, telemetry.alarm - ALARM_WINDOW_TICKS);  // the last few minutes, so the jump has room
+  const values = full.slice(from);
+  const alarmAt = telemetry.alarm - from;
+  const mean = base.reduce((a, v) => a + v, 0) / base.length;
+  const std = Math.max(Math.sqrt(base.reduce((a, v) => a + (v - mean) ** 2, 0) / base.length), META.std_floor.latency_ms);
+  const limit = mean + ALARM_Z * std;
+  const W = 560, H = 200, top = 20, hi = Math.max(...values, limit), lo = Math.min(...values);
+  const x = (i) => (i / (values.length - 1)) * W;
+  const y = (v) => top + (H - top) - ((v - lo) / ((hi - lo) || 1)) * (H - top);
+  const label = (attrs, text) => { const t = svg('text', attrs); t.textContent = text; return t; };
+  $('#alarmChart').replaceChildren(
+    svg('rect', { class: 'wash', x: x(alarmAt), y: 0, width: W - x(alarmAt), height: H }),
+    svg('line', { class: 'limit', x1: 0, x2: W, y1: y(limit), y2: y(limit) }),
+    label({ class: 'limit-label', x: 4, y: y(limit) - 6 }, `normal + ${ALARM_Z}σ`),
+    svg('polyline', { class: 'trace', pathLength: 1, points: values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ') }),
+    svg('line', { class: 'alarm-line', x1: x(alarmAt), x2: x(alarmAt), y1: 0, y2: H }),
+    label({ class: 'alarm-label', x: x(alarmAt) - 6, y: 14, 'text-anchor': 'end' }, 'ALARM'),
+    label({ x: 0, y: H + 22 }, `${truth.root} · latency`),
+    label({ x: W, y: H + 22, 'text-anchor': 'end' }, `${Math.round(values[values.length - 1])} ms`));
+  const z = zAt(telemetry.series, 'latency_ms', telemetry.alarm, META.baseline_ticks, META.std_floor)[truth.root];
+  $('#alarmZ').replaceChildren(`${Math.round(z)}σ`, el('small', {}, `above normal when the alarm fired · threshold ${ALARM_Z}σ for 15 s`));
+}
+
+function buildLog() {
+  const items = STORY.tools.map((t) => {
+    const detail = t.text.split('\n').slice(1).find((line) => line.trim()) ?? '';
+    const args = Object.values(t.args ?? {}).join(', ');
+    return el('li', {}, el('span', { class: 'cid' }, t.id), t.id === 'c0' ? 'top anomalies (sent with the alert)' : `${t.name}(${args})`, el('small', {}, detail.trim()));
+  });
+  const thought = STORY.thinking.replace(/\s+/g, ' ').trim();
+  if (thought) items.splice(1, 0, el('li', { class: 'think' }, thought.length > 170 ? `${thought.slice(0, 170)}…` : thought));
+  items.forEach((li, i) => li.style.setProperty('--d', `${i * 0.42}s`));
+  $('#tlog').replaceChildren(...items);
+}
+
+function buildChecks() {
+  const { verdict } = STORY;
+  let d = 0;  // each suspect's citations are checked one after another, then its verdict pops
+  $('#checks').replaceChildren(...verdict.causes.slice(0, 3).map((c) => {
+    const chips = c.evidence.map((id) => { d += 0.22; return el('span', { class: 'chip ok', style: `--d:${d}s` }, id); });
+    d += 0.2;
+    return el('li', {},
+      el('span', { class: 's-name' }, c.service),
+      el('span', { class: 'chips' }, chips.length ? chips : el('span', { class: 'chip' }, 'no evidence')),
+      el('span', { class: `badge ${c.verified ? 'ok' : 'bad'}`, style: `--d:${d}s` }, c.verified ? 'verified' : 'rejected'),
+      el('span', { class: 'conf', role: 'img', 'aria-label': `confidence ${pct(c.confidence)}` }, el('span', { style: `width:${pct(c.confidence)};--d:${d}s` })));
+  }));
+  const b = verdict.blast;
+  const callers = b.explained.filter((s) => s !== b.service);
+  $('#blastLine').textContent = `Blast radius: ${b.service} explains all ${b.abnormal.length} abnormal services` +
+    (callers.length ? ` (${callers.join(', ')} call it).` : '.');
+  const shop = drawShop($('#blastMap'));
+  for (const s of b.abnormal) setLevel(shop, s, 'bad');
+  shop.nodes[b.service].classList.add('culprit');
+}
+
+function buildVerdict() {
+  const { verdict } = STORY;
+  const top = verdict.causes[0];
+  const words = (text) => text.split(' ').flatMap((w, i) => [i ? ' ' : '', el('span', { class: 'wd', style: `--d:${0.5 + i * 0.014}s` }, w)]);
+  $('#verdictLayer').replaceChildren(
+    el('div', { class: 'banner' }, el('strong', {}, `Root cause: ${verdict.answer}`), ` · ${top.fault_type} · ${pct(top.confidence)} confident · evidence verified`),
+    el('div', { class: 'note-card', style: '--d:.3s' }, el('h4', {}, 'Ticket note · engineers'), el('p', {}, words(verdict.ticket_note))),
+    el('div', { class: 'note-card', style: '--d:1.4s' }, el('h4', {}, 'Customer update'), el('p', {}, verdict.customer_update)));
+}
+
+function activate(step) {
+  if (step === activeStep) return;
+  activeStep = step;
+  for (const s of document.querySelectorAll('.step')) s.classList.toggle('on', Number(s.dataset.step) === step);
+  for (const layer of document.querySelectorAll('.layer')) {
+    const on = Number(layer.dataset.layer) === step;
+    layer.classList.toggle('on', on);
+    layer.classList.remove('play');
+    if (on) { void layer.offsetWidth; layer.classList.add('play'); }  // restart its animation
+  }
+  $('#stageStep').textContent = `${step + 1} / 4 · ${STEP_NAMES[step]}`;
+}
+
+function buildStory() {
+  $('#stageId').textContent = `#${STORY_REPLAY}`;
+  buildAlarm(); buildLog(); buildChecks(); buildVerdict();
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) activate(Number(e.target.dataset.step));
+  }, { rootMargin: '-45% 0px -45% 0px' });
+  for (const step of document.querySelectorAll('.step')) io.observe(step);
+}
+
+// ---- 03 / 04: the numbers -----------------------------------------------------------------
+
+function barRows(container, rows) {
+  container.replaceChildren(...rows.map(([label, sub, value, tone, flag], i) => el('div', { class: 'bar-row' },
+    el('span', { class: 'bar-label' }, label, flag ?? '', el('small', {}, sub)),
+    el('span', { class: 'bar-track' }, el('span', { class: `bar-fill ${tone}`, style: `--v:${value ?? 0};--d:${i * 0.08}s` })),
+    el('span', { class: 'bar-val', 'data-v': value ?? '' }, pct(value)))));
+  revealOnScroll([container], () => {
+    container.classList.add('play');
+    enter(container.children, { duration: 900, stagger: 60, easing: 'lusion', y: 18 });
+    for (const v of container.querySelectorAll('.bar-val')) countUp(v, v.dataset.v === '' ? null : Number(v.dataset.v), pct, 1300);
+  }, { none: true });
+}
+
+const answeredOf = (s) => `answered alone ${s.answered} of ${s.outages} · ${usd(s.median_cost_usd)}`;
+
+function buildResults() {
+  const ev = META.evidence, a = ev.agent;
+  for (const n of document.querySelectorAll('.evN')) n.textContent = a.outages;
+  const stats = [
+    [a.agent_ac1, pct, `named the cause first · Opus agent · ${a.outages} outages`],
+    [a.baseline_ac1, pct, 'the classic no-AI ranking, same outages'],
+    [ev.auto?.median_cost_usd ?? a.median_cost_usd, usd, ev.auto ? `per outage on auto: Haiku first, Opus in ${ev.auto.escalated_to_strong} of ${ev.auto.outages}` : 'median cost per outage'],
+  ];
+  const boxes = stats.map(([, , text]) => el('div', {}, el('b', {}, '–'), el('span', {}, text)));
+  $('#bigstats').replaceChildren(...boxes);
+  revealOnScroll([$('#bigstats')], () => {
+    enter(boxes, { duration: 1000, stagger: 80, easing: 'lusion', y: 30 });
+    boxes.forEach((box, i) => countUp(box.firstChild, stats[i][0], stats[i][1]));
+  }, { none: true });
+  const rows = [
+    ['No AI · z-score ranking', 'the standard baseline', a.baseline_ac1, 'muted'],
+    ['No AI · robust z-score', 'median and MAD', a.robust_ac1, 'muted'],
+    ev['one-shot'] && ['Opus · one prompt, no tools', answeredOf(ev['one-shot']), ev['one-shot'].agent_ac1, ''],
+    ev.haiku && ['Haiku agent', answeredOf(ev.haiku), ev.haiku.agent_ac1, ''],
+    ev.sonnet && ['Sonnet agent', answeredOf(ev.sonnet), ev.sonnet.agent_ac1, ''],
+    ['Opus agent', answeredOf(a), a.agent_ac1, ''],
+    ev.auto && ['Auto · Haiku, then Opus if needed', answeredOf(ev.auto), ev.auto.agent_ac1, 'accent'],
+  ].filter(Boolean);
+  barRows($('#bars'), rows);
+  $('#resultsNote').textContent = `On the same outages the Opus agent alone was right in ${a.only_agent_right} and the no-AI ranking alone in ${a.only_baseline_right} ` +
+    `(exact McNemar test, ${a.mcnemar_p < 0.001 ? 'p < 0.001' : `p = ${a.mcnemar_p.toFixed(3)}`}). The blast-radius check flags ${a.baseline_wrong_caught} of the ranking's ${a.baseline_wrong} wrong answers.`;
+}
+
+function buildHard() {
+  const ev = META.evidence, h = ev['hard-agent'];
+  if (!h?.outages) { $('#hard').hidden = true; return; }
+  const flag = (s) => (s.right_when_answered === 1 ? el('span', { class: 'flag' }, 'never wrong')
+    : el('span', { class: 'flag bad' }, `${s.answered - Math.round(s.right_when_answered * s.answered)} wrong`));
+  const model = (key, label, tone = '') => ev[key]?.outages && [label, `${answeredOf(ev[key])} · right when it answered ${pct(ev[key].right_when_answered)}`,
+    ev[key].agent_ac1, tone, ev[key].answered ? flag(ev[key]) : null];
+  barRows($('#hardBars'), [
+    ['No AI · z-score ranking', 'fooled by the decoy, or by a loud victim', h.baseline_ac1, 'muted'],
+    ['No AI · robust z-score', 'median and MAD', h.robust_ac1, 'muted'],
+    model('hard-one-shot', 'Opus · one prompt, no tools'),
+    model('hard-haiku', 'Haiku agent'),
+    model('hard-sonnet', 'Sonnet agent'),
+    model('hard-agent', 'Opus agent', 'accent'),
+    model('hard-auto', 'Auto · Haiku, then Opus if needed'),
+  ].filter(Boolean));
+  $('#hardNote').textContent = `${h.outages} outages. An agent that is not sure hands the outage to a human instead of guessing, ` +
+    `which is why "answered alone" is lower here; what matters is that its answers are right.`;
+}
+
+// ---- start-up -----------------------------------------------------------------------------
+
+function revealHeadings() {
+  const titles = [...document.querySelectorAll('.band h2, .cta h2')];
+  const words = new Map(titles.map((h) => [h, splitWords(h)]));
+  revealOnScroll(titles, (h) => maskIn(words.get(h)), { none: true });
+  revealOnScroll(document.querySelectorAll('.eyebrow, .head2 .sub, .step, .note, .cta p, .cta .ctas, .marquee'), null, { easing: 'lusion', blur: 6 });
+  revealOnScroll([$('.statement .split')], null, { easing: 'lusion', y: 30 });
+  revealOnScroll([$('#heroTitle')], () => maskIn($('#heroTitle').querySelectorAll('.line > span'), { stagger: 120, duration: 1300 }), { none: true });
+}
+
+async function init() {
+  $('#themeBtn').addEventListener('click', () => toggleTheme());
+  const nav = $('#nav');
+  const onScroll = () => nav.classList.toggle('scrolled', scrollY > 8);
+  addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+  heroIn();
+  revealHeadings();
+  if (MOTION) {
+    import('/static/ribbon.js').then(({ startRibbon }) => startRibbon($('#ribbon'))).catch(() => { /* decoration only: without WebGL or the CDN the page works as before */ });
+  }
+  try {
+    const [meta, events] = await Promise.all([getJSON('/api/meta'), getJSON(`/api/replays/${STORY_REPLAY}`)]);
+    META = meta;
+    STORY = byType(events);
+  } catch (err) {
+    $('#heroCaption').textContent = `Could not load the recorded outage: ${err.message}`;
+    return;
+  }
+  heroLoop();
+  buildCards();
+  buildStory();
+  buildResults();
+  buildHard();
+}
+
+init();
+</script>
+</body>
+</html>

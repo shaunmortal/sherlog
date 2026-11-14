@@ -1,0 +1,75 @@
+/* Shared by the story page (/) and the console (/console): colours, type, motion tokens, base. */
+/* light: a cool off-white, black type, one electric blue; dark: near-black with the same blue */
+:root {
+  --bg: #f0f1fa; --sunk: #e4e6ef; --card: #ffffff; --line: #d9dbe7; --line-strong: #b3b6c6; --text: #000000; --muted: #5c5f6e;
+  --ink: #1d1f28; --on-ink: #f0f1fa; --accent: #1a2ffb; --on-accent: #ffffff;
+  --bad: #e5291e; --bad-soft: #ffe2df; --warn: #a86400; --warn-soft: #fff0d4; --ok: #0d7d48; --ok-soft: #dcf3e6;
+  --trace: #0b0c10; --signal: #ff4c41; --signal-wash: rgba(255, 76, 65, .1); --cursor: #4c4f5c; --axis: #868a99; --tip-bg: #ffffff;
+  --panel: #0c0d12; --on-panel: #f0f1fa; --lime: #c1ff00;
+  --nav-bg: rgba(240, 241, 250, .78);
+  --shadow: 0 6px 10px rgba(0, 0, 0, .04), 0 2px 4px rgba(0, 0, 0, .04);
+  --radius: 18px; --radius-sm: 12px; --pill: 100px;
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* motion: one set of curves and durations for every page (JS reads the curves too) */
+  --ease-quad: cubic-bezier(.25, .46, .45, .94);   /* small hovers */
+  --ease-lusion: cubic-bezier(.4, 0, .1, 1);       /* most movement: fast out, long settle */
+  --ease-snap: cubic-bezier(.35, 0, 0, 1);         /* fills and wipes */
+  --ease-expo: cubic-bezier(.16, 1, .3, 1);        /* things arriving */
+  --ease-quint: cubic-bezier(.22, 1, .36, 1);      /* reveals */
+  --ease-soft: cubic-bezier(.25, .1, .25, 1);      /* page load */
+  --ease-drawer: cubic-bezier(.32, .72, 0, 1);     /* sliding indicators */
+  --spring: linear(0, .047, .161, .306, .458, .601, .726, .828, .907, .965, 1.005, 1.029, 1.042, 1.046, 1.045, 1.04, 1.033, 1.026, 1.02, 1.014, 1.009, 1.005, 1.002, 1);
+  --fast: .1s; --hover: .25s;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #07080b; --sunk: #12141b; --card: #101219; --line: #22252f; --line-strong: #3a3e4c; --text: #f0f1fa; --muted: #9599a8;
+    --ink: #f0f1fa; --on-ink: #07080b; --accent: #4b5dff; --on-accent: #ffffff;
+    --bad: #ff5a4f; --bad-soft: #3a1513; --warn: #f2b14a; --warn-soft: #33260c; --ok: #b6f23a; --ok-soft: #1b2a0c;
+    --trace: #e8e9f2; --signal: #ff5a4f; --signal-wash: rgba(255, 90, 79, .14); --cursor: #b4b8c6; --axis: #868a99; --tip-bg: #12141b;
+    --panel: #101219; --nav-bg: rgba(7, 8, 11, .75); --shadow: none;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #07080b; --sunk: #12141b; --card: #101219; --line: #22252f; --line-strong: #3a3e4c; --text: #f0f1fa; --muted: #9599a8;
+  --ink: #f0f1fa; --on-ink: #07080b; --accent: #4b5dff; --on-accent: #ffffff;
+  --bad: #ff5a4f; --bad-soft: #3a1513; --warn: #f2b14a; --warn-soft: #33260c; --ok: #b6f23a; --ok-soft: #1b2a0c;
+  --trace: #e8e9f2; --signal: #ff5a4f; --signal-wash: rgba(255, 90, 79, .14); --cursor: #b4b8c6; --axis: #868a99; --tip-bg: #12141b;
+  --panel: #101219; --nav-bg: rgba(7, 8, 11, .75); --shadow: none;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button:focus-visible, a:focus-visible, .node:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* service map */
+/* requests flow along each call, caller → callee; calls into an unhealthy service glow */
+.edge { stroke: var(--line-strong); stroke-width: 1.2; stroke-dasharray: 3 5; animation: flow 1.2s linear infinite; animation-delay: var(--phase, 0s);
+  transition: opacity var(--hover) var(--ease-quad), stroke var(--hover) var(--ease-quad); }
+@keyframes flow { to { stroke-dashoffset: -16; } }
+.edge.sick { stroke: var(--signal); stroke-width: 1.6; animation-duration: .6s; }
+#arrowHead, .arrow-head { fill: var(--line-strong); }
+.node { cursor: pointer; transition: opacity var(--hover) var(--ease-quad); }
+.node .halo { fill: none; stroke: var(--bad); stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.node.flash .halo { animation: halo 1s var(--ease-expo); }
+@keyframes halo { from { opacity: .7; transform: scale(1); } to { opacity: 0; transform: scale(1.4, 1.9); } }
+.node rect.box { fill: var(--bg); stroke: var(--line-strong); stroke-width: 1.2; transition: fill .3s var(--ease-quad), stroke .3s var(--ease-quad); }
+.node text { fill: var(--text); font: 500 13px var(--mono); pointer-events: none; }
+.node.warn rect.box { fill: var(--warn-soft); stroke: var(--warn); }
+.node.bad rect.box { fill: var(--bad-soft); stroke: var(--bad); }
+.node.culprit rect.box { stroke-width: 2.6; }
+.node:hover rect.box { stroke: var(--text); }
+.pill text { font: 600 9px var(--mono); fill: #fff; letter-spacing: .06em; }
+.pill.you rect { fill: #3654c9; } .pill.ai rect { fill: #2e7a4b; } .pill.culprit rect { fill: #c43a22; }
+.pill .pop { transform-box: fill-box; transform-origin: center; animation: pop .6s var(--spring); }
+@keyframes pop { from { opacity: 0; transform: scale(.4); } }
+.pill.verified rect { fill: var(--ink); } .pill.verified text { fill: var(--on-ink); }
+
+.pre { opacity: 0; }  /* waiting to be revealed on scroll */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .35s; animation-timing-function: var(--ease-quad); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

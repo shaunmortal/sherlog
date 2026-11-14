@@ -1,0 +1,11 @@
+# never upload secrets or local tooling
+.env
+.env.*
+!.env.example
+.venv
+__pycache__
+.pytest_cache
+.vercel
+media
+test_core.py
+SUBMISSION.md
