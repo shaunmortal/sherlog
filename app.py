@@ -132,13 +132,14 @@ def _sse(events: Iterator[dict]) -> Iterator[str]:
 
 def _enrich(events: Iterator[dict], inc: sim.Incident) -> Iterator[dict]:
     """Add what the console shows but the agent never sees: the telemetry after the agent's cut-off (so the
-    charts keep running while it investigates) and the blast-radius check of its answer."""
+    charts keep running while it investigates), and the blast-radius and rollback checks of its answer."""
     rest = {s: {m: inc.series[s][m][inc.now + 1:] for m in sim.METRICS} for s in sim.SERVICES}
     for event in events:
         if event["type"] == "telemetry":
             yield {**event, "rest": rest}
         elif event["type"] == "verdict" and event.get("answer"):
-            yield {**event, "blast": investigate.blast_radius(inc, event["answer"])}
+            yield {**event, "blast": investigate.blast_radius(inc, event["answer"]),
+                   "rollback": investigate.rollback_check(inc, event["answer"])}
         else:
             yield event
 

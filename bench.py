@@ -13,6 +13,7 @@ import json
 import math
 import statistics
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
 from itertools import product
 from pathlib import Path
 
@@ -193,17 +194,43 @@ def deep_stats(records: list[dict]) -> dict:
     }
 
 
+@lru_cache(maxsize=None)
+def _rollback_proves(root: str, fault: str, seed: int, hard: bool, answer: str) -> bool:
+    # cached: every variant ran the same outages, and most answers name the same service
+    return investigate.rollback_check(sim.simulate(root, fault, seed, hard), answer)["proves"]
+
+
+def rollback_stats(records: list[dict]) -> dict:
+    """The rollback check as an offline what-if on the recorded answers (re-simulated, no API calls): how many
+    answers it confirms, the wrong ones it would have caught, the right ones it would have wrongly rejected,
+    and how often the true cause goes out once answers that fail it become escalations."""
+    answered = [(r, r["truth"]["ai_answer"]) for r in records if r["truth"]["ai_answer"]]
+    if not answered:
+        return {}
+    passed = [_rollback_proves(r["root"], r["fault"], r["seed"], r.get("hard", False), a) for r, a in answered]
+    right = [a == r["root"] for r, a in answered]
+    return {
+        "rollback_checked": len(answered),
+        "rollback_pass": _share(passed),
+        "rollback_caught": sum(not p and not ok for p, ok in zip(passed, right)),
+        "rollback_wrongly_rejected": sum(not p and ok for p, ok in zip(passed, right)),
+        "rollback_gated_cause_first": round(sum(p and ok for p, ok in zip(passed, right)) / len(records), 3),
+        "rollback_gated_wrong": sum(p and not ok for p, ok in zip(passed, right)),
+    }
+
+
 EVIDENCE = RUNS.with_name("evidence.json")
 
 
 def evidence() -> dict:
-    """Everything the console's Evidence view shows: every variant, the auto routes, and the deep checks."""
-    out = {v: {"label": VARIANT_LABELS[v], **summarize(load(runs_path(v)))} for v in VARIANTS}
+    """Everything the console's Evidence view shows: every variant, the auto routes, the deep checks and the
+    rollback what-if."""
+    records = {v: load(runs_path(v)) for v in VARIANTS}
+    records.update({f"{p}auto": auto_records(f"{p}haiku", f"{p}agent") for p in ("", "hard-")})
+    out = {v: {"label": VARIANT_LABELS[v], **summarize(rs), **rollback_stats(rs)} for v, rs in records.items()}
     for prefix in ("", "hard-"):
-        out[f"{prefix}auto"] = {"label": VARIANT_LABELS[f"{prefix}auto"],
-                                **summarize(auto_records(f"{prefix}haiku", f"{prefix}agent"))}
         if out[f"{prefix}agent"]:
-            out[f"{prefix}agent"] = {**out[f"{prefix}agent"], **deep_stats(load(runs_path(f"{prefix}agent")))}
+            out[f"{prefix}agent"] = {**out[f"{prefix}agent"], **deep_stats(records[f"{prefix}agent"])}
     return out
 
 
@@ -236,6 +263,20 @@ def ladder() -> str:
         return ""
     header = "| Method | AC@1 | AC@3 | Answered without a human | Median cost |"
     return "\n".join([header, "|---|---:|---:|---:|---:|", *rows])
+
+
+def rollback_table(ev: dict) -> str:
+    """The rollback what-if, one row per method that answered at least once."""
+    rows = [
+        f"| {v} | {s['rollback_checked']} | {_pct(s['rollback_pass'])} | {s['rollback_caught']} | "
+        f"{s['rollback_wrongly_rejected']} | {s['rollback_gated_wrong']} | {_pct(s['rollback_gated_cause_first'])} |"
+        for v, s in ev.items() if s.get("rollback_checked")
+    ]
+    if not rows:
+        return ""
+    header = ("| Rollback what-if | Answers | Pass | Wrong caught | Right rejected | Wrong left after gate | "
+              "Gated cause first |")
+    return "\n".join([header, "|---|---:|---:|---:|---:|---:|---:|", *rows])
 
 
 def report(summary: dict) -> str:
@@ -288,7 +329,10 @@ def main() -> None:
     print(report(summarize(load(path))))
     print()
     print(ladder())
-    EVIDENCE.write_text(json.dumps(evidence()))
+    ev = evidence()
+    print()
+    print(rollback_table(ev))
+    EVIDENCE.write_text(json.dumps(ev))
 
 
 if __name__ == "__main__":
