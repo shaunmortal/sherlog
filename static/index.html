@@ -233,7 +233,7 @@
   .score .ranks { margin-top: 4px; font: 13px var(--mono); }
   .score .ranks th { padding: 4px 8px 4px 0; text-align: left; font: 500 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
   .score .ranks td { padding: 6px 8px 6px 0; text-align: left; font-weight: 400; vertical-align: top; }
-  .ranks small { display: block; color: var(--muted); font-size: 12px; }
+  .ranks small { display: block; color: var(--muted); font-size: 12px; white-space: nowrap; }  /* "latency · z 200" on one line in the 300px column */
   .s-note { margin: 4px 0 0; font: 12px var(--mono); color: var(--muted); }
   .notes { display: grid; gap: 10px; }
   .note-card { padding: 12px 14px; border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow); font-size: 14px; }
@@ -942,21 +942,21 @@ function renderVerdict(v) {
   enter($('#verdict').querySelectorAll(':scope > :not(.suspects):not(.notes), .suspects > li, .notes > *'), { duration: 600, stagger: 50, easing: 'quint', y: 8 });
 }
 
-/** The blast-radius check: does the answer explain every service that looks broken? */
-function blastNote(b) {
+/** The blast-radius check: does the answer explain every service that looks broken? `head` says whose answer it is. */
+function blastNote(b, head = 'Blast radius') {
   if (!b) return null;
   const callers = b.explained.filter((s) => s !== b.service);
   const ok = !b.unexplained.length && !b.better;
   const text = !b.abnormal.length
-    ? 'Blast radius: no service stayed abnormal.'  // quiet uploaded telemetry; a simulated outage always has some
+    ? 'no service stayed abnormal.'  // quiet uploaded telemetry; a simulated outage always has some
     : b.better
-    ? `Blast radius: ${b.better} would explain more of the outage than ${b.service}. Treat this answer with care.`
+    ? `${b.better} would explain more of the outage than ${b.service}. Treat this answer with care.`
     : ok
-    ? `Blast radius: ${b.service} explains all ${b.abnormal.length} abnormal service${b.abnormal.length === 1 ? '' : 's'}` +
+    ? `${b.service} explains all ${b.abnormal.length} abnormal service${b.abnormal.length === 1 ? '' : 's'}` +
       (callers.length ? ` (${callers.join(', ')} call${callers.length === 1 ? 's' : ''} it, directly or indirectly).` : '.')
-    : `Blast radius: ${b.service} explains ${b.explained.length} of ${b.abnormal.length} abnormal services; ` +
+    : `${b.service} explains ${b.explained.length} of ${b.abnormal.length} abnormal services; ` +
       `${b.unexplained.join(', ')} ${b.unexplained.length === 1 ? 'is' : 'are'} abnormal too but cannot be affected by it.`;
-  return el('p', { class: `blast ${ok ? 'ok' : 'warn'}` }, text);
+  return el('p', { class: `blast ${ok ? 'ok' : 'warn'}` }, `${head}: ${text}`);
 }
 
 /** Services as chips in a sentence ("a, b and c"): red while abnormal, flipping to green if they recover. */
@@ -1198,7 +1198,7 @@ function renderTriage(t) {
     : `The alarm fired at tick ${t.alarm}, ${clock(t.alarm * t.tick_seconds)} into the recording; the agent would see up to tick ${t.now}.`;
   const rows = t.zscore_ranking.slice(0, TRIAGE_TOP).map((z, i) => el('tr', {}, el('td', {}, i + 1),
     el('td', {}, z.service, el('small', {}, `${LABEL[z.metric]} · z ${z.z}`)), el('td', {}, t.robust_ranking[i])));
-  const blast = blastNote(t.blast);
+  const blast = blastNote(t.blast, "Blast radius of the classic ranking's #1");  // the triage has no answer of its own
   $('#triage').replaceChildren(el('div', { class: 'score' }, el('h3', {}, 'Triage · no AI'), el('p', {}, alarm),
     el('table', { class: 'ranks' },
       el('thead', {}, el('tr', {}, ['#', 'Classic z-score', 'Robust z-score'].map((h) => el('th', { scope: 'col' }, h)))),
