@@ -150,6 +150,24 @@ def test_triage_replaces_the_last_outage_on_screen_even_while_paused(page, error
     assert errors == []
 
 
+def test_triaging_an_upload_with_its_own_call_graph_draws_its_services_until_a_replay_brings_the_shop_back(page, errors):
+    page.goto(f"{URL}/console#data", wait_until="networkidle")  # the buttons listen once the console has its data
+    page.locator("#graphSampleUse").click()
+    sync_api.expect(page.locator("#status")).to_contain_text("Loaded the custom-graph sample")
+    page.locator("#triageBtn").click()
+    sync_api.expect(page.locator("#status")).to_contain_text("Triage done.")
+    sync_api.expect(page.locator("#map .node")).to_have_count(6)
+    sync_api.expect(page.locator(".tele-row")).to_have_count(6)
+    sync_api.expect(page.locator("#map [data-service='postgres']")).to_be_visible()
+    sync_api.expect(page.locator("#metaSystem")).to_have_text("Your upload · 6 services")
+    sync_api.expect(page.locator("#triage")).to_contain_text("postgres would explain more of the outage than inventory")
+    page.get_by_role("tab", name="REPLAY").click()
+    page.locator("#startHere button").first.click()
+    sync_api.expect(page.locator("#map .node")).to_have_count(11)
+    sync_api.expect(page.locator("#metaSystem")).to_have_text("Simulated shop · 11 services")
+    assert errors == []
+
+
 def test_a_keyboard_triage_keeps_focus_on_its_button(page, errors):
     # the button is disabled while the triage runs, which on its own would drop focus to the page
     page.goto(f"{URL}/console#data", wait_until="networkidle")  # the buttons listen once the console has its data

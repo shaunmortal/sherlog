@@ -343,12 +343,14 @@
     </div>
     <div class="pad" id="dataPanel" role="tabpanel" aria-labelledby="tab-data" hidden>
       <h2 class="label">Your data</h2>
-      <p class="hint" style="margin:0">Bring 10 minutes of telemetry from your own shop, its services mapped onto the 11 on the map, and the same alarm, rankings and checks run on it.</p>
+      <p class="hint" style="margin:0">Bring 10 minutes of telemetry from your own system, with its call graph (2 to 40 services) or mapped onto the shop's 11, and the same alarm, rankings and checks run on it.</p>
       <p class="hint" style="margin:6px 0 0"><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format, and how to export your telemetry</a></p>
       <p class="sub">1 · Telemetry</p>
       <div class="grid">
-        <a class="cell" href="/api/sample-incident" download="sherlog-sample-incident.json"><b>Download</b><small>the sample</small></a>
-        <button type="button" class="cell" id="sampleUse"><b>Use</b><small>the sample</small></button>
+        <a class="cell" href="/api/sample-incident" download="sherlog-sample-incident.json"><b>Download</b><small>the shop sample</small></a>
+        <button type="button" class="cell" id="sampleUse"><b>Use</b><small>the shop sample</small></button>
+        <a class="cell" href="/api/sample-incident?graph=custom" download="sherlog-custom-graph-sample.json"><b>Download</b><small>a custom-graph sample</small></a>
+        <button type="button" class="cell" id="graphSampleUse"><b>Use</b><small>a custom-graph sample</small></button>
       </div>
       <label class="field" for="dataFile">Or open a .json file</label>
       <input type="file" id="dataFile" accept=".json,application/json">
@@ -483,6 +485,7 @@ const MODEL_VARIANT = { auto: 'auto', opus: 'agent', sonnet: 'sonnet', haiku: 'h
 let replays = new Map();           // recorded outage id -> { label, model }; the model once the server names it
 let recorded = null;               // the recorded run the charts show ({ label, model }), or null for the live shop
 let teleRows = {};                 // service -> its telemetry row's DOM nodes
+let graph = null;                  // the services on screen, who calls whom and where each sits: the shop's or an upload's own
 let view = { metric: 'latency_ms', picked: false };  // picked: the viewer chose the metric themselves
 let frame = null;                  // what the charts show: the recording, its playhead t and the tick domain
 let axisCanvas = null;
@@ -570,7 +573,7 @@ function setAgent(text, busy = false) {
   $('#agent').classList.toggle('busy', busy);
   if (text) $('#agentLabel').textContent = text;
 }
-const watching = () => (META ? `Watching ${META.services.length} services` : 'Watching');
+const watching = () => (graph ? `Watching ${graph.services.length} services` : 'Watching');
 
 // ---- views, theme, choice grids ----------------------------------------------------------
 
@@ -619,11 +622,66 @@ function describeFault() {
   $('#faultDesc').textContent = `${text[0].toUpperCase()}${text.slice(1)}.`;
 }
 
+// ---- the services on screen: the shop's, or an upload's own call graph ----------------------------
+
+const MAP_W = 800, MAP_H = 340;    // the map's viewBox; a graph with many rows gets more height
+const MAP_ROW_MAX = 6;             // services side by side before a row wraps, so the boxes keep a gap
+const MAP_ROW_H = 85;
+const LABEL_CHARS = 12;            // what fits in a box on the map; the full name is in its label for screen readers
+
+/** The shop as the simulator wires it: service -> the services it calls. */
+function shopGraph() {
+  const calls = Object.fromEntries(Object.entries(META.calls).map(([s, callees]) => [s, Object.keys(callees)]));
+  return { services: META.services, calls, pos: POS, height: MAP_H, own: false };
+}
+
+/** The graph an incident document brings in `calls`, else the shop's. Only for a document the server accepted. */
+const graphOf = (doc) => (doc.calls ? { services: Object.keys(doc.calls), calls: doc.calls, ...layout(doc.calls), own: true } : shopGraph());
+
+/** Callers above the services they call: a row for each depth, the longest chain of callers above a service (a cycle
+    stops deepening at one row per service), and wide rows wrapped. */
+function layout(calls) {
+  const services = Object.keys(calls);
+  let depth = Object.fromEntries(services.map((s) => [s, 0]));
+  for (let pass = 0; pass < services.length; pass++) {
+    const next = { ...depth };
+    for (const s of services) for (const c of calls[s]) next[c] = Math.min(services.length - 1, Math.max(next[c], depth[s] + 1));
+    if (services.every((s) => next[s] === depth[s])) break;
+    depth = next;
+  }
+  const levels = [...new Set(Object.values(depth))].sort((a, b) => a - b);
+  const rows = levels.flatMap((d) => {
+    const row = services.filter((s) => depth[s] === d);
+    return Array.from({ length: Math.ceil(row.length / MAP_ROW_MAX) }, (_, k) => row.slice(k * MAP_ROW_MAX, (k + 1) * MAP_ROW_MAX));
+  });
+  const height = Math.max(MAP_H, rows.length * MAP_ROW_H);
+  const pos = Object.fromEntries(rows.flatMap((row, r) => row.map((s, k) =>
+    [s, [Math.round(((k + 1) * MAP_W) / (row.length + 1)), Math.round(((r + 0.5) * height) / rows.length)]])));
+  return { pos, height };
+}
+
+/** Put these services on screen: new telemetry rows and a new map, unless they are the ones already there. */
+function useGraph(next) {
+  if (graph && JSON.stringify([graph.services, graph.calls]) === JSON.stringify([next.services, next.calls])) return;
+  graph = next;
+  ++playId;  // a playback still running would draw the other services
+  frame = null;
+  hover = null;
+  mapFocus = null;
+  setLive(false);
+  buildTelemetry();
+  drawMap();
+  placeInks();
+  $('#metaSystem').textContent = `${next.own ? 'Your upload' : 'Simulated shop'} · ${next.services.length} services`;
+  if (!state.running) setAgent(watching());
+}
+
 // ---- service map --------------------------------------------------------------------
 
 function drawMap() {
   const map = $('#map');
   const focused = map.contains(document.activeElement) ? document.activeElement.dataset.service : null;  // a redraw must not drop keyboard focus
+  map.setAttribute('viewBox', `0 0 ${MAP_W} ${graph.height}`);
   map.replaceChildren();
   const defs = svg('defs');
   const marker = svg('marker', { id: 'arrow', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' });
@@ -632,14 +690,14 @@ function drawMap() {
   map.append(defs);
 
   const phase = `--phase:-${Math.round(performance.now() % 1200)}ms`;  // a redraw keeps the traffic flowing smoothly
-  for (const [caller, callees] of Object.entries(META.calls)) {
-    for (const callee of Object.keys(callees)) {
+  for (const [caller, callees] of Object.entries(graph.calls)) {
+    for (const callee of callees) {
       const sick = levelOf(state.health[callee] ?? 0) !== 'ok';
-      map.append(svg('line', { ...edgeEnds(POS[caller], POS[callee]), class: `edge${sick ? ' sick' : ''}`,
+      map.append(svg('line', { ...edgeEnds(graph.pos[caller], graph.pos[callee]), class: `edge${sick ? ' sick' : ''}`,
         'data-from': caller, 'data-to': callee, style: phase, 'marker-end': 'url(#arrow)' }));
     }
   }
-  for (const service of META.services) map.append(drawNode(service));
+  for (const service of graph.services) map.append(drawNode(service));
   focusMap(mapFocus);
   if (focused) map.querySelector(`[data-service="${focused}"]`)?.focus();
 }
@@ -649,22 +707,22 @@ let mapFocus = null;
 function focusMap(service) {
   mapFocus = service;
   const map = $('#map');
-  const linked = new Set(service ? [service, ...Object.keys(META.calls[service] ?? {}),
-    ...META.services.filter((s) => service in (META.calls[s] ?? {}))] : []);
+  const linked = new Set(service ? [service, ...(graph.calls[service] ?? []),
+    ...graph.services.filter((s) => graph.calls[s].includes(service))] : []);
   map.classList.toggle('focus', Boolean(service));
   for (const n of map.querySelectorAll('.node')) n.classList.toggle('near', linked.has(n.dataset.service));
   for (const e of map.querySelectorAll('.edge')) e.classList.toggle('hot', e.dataset.from === service || e.dataset.to === service);
 }
 
 function drawNode(service) {
-  const [cx, cy] = POS[service];
+  const [cx, cy] = graph.pos[service];
   const level = levelOf(state.health[service] ?? 0);
   const tags = [
     state.guess === service && ['you', 'YOU', 30],
     state.ai === service && ['ai', 'AI', 22],
     state.root === service && ['culprit', 'CULPRIT', 54],
   ].filter(Boolean);
-  const callees = Object.keys(META.calls[service] ?? {});
+  const callees = graph.calls[service] ?? [];
   const described = [service, LEVEL_WORD[level], ...tags.map((t) => t[1].toLowerCase()), callees.length ? `calls ${callees.join(', ')}` : 'calls no one'];
 
   const g = svg('g', {
@@ -678,7 +736,7 @@ function drawNode(service) {
   g.addEventListener('blur', () => focusMap(null));
   g.append(svg('rect', { class: 'box', width: NODE_W, height: NODE_H }));
   const label = svg('text', { x: NODE_W / 2, y: NODE_H / 2 + 4.5, 'text-anchor': 'middle' });
-  label.textContent = service;
+  label.textContent = service.length > LABEL_CHARS ? `${service.slice(0, LABEL_CHARS - 1)}…` : service;
   g.append(label);
 
   let x = 0;
@@ -715,7 +773,8 @@ function lockGuess(service) {
 function buildTelemetry() {
   $('#metricTabs').replaceChildren(el('span', { class: 'ink', 'aria-hidden': 'true' }), ...META.metrics.map((m) =>
     el('button', { type: 'button', 'data-metric': m, 'aria-pressed': String(m === view.metric), onclick: () => showMetric(m, true) }, LABEL[m])));
-  const rows = META.services.map((s) => {
+  teleRows = {};
+  const rows = graph.services.map((s) => {
     const canvas = el('canvas', { 'aria-hidden': 'true' });
     const metric = el('span'), value = el('div', { class: 'tele-val' });
     const row = el('div', { class: 'tele-row', role: 'button', tabindex: 0, 'aria-describedby': 'guessHint', onclick: () => lockGuess(s),
@@ -745,7 +804,7 @@ function showMetric(metric, picked = false) {
 /** Mean and spread of each metric over the healthy start of a recording, as the alarm computes them. */
 function baselineStats(series) {
   const stats = {};
-  for (const s of META.services) {
+  for (const s of graph.services) {
     stats[s] = {};
     for (const m of META.metrics) {
       const base = series[s][m].slice(0, META.baseline_ticks);
@@ -767,15 +826,15 @@ function drawFrame(series, stats, t, alarm, looped = false) {
   // the idle shop scrolls; an outage shows everything from the start of its recording to the playhead
   const [d0, d1] = looped ? [t - WINDOW_TICKS + 1, t] : [0, t];
   frame = { series, t, alarm, looped, d0, d1 };
-  const zs = Object.fromEntries(META.services.map((s) => [s, Object.fromEntries(META.metrics.map((m) => {
+  const zs = Object.fromEntries(graph.services.map((s) => [s, Object.fromEntries(META.metrics.map((m) => {
     const [mean, std] = stats[s][m];
     let sum = 0;
     for (let i = t - RECENT_TICKS + 1; i <= t; i++) sum += (valueAt(series[s][m], i, looped) - mean) / std;
     return [m, sum / RECENT_TICKS];
   }))]));
   paint();
-  const health = Object.fromEntries(META.services.map((s) => [s, Math.max(...Object.values(zs[s]))]));
-  const changed = META.services.some((s) => levelOf(health[s]) !== levelOf(state.health[s] ?? 0));
+  const health = Object.fromEntries(graph.services.map((s) => [s, Math.max(...Object.values(zs[s]))]));
+  const changed = graph.services.some((s) => levelOf(health[s]) !== levelOf(state.health[s] ?? 0));
   state = { ...state, health };
   if (changed) drawMap();
   return zs;
@@ -794,7 +853,7 @@ function sizeCanvas(canvas) {
 /** The tick under the mouse, or null when it is off the charts or past the playhead. */
 function hoverTick() {
   if (!hover || !frame) return null;
-  const box = teleRows[META.services[0]].canvas.getBoundingClientRect();
+  const box = teleRows[graph.services[0]].canvas.getBoundingClientRect();
   if (hover.x < box.left || hover.x > box.right) return null;
   const i = Math.round(frame.d0 + ((hover.x - box.left) / box.width) * (frame.d1 - frame.d0));
   return i <= frame.t ? i : null;
@@ -808,7 +867,7 @@ function paint() {
   const ink = { trace: color('--trace'), signal: color('--signal'), wash: color('--signal-wash'), cursor: color('--cursor'), axis: color('--axis'), alarm: color('--bad') };
   const cursor = hoverTick();
   const showAlarm = alarm !== null && alarm >= d0 && alarm <= t;
-  for (const s of META.services) {
+  for (const s of graph.services) {
     const r = teleRows[s];
     const [ctx, w, h] = sizeCanvas(r.canvas);
     const x = (i) => ((i - d0) / (d1 - d0)) * w;
@@ -873,8 +932,8 @@ function renderTip(i) {
   if (i === null) { tip.hidden = true; return; }
   const { series, t, looped } = frame;
   const name = (s) => `${s}_${LABEL[view.metric]}`;
-  const width = Math.max(...META.services.map((s) => name(s).length));
-  tip.replaceChildren(el('div', {}, `t ${clock((i - t) * TICK_SECONDS)}`), ...META.services.map((s) =>
+  const width = Math.max(...graph.services.map((s) => name(s).length));
+  tip.replaceChildren(el('div', {}, `t ${clock((i - t) * TICK_SECONDS)}`), ...graph.services.map((s) =>
     el('div', {}, `${name(s).padEnd(width)}  ${UNIT[view.metric](valueAt(series[s][view.metric], i, looped))}`)));
   tip.hidden = false;
   tip.style.left = `${Math.min(hover.x + 14, innerWidth - tip.offsetWidth - 8)}px`;
@@ -932,7 +991,7 @@ function runIdle() {
 
 /** Play the outage up to the moment the agent is called, then keep the shop running in the background. */
 async function playIncident(ev) {
-  const series = Object.fromEntries(META.services.map((s) => [s, Object.fromEntries(META.metrics.map((m) =>
+  const series = Object.fromEntries(graph.services.map((s) => [s, Object.fromEntries(META.metrics.map((m) =>
     [m, [...ev.series[s][m], ...(ev.rest?.[s]?.[m] ?? [])]]))]));
   const stats = baselineStats(series);
   const alarmTick = ev.alarm ?? ev.now;
@@ -942,14 +1001,14 @@ async function playIncident(ev) {
   };
   const start = MOTION ? Math.max(RECENT_TICKS, alarmTick - LEAD_TICKS) : ev.now;
   if (!(await play(start, ev.now, PLAYBACK_TICK_MS, draw)) || !MOTION) return;
-  const last = series[META.services[0]][META.metrics[0]].length - 1;
+  const last = series[graph.services[0]][META.metrics[0]].length - 1;
   play(ev.now + 1, last, AFTER_TICK_MS, draw);  // not awaited: the investigation streams in meanwhile
 }
 
 function raiseAlarm(ev, zs) {
   state = { ...state, incident: true };
   if (!view.picked) {  // switch to the most abnormal metric, unless the viewer chose one
-    const peak = (m) => Math.max(...META.services.map((s) => zs[s][m]));
+    const peak = (m) => Math.max(...graph.services.map((s) => zs[s][m]));
     showMetric(META.metrics.reduce((a, b) => (peak(b) > peak(a) ? b : a)));
   }
   logItem('alarm', [ev.alarm === null
@@ -1157,7 +1216,7 @@ function setBusy(busy) {
   $('#go').disabled = busy || !META.live;
   $('#investigateBtn').disabled = busy || !META.live;
   $('#randomReplay').disabled = busy || !replays.size;
-  for (const b of [...document.querySelectorAll('#replayPanel .cell'), $('#triageBtn'), $('#sampleUse')]) b.disabled = busy;  // each would redraw the charts
+  for (const b of [...document.querySelectorAll('#replayPanel .cell'), $('#triageBtn'), $('#sampleUse'), $('#graphSampleUse')]) b.disabled = busy;  // each would redraw the charts
   // disabling the focused button drops keyboard focus to the page; once the buttons work again it goes back,
   // unless the viewer has moved on, and without scrolling, since they may be reading the verdict by then
   if (busy && focused?.disabled) busyFocus = focused;
@@ -1188,12 +1247,14 @@ async function refusal(res) {
   return res.status === 413 ? 'That file is too big for the server. Trim it to the 10 minutes it needs.' : `Request failed (${res.status}).`;
 }
 
-/** A live investigation: POST `body` to `url`, then stream its events into the flight log and the verdict. */
-async function runStream(url, body, message, doneMessage) {
+/** A live investigation: POST `body` to `url`, then stream its events into the flight log and the verdict, over the
+    services `shows` names once the server has accepted the request. */
+async function runStream(url, body, message, doneMessage, shows = shopGraph) {
   begin(message, shortModel(pick.model === 'auto' ? 'haiku' : pick.model));
   try {
     const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     if (!res.ok) throw new Error(await refusal(res));
+    useGraph(shows());
     await readStream(res);
     if (!state.verdictShown) throw new Error('The investigation stopped before it finished. Try again, or watch a recorded outage.');
     end(doneMessage);
@@ -1213,6 +1274,7 @@ async function runReplay(id) {
   begin(`Replaying recorded outage ${label}…`, shortModel(model));
   try {
     const events = await getJSON(`/api/replays/${encodeURIComponent(chosen)}`);
+    useGraph(shopGraph());  // every recording is of the shop
     // the replay list names the model that ran it; a server that does not still names it in the verdict event
     const ran = model ?? events.find((ev) => ev.type === 'verdict')?.model ?? META.model;
     state = { ...state, investigator: shortModel(ran) };
@@ -1244,10 +1306,16 @@ function readIncident() {
   catch (err) { throw new Error(`That is not valid JSON: ${err.message}`); }
 }
 
-async function useSample() {
+const SAMPLES = {
+  shop: ['/api/sample-incident', 'Loaded the sample: a simulated outage with its culprit removed.'],
+  custom: ['/api/sample-incident?graph=custom', 'Loaded the custom-graph sample: six services of a simulated outage under ' +
+    'other names, with their own call graph in "calls" and the culprit removed.'],
+};
+
+async function useSample(kind) {
+  const [url, loaded] = SAMPLES[kind];
   try {
-    setIncidentText(JSON.stringify(await getJSON('/api/sample-incident')),
-      'Loaded the sample: a simulated outage with its culprit removed. Triage it, or investigate it with Claude.');
+    setIncidentText(JSON.stringify(await getJSON(url)), `${loaded} Triage it, or investigate it with Claude.`);
   } catch (err) {
     setStatus(`Could not load the sample: ${err.message}`, 'bad');
   }
@@ -1269,7 +1337,7 @@ async function runTriage() {
     const res = await fetch('/api/triage', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(doc) });
     if (!res.ok) throw new Error(await refusal(res));
     const result = await res.json();
-    showUploaded(doc.series, result);
+    showUploaded(doc, result);
     announce(renderTriage(result));
     setStatus('Triage done.', 'ok');
     $('#triage').scrollIntoView({ block: 'nearest', behavior: MOTION ? 'smooth' : 'auto' });  // below the fold on a laptop
@@ -1280,8 +1348,11 @@ async function runTriage() {
   }
 }
 
-/** The whole uploaded window on the charts, alarm marked, on the classic ranking's worst metric unless the viewer chose one. */
-function showUploaded(series, result) {
+/** The whole uploaded window on the charts and its services on the map, alarm marked, on the classic ranking's worst
+    metric unless the viewer chose one. */
+function showUploaded(doc, result) {
+  const { series } = doc;
+  useGraph(graphOf(doc));
   // the charts now hold the upload, so the last outage's map tags, flight log and verdict go too
   state = freshState();
   seenPills = new Set();
@@ -1290,7 +1361,7 @@ function showUploaded(series, result) {
   $('#verdict').replaceChildren(BLANK.verdict.cloneNode(true));
   drawMap();
   const stats = baselineStats(series);
-  const last = series[META.services[0]][META.metrics[0]].length - 1;
+  const last = series[graph.services[0]][META.metrics[0]].length - 1;
   if (!view.picked) showMetric(result.zscore_ranking[0].metric);
   // one still frame, drawn at once even while the motion is paused; bumping playId stops any playback still running
   ++playId;
@@ -1318,7 +1389,7 @@ const runUpload = () => {
   let incident;
   try { incident = readIncident(); } catch (err) { setStatus(err.message, 'bad'); return; }
   runStream('/api/investigate', { incident, model: pick.model }, 'Sending your telemetry to the agent…',
-    'Done. Nobody knows the true culprit of uploaded telemetry, so there is no scoreboard.');
+    'Done. Nobody knows the true culprit of uploaded telemetry, so there is no scoreboard.', () => graphOf(incident));
 };
 
 // ---- stats and evidence -----------------------------------------------------------------
@@ -1483,8 +1554,6 @@ async function init() {
     setStatus(`Could not reach the server: ${err.message}`, 'bad');
     return;
   }
-  $('#metaSystem').textContent = `Simulated shop · ${META.services.length} services`;
-  setAgent(watching());
   choiceGrid($('#svcGrid'), META.services.map((s) => [s, s]), pick.service, (s) => { pick = { ...pick, service: s }; press($('#svcGrid'), s); });
   choiceGrid($('#faultGrid'), Object.keys(META.faults).map((f) => [f, f, FAULT_SHORT[f] ?? '']), pick.fault,
     (f) => { pick = { ...pick, fault: f }; press($('#faultGrid'), f); describeFault(); });
@@ -1494,9 +1563,7 @@ async function init() {
   renderStats(META.evidence);
   renderEvidence(META.evidence);
   renderModels(META.evidence);
-  drawMap();
-  buildTelemetry();
-  placeInks();
+  useGraph(shopGraph());  // the map, the telemetry rows and the header's count of services
   revealOnScroll(document.querySelectorAll('#mapHead, .map-wrap, .how, #evidence > *'));  // once the telemetry has pushed them down
   runIdle();
   $('#go').addEventListener('click', runLive);
@@ -1509,7 +1576,8 @@ async function init() {
     $('#log').focus({ preventScroll: true });
   });
   new IntersectionObserver(([e]) => { if (e.isIntersecting) $('#jumpVerdict').hidden = true; }).observe($('#verdict'));
-  $('#sampleUse').addEventListener('click', useSample);
+  $('#sampleUse').addEventListener('click', () => useSample('shop'));
+  $('#graphSampleUse').addEventListener('click', () => useSample('custom'));
   $('#dataFile').addEventListener('change', (e) => openFile(e.target));
   $('#dataText').addEventListener('input', () => $('#triage').replaceChildren());
   $('#triageBtn').addEventListener('click', runTriage);

@@ -54,7 +54,14 @@ TRAFFIC = {
     "frontend": 400, "recommend": 200, "checkout": 40, "shipping": 40, "catalog": 320, "cart": 120,
     "payment": 40, "email": 40, "currency": 80, "db": 500, "cache": 900,
 }
-CALLERS = {s: tuple(c for c in SERVICES if s in CALLS[c]) for s in SERVICES}
+CALLEES = {s: tuple(callees) for s, callees in CALLS.items()}
+
+
+def _callers(calls: dict[str, tuple[str, ...]]) -> dict[str, tuple[str, ...]]:
+    return {s: tuple(c for c in calls if s in calls[c]) for s in calls}
+
+
+CALLERS = _callers(CALLEES)
 RPC = {
     "frontend": "Render", "recommend": "ListRecommendations", "checkout": "PlaceOrder",
     "shipping": "GetQuote", "catalog": "ListProducts", "cart": "GetCart", "payment": "Charge",
@@ -107,12 +114,28 @@ class Incident:
     series: dict[str, dict[str, tuple[float, ...]]]
     logs: tuple[LogLine, ...]
     decoy: str | None = None  # hard mode: a service with a harmless anomaly at the same time
+    # an upload's own call graph, service -> the services it calls; None is the shop's (CALLS)
+    calls: dict[str, tuple[str, ...]] | None = None
+
+    @cached_property
+    def services(self) -> tuple[str, ...]:
+        return SERVICES if self.calls is None else tuple(self.calls)
+
+    @cached_property
+    def callees(self) -> dict[str, tuple[str, ...]]:
+        """service -> the services it calls."""
+        return CALLEES if self.calls is None else self.calls
+
+    @cached_property
+    def callers(self) -> dict[str, tuple[str, ...]]:
+        """service -> the services that call it."""
+        return CALLERS if self.calls is None else _callers(self.calls)
 
     @cached_property
     def stats(self) -> dict[tuple[str, str], tuple[float, float]]:
         """(service, metric) -> (mean, std) over the healthy baseline."""
         out = {}
-        for s in SERVICES:
+        for s in self.services:
             for m in METRICS:
                 base = self.series[s][m][:BASELINE_TICKS]
                 out[(s, m)] = (statistics.fmean(base), max(statistics.pstdev(base), STD_FLOOR[m]))
@@ -131,7 +154,7 @@ class Incident:
         """The alarm, watching only these metrics."""
         for t in range(BASELINE_TICKS, WINDOW_TICKS):
             recent = range(t - ALARM_SUSTAIN_TICKS + 1, t + 1)
-            if any(all(self.z(s, m, k) >= ALARM_Z for k in recent) for s in SERVICES for m in metrics):
+            if any(all(self.z(s, m, k) >= ALARM_Z for k in recent) for s in self.services for m in metrics):
                 return t
         return None
 
@@ -154,7 +177,7 @@ class Incident:
 
 def zscore_ranking(inc: Incident) -> list[str]:
     """The no-AI control: rank services by their strongest deviation."""
-    return sorted(SERVICES, key=lambda s: inc.worst(s)[1], reverse=True)
+    return sorted(inc.services, key=lambda s: inc.worst(s)[1], reverse=True)
 
 
 def robust_ranking(inc: Incident) -> list[str]:
@@ -171,7 +194,7 @@ def robust_ranking(inc: Incident) -> list[str]:
             best = max(best, (statistics.median(inc.series[service][m][start:inc.now + 1]) - centre) / spread)
         return best
 
-    return sorted(SERVICES, key=score, reverse=True)
+    return sorted(inc.services, key=score, reverse=True)
 
 
 def simulate(root: str | None, fault: str | None, seed: int, hard: bool = False,
