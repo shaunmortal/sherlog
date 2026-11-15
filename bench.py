@@ -2,6 +2,7 @@
 
     uv run --env-file .env python bench.py --n 44     # about $0.05 per outage on Claude Opus 5.5
     uv run python bench.py --report                   # print the tables from runs/bench.jsonl
+    uv run --env-file .env python bench.py --n 132 --variant open   # GLM-5.3, needs FIREWORKS_API_KEY
 
 Benchmark seeds start at 1000. The prompt and tools were developed on seeds below 1000, so these
 outages were never looked at while building them. Finished outages are skipped on a re-run.
@@ -18,6 +19,7 @@ from itertools import product
 from pathlib import Path
 
 import investigate
+import openmodel
 import sim
 
 RUNS = Path(__file__).parent / "runs" / "bench.jsonl"
@@ -37,7 +39,13 @@ VARIANTS = {  # name -> (tools, model, hard mode)
     "hard-haiku": (investigate.TOOLS, HAIKU, True),
     "hard-sonnet": (investigate.TOOLS, SONNET, True),
     "hard-agent": (investigate.TOOLS, OPUS, True),
+    # open-weights models behind exactly the same prompt, tools and gate (docs/open-model.md)
+    "open": (investigate.TOOLS, openmodel.GLM, False),
+    "hard-open": (investigate.TOOLS, openmodel.GLM, True),
+    "open-small": (investigate.TOOLS, openmodel.GPT_OSS, False),
+    "hard-open-small": (investigate.TOOLS, openmodel.GPT_OSS, True),
 }
+OPEN_VARIANTS = ("open", "open-small")
 VARIANT_LABELS = {
     "one-shot": "Claude Opus 5.5, one prompt (sees only the top anomalies, no tools)",
     "no-logs": "Sherlog agent without log access",
@@ -45,10 +53,13 @@ VARIANT_LABELS = {
     "sonnet": "Sherlog agent on Claude Sonnet 5.5",
     "agent": "Sherlog agent on Claude Opus 5.5",
     "auto": "Sherlog auto: Claude Haiku 5.5 first, Opus 5.5 only if Haiku's answer does not stand",
+    "open": "Sherlog agent on GLM-5.3 (open weights)",
+    "open-small": "Sherlog agent on gpt-oss-120b (open weights)",
 }
-VARIANT_LABELS.update({f"hard-{k}": v for k, v in VARIANT_LABELS.items() if k in ("one-shot", "haiku", "sonnet", "agent", "auto")})
+VARIANT_LABELS.update({f"hard-{k}": v for k, v in VARIANT_LABELS.items()
+                       if k in ("one-shot", "haiku", "sonnet", "agent", "auto", *OPEN_VARIANTS)})
 # list prices per million tokens (input, output), for prompts under 100K tokens
-USD_PER_MTOK = {OPUS: (4.00, 20.00), SONNET: (2.00, 10.00), HAIKU: (0.10, 0.50)}
+USD_PER_MTOK = {OPUS: (4.00, 20.00), SONNET: (2.00, 10.00), HAIKU: (0.10, 0.50), **openmodel.USD_PER_MTOK}
 Z95 = 1.96
 
 
@@ -62,8 +73,8 @@ def cases(n: int, seed_base: int = SEED_BASE) -> list[tuple[str, str, int]]:
 
 
 def run_case(root: str, fault: str, seed: int, tools: list[dict] = investigate.TOOLS, model: str = OPUS,
-             hard: bool = False) -> dict:
-    events = list(investigate.incident_events(sim.simulate(root, fault, seed, hard), tools=tools, model=model))
+             hard: bool = False, client=None) -> dict:
+    events = list(investigate.incident_events(sim.simulate(root, fault, seed, hard), client, tools, model))
     verdict = next((e for e in events if e["type"] == "verdict"), {})
     return {
         "id": f"{root}-{fault}-{seed}",
@@ -273,6 +284,30 @@ def graph_stats(records: list[dict]) -> dict:
     }
 
 
+def wrong_stats(records: list[dict]) -> dict:
+    """Wrong answers behind the gate, and with no gate at all: suspect #1 shipped whatever its citations and
+    confidence, as the no-AI rules always ship theirs (a failed run has no suspect, so ships nothing)."""
+    verdicts = [next((e for e in r["events"] if e["type"] == "verdict"), {}) for r in records]
+    shipped = [(v["causes"][0]["service"], r["root"]) for v, r in zip(verdicts, records) if v.get("causes")]
+    return {
+        "wrong_answers": sum(r["truth"]["answered"] and r["truth"]["ai_answer"] != r["root"] for r in records),
+        "ungated_answered": len(shipped),
+        "ungated_wrong": sum(service != root for service, root in shipped),
+    }
+
+
+def paired_stats(records: list[dict], other: list[dict], name: str) -> dict:
+    """Cause first against another method on the same outages, paired outage by outage, exact McNemar test."""
+    theirs = {r["id"]: r["truth"]["ai_top1"] for r in other}
+    pairs = [(r["truth"]["ai_top1"], theirs[r["id"]]) for r in records if r["id"] in theirs]
+    return {f"vs_{name}": {
+        "outages": len(pairs),
+        "only_this_right": sum(a and not b for a, b in pairs),
+        "only_other_right": sum(b and not a for a, b in pairs),
+        "mcnemar_p": mcnemar_p([a for a, _ in pairs], [b for _, b in pairs]),
+    }}
+
+
 EVIDENCE = RUNS.with_name("evidence.json")
 
 
@@ -287,6 +322,11 @@ def evidence() -> dict:
     for prefix in ("", "hard-"):
         if out[f"{prefix}agent"]:
             out[f"{prefix}agent"] = {**out[f"{prefix}agent"], **deep_stats(records[f"{prefix}agent"])}
+        for v in (f"{prefix}{o}" for o in OPEN_VARIANTS):  # the open models against Claude, on the same outages
+            if records[v]:
+                out[v] = {**out[v], **wrong_stats(records[v]),
+                          **paired_stats(records[v], records[f"{prefix}agent"], "agent"),
+                          **paired_stats(records[v], records[f"{prefix}auto"], "auto")}
     return out
 
 
@@ -364,6 +404,21 @@ def graph_table(ev: dict) -> str:
     return "\n".join([header, "|---|---:|---:|---:|---:|---:|---:|---:|---:|", *rows])
 
 
+def gate_off_table() -> str:
+    """Wrong answers behind today's gate against none at all, for every single-model run (computed, not stored)."""
+    rows = []
+    for v in VARIANTS:
+        rs = load(runs_path(v))
+        if rs:
+            w = wrong_stats(rs)
+            rows.append(f"| {v} | {len(rs)} | {summarize(rs)['answered']} / {w['wrong_answers']} | "
+                        f"{w['ungated_answered']} / {w['ungated_wrong']} |")
+    if not rows:
+        return ""
+    header = "| Gate-off what-if | Outages | Today's gate: answered / wrong | No gate: answered / wrong |"
+    return "\n".join([header, "|---|---:|---:|---:|", *rows])
+
+
 def report(summary: dict) -> str:
     if not summary:
         return "No benchmark runs yet: run `python bench.py --n 44` first."
@@ -402,8 +457,10 @@ def main() -> None:
         seed_base = HARD_SEED_BASE if VARIANTS[args.variant][2] else SEED_BASE
         todo = [c for c in cases(args.n, seed_base) if f"{c[0]}-{c[1]}-{c[2]}" not in done]
         path.parent.mkdir(exist_ok=True)
+        # None: the Anthropic client; an open model gets the adapter, one shared by every worker
+        client = openmodel.Client() if VARIANTS[args.variant][1] in openmodel.USD_PER_MTOK else None
         with ThreadPoolExecutor(max_workers=args.workers) as pool, path.open("a") as out:
-            futures = [pool.submit(run_case, *c, *VARIANTS[args.variant]) for c in todo]
+            futures = [pool.submit(run_case, *c, *VARIANTS[args.variant], client) for c in todo]
             for i, future in enumerate(as_completed(futures), 1):
                 record = future.result()
                 out.write(json.dumps(record) + "\n")
@@ -421,6 +478,8 @@ def main() -> None:
     print(gate_table(ev))
     print()
     print(graph_table(ev))
+    print()
+    print(gate_off_table())
     EVIDENCE.write_text(json.dumps(ev))
 
 
