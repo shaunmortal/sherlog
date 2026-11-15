@@ -98,6 +98,12 @@ def test_a_bad_call_graph_is_refused_with_a_useful_422(change, loc, message):
     assert any(e["loc"] == loc and message in e["msg"] for e in res.json()["errors"]), res.json()["errors"]
 
 
+def test_a_huge_bad_name_is_not_echoed_whole_in_the_message():
+    huge = "X" * 5000
+    errors = _post("/api/triage", _with(lambda d: d["calls"].update({huge: []}))).json()["errors"]
+    assert "not a valid service name" in errors[0]["msg"] and len(errors[0]["msg"]) < 300
+
+
 def test_without_calls_the_shop_names_still_rule():
     shop = json.loads(json.dumps(byo.sample()))
     shop["logs"][0]["service"] = "inventory"

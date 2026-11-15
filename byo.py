@@ -65,16 +65,21 @@ def _series_model(services: tuple[str, ...]) -> type[BaseModel]:
     return create_model("Series", __config__=_STRICT, **fields)
 
 
+def _shown(name: str) -> str:
+    """A refused name as an error message quotes it: cut short, so a huge one is not echoed back whole."""
+    return repr(name) if len(name) <= MAX_NAME_CHARS else f"{name[:MAX_NAME_CHARS]!r}…"
+
+
 def _service_name(name: str) -> str:
     if not SERVICE_NAME.fullmatch(name):
-        raise ValueError(f"{name!r} is not a valid service name: use 1 to {MAX_NAME_CHARS} lowercase letters, digits "
-                         "and dashes, starting with a letter and not ending with a dash")
+        raise ValueError(f"{_shown(name)} is not a valid service name: use 1 to {MAX_NAME_CHARS} lowercase letters, "
+                         "digits and dashes, starting with a letter and not ending with a dash")
     return name
 
 
 def _rpc_name(name: str) -> str:
     if not RPC_NAME.fullmatch(name):
-        raise ValueError(f"{name!r} is not a valid RPC name: use 1 to {MAX_NAME_CHARS} letters, digits and "
+        raise ValueError(f"{_shown(name)} is not a valid RPC name: use 1 to {MAX_NAME_CHARS} letters, digits and "
                          "underscores, starting with a letter")
     return name
 

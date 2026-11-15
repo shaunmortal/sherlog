@@ -551,7 +551,7 @@ def rollback_check(inc: sim.Incident, service: str) -> dict:
     simulated, so the replay is free; in production the equivalent is a canary rollback or a kill switch."""
     if inc.root is None:
         raise ValueError("the rollback replay needs a simulated outage; uploaded telemetry has no seed to replay")
-    after =sim.simulate(inc.root, inc.fault, inc.seed, hard=inc.decoy is not None, rolled_back=service)
+    after = sim.simulate(inc.root, inc.fault, inc.seed, hard=inc.decoy is not None, rolled_back=service)
     ranked, ticks = sim.zscore_ranking(inc), _window(inc)
     still = [s for s in ranked if _sustained(after, s, ticks=ticks)]
     alarm_after = after.alarm is not None
