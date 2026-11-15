@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page not found · Sherlog</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/shared.css">
+<link rel="stylesheet" href="/static/page.css">
+<style>
+  .why { max-width: 60ch; margin: 0 0 28px; color: var(--muted); font-size: 16px; }
+  .go { display: flex; flex-wrap: wrap; gap: 12px; }
+  .go a { display: inline-flex; align-items: center; min-height: 48px; padding: 0 24px; border-radius: var(--pill); font: 500 14px var(--sans); letter-spacing: .03em; text-transform: uppercase; text-decoration: none; }
+  .go .main { background: var(--accent); color: var(--on-accent); }
+  .go .other { background: var(--sunk); }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header>
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Sherlog home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13" cy="13" r="8" fill="none" stroke="var(--accent)" stroke-width="4"/><path d="M19 19l8 8" stroke="var(--accent)" stroke-width="4.5" stroke-linecap="square"/></svg>
+      SHERLOG
+    </a>
+    <a class="pill home" href="/">Story</a>
+    <a class="pill" href="/console">Console</a>
+    <button type="button" class="round" id="themeBtn" aria-label="Switch light or dark theme">◐</button>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <h1>Page not found</h1>
+    <p class="lede">Nothing lives at this address.</p>
+    <p class="why">The link may be old or mistyped. The story page shows what Sherlog does; the console lets you break a service or replay a recorded outage for free.</p>
+    <nav class="go" aria-label="Where to go next"><a class="main" href="/">The story page</a><a class="other" href="/console">The console</a></nav>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <nav aria-label="Pages"><a href="/console">Console</a><a href="/status">Status</a><a href="/reference">API</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
+  </div>
+</footer>
+
+<script src="/static/shared.js"></script>
+<script>
+$('#themeBtn').addEventListener('click', () => toggleTheme());
+</script>
+</body>
+</html>

@@ -11,5 +11,28 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt -r requirements-dev.txt
-      # the browser checks in tests/test_e2e.py skip themselves without SHERLOG_E2E_URL
+      # the browser checks in tests/test_e2e.py skip themselves without SHERLOG_E2E_URL; the next job runs them
       - run: pytest -q
+
+  browser:
+    # the app on this runner with no API key, so only recorded outages play, and Playwright's own Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SHERLOG_E2E_URL: http://127.0.0.1:8000
+      SHERLOG_E2E_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt -r requirements-dev.txt playwright==1.65.2
+      - run: python -m playwright install --with-deps chromium
+      - name: Browser checks against the app
+        run: |
+          uvicorn app:app --port 8000 > uvicorn.log 2>&1 &
+          curl -sS -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 "$SHERLOG_E2E_URL/api/health"
+          pytest -q tests/test_e2e.py
+      - name: Server log
+        if: failure()
+        run: cat uvicorn.log

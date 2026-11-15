@@ -16,24 +16,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/shared.css">
+<link rel="stylesheet" href="/static/page.css">
 <style>
-  a { color: inherit; }
-  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
-  @media (max-width: 760px) { .wrap { padding: 0 16px; } }
-
-  /* ---- header: same brand, theme button and pill links as the story page; every target is 48px ---- */
-  header .wrap { display: flex; align-items: center; gap: 8px; padding-top: 20px; padding-bottom: 20px; }
-  .brand { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-right: auto; font: 500 22px/1 var(--sans); letter-spacing: .08em; text-decoration: none; }
-  .brand svg { width: 20px; height: 20px; }
-  .pill { display: inline-flex; align-items: center; min-height: 48px; padding: 0 18px; border-radius: var(--pill); font: 500 13px var(--sans); letter-spacing: .03em; text-transform: uppercase; text-decoration: none; transition: background-color var(--hover) var(--ease-quad); }
-  .pill:hover { background: var(--sunk); }
-  .round { flex: none; width: 48px; height: 48px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--sunk); color: var(--text); font-size: 17px; }
-  @media (max-width: 480px) { .pill { padding: 0 12px; } .brand { font-size: 18px; } }
-  @media (max-width: 400px) { .home { display: none; } }  /* the brand links home too */
-
   /* ---- the answer first, then one row per thing a visitor relies on ---- */
-  main { padding: 6vh 0 12vh; }
-  h1 { margin: 0 0 12px; font: 500 13px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
   .summary { display: flex; align-items: baseline; gap: 14px; margin: 0 0 32px; font: 400 clamp(26px, 3.6vw, 40px)/1.15 var(--sans); letter-spacing: -.02em; }
   .summary .dot { width: 14px; height: 14px; transform: translateY(-.12em); }
   .rows { margin: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); }
@@ -51,12 +36,6 @@
   .checked { margin: 16px 0 0; color: var(--muted); font: 13px/1.6 var(--mono); }
   .checked a { text-underline-offset: 3px; }
   .notice { margin: 0; padding: 20px 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
-
-  /* ---- footer: the same page links as the story page's; the padding makes 48px targets, the margin keeps the words in line ---- */
-  footer { border-top: 1px solid var(--line); padding: 12px 0 32px; font: 13px var(--sans); color: var(--muted); }
-  footer nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 -12px; }
-  footer a { display: inline-flex; align-items: center; min-height: 48px; padding: 0 12px; text-underline-offset: 3px; }
-  footer a:hover { color: var(--text); }
 </style>
 </head>
 <body>
@@ -90,7 +69,7 @@
 
 <footer>
   <div class="wrap">
-    <nav aria-label="Pages"><a href="/console">Console</a><a href="/status" aria-current="page">Status</a><a href="/docs">API</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
+    <nav aria-label="Pages"><a href="/console">Console</a><a href="/status" aria-current="page">Status</a><a href="/reference">API</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
   </div>
 </footer>
 

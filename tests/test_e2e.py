@@ -1,10 +1,12 @@
 """Browser checks against a running server, skipped unless SHERLOG_E2E_URL is set. They play recorded outages
-only, so no API key is needed. Needs Playwright for Python (pip install playwright) and Chrome:
+only, so no API key is needed. Needs Playwright for Python (pip install playwright) and Chrome, or Playwright's own
+Chromium with SHERLOG_E2E_CHANNEL=chromium (python -m playwright install chromium), as CI runs them:
 
     uvicorn app:app --port 8000 &
     SHERLOG_E2E_URL=http://127.0.0.1:8000 pytest -q tests/test_e2e.py
 """
 import os
+import time
 
 import pytest
 
@@ -12,6 +14,7 @@ URL = os.environ.get("SHERLOG_E2E_URL", "").rstrip("/")
 if not URL:
     pytest.skip("set SHERLOG_E2E_URL to run the browser checks", allow_module_level=True)
 sync_api = pytest.importorskip("playwright.sync_api")
+CHANNEL = os.environ.get("SHERLOG_E2E_CHANNEL", "chrome")  # chrome: the installed browser; chromium: Playwright's
 
 REPLAY_TIMEOUT_MS = 120_000  # a recorded outage plays back at reading speed
 
@@ -19,7 +22,7 @@ REPLAY_TIMEOUT_MS = 120_000  # a recorded outage plays back at reading speed
 @pytest.fixture(scope="module")
 def browser():
     with sync_api.sync_playwright() as playwright:
-        browser = playwright.chromium.launch(channel="chrome", headless=True)
+        browser = playwright.chromium.launch(channel=CHANNEL, headless=True)
         yield browser
         browser.close()
 
@@ -237,3 +240,96 @@ def test_a_verdict_comes_into_view_and_is_ringed_when_it_lands(page, errors):
     sync_api.expect(page.locator("#h-verdict")).to_be_in_viewport()
     sync_api.expect(page.locator("#verdict")).not_to_have_class("landed")  # only for a moment
     assert errors == []
+
+
+# --- the content security policy, the 404 page, layout shift and accessibility -----------------------------------
+
+VIOLATIONS = """window.__blocked = [];
+addEventListener('securitypolicyviolation', (e) => window.__blocked.push(`${e.effectiveDirective} ${e.blockedURI}`));"""
+SETTLE_MS = 2_500  # long enough for the CDN's modules, the fonts and the first data to arrive
+
+
+@pytest.mark.parametrize("path, ready", [("/", "#hero3d canvas"), ("/console", "#map .node"),
+                                         ("/status", "#rows:not([hidden])"), ("/reference", ".op"),
+                                         ("/docs", ".opblock")])
+def test_every_page_runs_under_the_content_security_policy(page, errors, path, ready):
+    # "/" waits for the 3D shop, drawn by three.js from the CDN, and /docs for Swagger UI's operations
+    page.add_init_script(VIOLATIONS)
+    page.goto(f"{URL}{path}")
+    page.locator(ready).first.wait_for()
+    page.wait_for_timeout(SETTLE_MS)
+    assert page.evaluate("window.__blocked") == [] and errors == []
+
+
+def test_the_policy_blocks_an_inline_script_the_page_did_not_ship(page):
+    page.add_init_script(VIOLATIONS)
+    page.goto(f"{URL}/status")
+    page.evaluate("() => document.head.append(Object.assign(document.createElement('script'), "
+                  "{ textContent: 'window.injected = true' }))")
+    page.wait_for_function("window.__blocked.length > 0")
+    assert page.evaluate("window.injected") is None
+    assert page.evaluate("window.__blocked") == ["script-src-elem inline"]
+
+
+def test_a_dead_link_shows_the_404_page_with_a_way_back(page):
+    page.add_init_script(VIOLATIONS)
+    res = page.goto(f"{URL}/no-such-page")
+    assert res.status == 404
+    sync_api.expect(page.get_by_role("heading", level=1)).to_have_text("Page not found")
+    page.get_by_role("link", name="The console").click()
+    page.wait_for_url(f"{URL}/console")
+    assert page.evaluate("window.__blocked") == []
+
+
+LAYOUT_SHIFTS = """window.__shifts = [];
+new PerformanceObserver((list) => { for (const e of list.getEntries()) window.__shifts.push(e.value); })
+  .observe({ type: 'layout-shift', buffered: true });"""
+API_DELAY_S = 0.8  # the deployed site's data arrives after the first paint; the local server's might not
+GOOD_CLS = 0.1     # Lighthouse's line between good and needs improvement
+SIZES = {"phone": {"width": 412, "height": 823}, "desktop": {"width": 1350, "height": 940}}  # Lighthouse's own
+
+
+def _slowly(route):
+    time.sleep(API_DELAY_S)
+    route.continue_()
+
+
+@pytest.mark.parametrize("size", SIZES)
+@pytest.mark.parametrize("path", ["/", "/console", "/status"])
+def test_pages_do_not_shift_while_they_load(browser, path, size):
+    context = browser.new_context(viewport=SIZES[size])
+    context.add_init_script(LAYOUT_SHIFTS)
+    page = context.new_page()
+    page.route("**/api/**", _slowly)
+    page.goto(f"{URL}{path}")
+    page.wait_for_timeout(PAST_REVEAL_FALLBACK_MS)
+    shifts = page.evaluate("window.__shifts")
+    context.close()
+    assert sum(shifts) < GOOD_CLS, shifts  # every shift counted, a stricter sum than Lighthouse's worst window
+
+
+AXE_URL = "https://cdn.jsdelivr.net/npm/axe-core@4.10.2/axe.min.js"
+AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]
+AXE_SIZES = {"desktop": {"width": 1440, "height": 900}, "phone": {"width": 390, "height": 844}}
+# axe judges colours as they are painted, so it waits out every transition and entrance that ends (not the endless
+# loops, nor the story page's scroll-driven progress bar): mid-way, a guess card turning red can read darker than either end
+SETTLED = """() => Promise.allSettled(document.getAnimations()
+  .filter((a) => Number.isFinite(a.effect?.getComputedTiming().endTime)).map((a) => a.finished))"""
+
+
+@pytest.mark.parametrize("scheme", ["light", "dark"])
+@pytest.mark.parametrize("size", AXE_SIZES)
+@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/no-such-page"])
+def test_axe_finds_no_accessibility_violations(browser, path, size, scheme):
+    # the policy would block axe's injected script, so this context bypasses it; the checks above run with it on
+    context = browser.new_context(viewport=AXE_SIZES[size], color_scheme=scheme, bypass_csp=True)
+    page = context.new_page()
+    page.goto(f"{URL}{path}")
+    page.wait_for_timeout(PAST_REVEAL_FALLBACK_MS)  # every section revealed, the data loaded
+    if path == "/":
+        page.locator("#cards.ready").wait_for()  # the guess cards light up one by one after their section shows
+    page.evaluate(SETTLED)
+    page.add_script_tag(url=AXE_URL)
+    result = page.evaluate("(tags) => axe.run(document, { runOnly: { type: 'tag', values: tags } })", AXE_TAGS)
+    context.close()
+    assert [(v["id"], len(v["nodes"])) for v in result["violations"]] == []

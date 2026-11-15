@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /mcp
+
+Sitemap: https://sherlog-jade.vercel.app/sitemap.xml

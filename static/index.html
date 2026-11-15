@@ -33,8 +33,9 @@
   .top { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); min-height: 48px; }
   .brand { display: flex; align-items: center; gap: 10px; padding: 0 22px; border-right: 1px solid var(--line); font: 600 17px var(--mono); letter-spacing: .16em; color: inherit; text-decoration: none; }
   .brand svg { width: 16px; height: 16px; }
-  .meta { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; padding: 8px 22px; font: 13px var(--mono); }
+  .meta { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; padding: 8px 22px; font: 13px/17px var(--mono); }  /* a fixed line: the bar keeps its height when the font arrives */
   .meta span { color: var(--muted); margin-right: 6px; }
+  .meta b { font-weight: 400; }
   .views, .views [role="tablist"] { display: flex; }
   .views { position: relative; }
   .views button { border: 0; border-left: 1px solid var(--line); background: none; padding: 0 22px; font: 500 13px var(--mono); letter-spacing: .1em; color: var(--muted); transition: color var(--hover) var(--ease-quad); }
@@ -87,6 +88,8 @@
   .cell small { display: block; font: 13px var(--sans); color: var(--muted); }
   .cell:is([aria-pressed="true"], [aria-checked="true"]) small { color: inherit; opacity: .75; }
   .desc { margin: 10px 0 0; font-size: 14px; color: var(--muted); min-height: 3em; }
+  #modelDesc { min-height: 0; }
+  .cell.wait { visibility: hidden; }  /* a blank cell holding a grid's place until the shop's data arrives */
   .act { position: relative; isolation: isolate; overflow: hidden; margin-top: 18px; height: 52px; padding: 0 28px; border: 0; border-radius: var(--pill); background: var(--accent); color: var(--on-accent);
     font: 500 14px var(--sans); letter-spacing: .03em; text-transform: uppercase; transition: color .4s ease, transform var(--hover) var(--ease-quad); }
   .act::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--ink); transform: translateY(102%); transition: transform .5s var(--ease-snap); }
@@ -102,6 +105,7 @@
     html { scroll-padding-bottom: 84px; }
   }
   .hint { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+  .hint.first { margin: 0 0 14px; } .hint.flush { margin: 0; } .hint.near { margin: 6px 0 0; }
   .status { margin: 0; padding: 14px 22px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); min-height: 1.5em; }
   .status:empty { padding: 0; border: 0; min-height: 0; }  /* stays in the page so screen readers hear its first message */
   .status.bad { color: var(--bad); } .status.ok { color: var(--ok); }
@@ -128,6 +132,7 @@
   .stat .label { margin: 0; }
   .big { margin: 8px 0 4px; font: 400 48px/1.05 var(--sans); letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
   .stat .small { font: 14px var(--mono); color: var(--muted); }
+  @media (min-width: 761px) { .stat .small { min-height: 3lh; } }  /* side by side, the tallest sub-line has 3 lines once loaded */
   .note { margin: 0; padding: 10px 22px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); }
   @media (max-width: 760px) { .stats { grid-template-columns: minmax(0, 1fr); } .stat + .stat { border-left: 0; border-top: 1px solid var(--line); } }
   .head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 16px 22px 12px; }
@@ -179,6 +184,7 @@
   .tele-val { padding: 7px 14px 0 6px; border-left: 1px solid var(--line); text-align: right; font: 14px/1.35 var(--mono); white-space: nowrap; }
   .axis { height: 26px; border-bottom: 1px solid var(--line); }
   .axis canvas { width: 100%; height: 22px; display: block; }
+  .tele-wait { height: calc(1px + 11 * 52px + 26px); padding: 0 22px 16px; }  /* the shop's 11 rows and the axis */
   #tip { position: fixed; z-index: 20; background: var(--tip-bg); color: var(--text); border: 1px solid var(--line-strong); border-radius: 8px; padding: 6px 9px; font: 11px/1.5 var(--mono); white-space: pre; pointer-events: none; animation: fade var(--fast) var(--ease-quad); }
   @keyframes fade { from { opacity: 0; } }
   @media (max-width: 760px) {
@@ -284,6 +290,7 @@
   .evidence h1 { margin: 0 0 12px; font: 600 34px/1.15 var(--sans); letter-spacing: -.01em; }
   .evidence p { margin: 0 0 10px; max-width: 75ch; color: var(--muted); font-size: 16px; }
   .evidence .sub { margin-top: 32px; }
+  #evTest, #evHardTest { margin-top: 12px; }
   .table-wrap { overflow-x: auto; }
   .ev-table { width: 100%; border-collapse: collapse; font: 14px var(--mono); }
   .ev-table th { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line-strong); text-align: left; font: 500 12px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -299,7 +306,8 @@
   .foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0 24px; padding: 10px 22px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
   .foot a { display: inline-flex; align-items: center; min-height: 44px; }  /* a whole touch target, as in the story page's footer */
   .foot nav { display: flex; flex-wrap: wrap; gap: 0 20px; }
-</style>
+    #evRealTest.ev-gap { margin-top: 12px; }
+  </style>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -309,10 +317,11 @@
     SHERLOG
   </a>
   <div class="meta">
-    <div><span>SYSTEM</span><b id="metaSystem" style="font-weight:400">Simulated shop</b><a class="meta-link" id="realLink" href="#evidence">also tested on 252 real outages <span aria-hidden="true">→</span></a></div>
-    <div><span>MODEL</span><b id="metaModel" style="font-weight:400">Claude</b></div>
+    <!-- the text the console shows once the shop has loaded, so the bar does not rewrap then -->
+    <div><span>SYSTEM</span><b id="metaSystem">Simulated shop · 11 services</b><a class="meta-link" id="realLink" href="#evidence">also tested on 252 real outages <span aria-hidden="true">→</span></a></div>
+    <div><span>MODEL</span><b id="metaModel">claude-haiku-5-5 → claude-opus-5-5</b></div>
     <div><span>SOURCES</span>metrics · logs · call graph</div>
-    <div><span>MODE</span><b id="metaMode" style="font-weight:400">…</b></div>
+    <div><span>MODE</span><b id="metaMode">…</b></div>
   </div>
   <div class="views">
     <div role="tablist" aria-label="Views">
@@ -333,21 +342,23 @@
     <div class="pad" id="breakPanel" role="tabpanel" aria-labelledby="tab-live">
       <h2 class="label">Break something</h2>
       <p class="sub">1 · Service</p>
-      <div class="grid" id="svcGrid" role="radiogroup" aria-label="Service to break"></div>
+      <!-- until the shop's data arrives, blank cells hold each grid's place (11 services, 4 faults, 4 investigators,
+           2 modes) and the descriptions read as they will for the default picks, so nothing moves when it does -->
+      <div class="grid" id="svcGrid" role="radiogroup" aria-label="Service to break"><span class="cell wait" aria-hidden="true">&nbsp;</span><span class="cell wait" aria-hidden="true">&nbsp;</span><span class="cell wait" aria-hidden="true">&nbsp;</span><span class="cell wait" aria-hidden="true">&nbsp;</span><span class="cell wait" aria-hidden="true">&nbsp;</span><span class="cell wait" aria-hidden="true">&nbsp;</span><span class="cell wait" aria-hidden="true">&nbsp;</span><span class="cell wait" aria-hidden="true">&nbsp;</span><span class="cell wait" aria-hidden="true">&nbsp;</span><span class="cell wait" aria-hidden="true">&nbsp;</span><span class="cell wait" aria-hidden="true">&nbsp;</span></div>
       <p class="sub">2 · Fault</p>
-      <div class="grid" id="faultGrid" role="radiogroup" aria-label="Fault to inject"></div>
-      <p class="desc" id="faultDesc"></p>
+      <div class="grid" id="faultGrid" role="radiogroup" aria-label="Fault to inject"><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span></div>
+      <p class="desc" id="faultDesc">Adds 400 ms to every request (slow network).</p>
       <p class="sub">3 · Who investigates</p>
-      <div class="grid" id="modelGrid" role="radiogroup" aria-label="Model that investigates"></div>
-      <p class="desc" id="modelDesc" style="min-height:0"></p>
+      <div class="grid" id="modelGrid" role="radiogroup" aria-label="Model that investigates"><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span></div>
+      <p class="desc" id="modelDesc">Claude Haiku 5.5 investigates first; Claude Opus 5.5 starts over only if its citations fail the check, it is under 80% sure, or another service would explain more of the outage. Numbers: cause named first, median cost per outage on the benchmark.</p>
       <p class="sub">4 · Difficulty</p>
-      <div class="grid" id="modeGrid" role="radiogroup" aria-label="Difficulty"></div>
+      <div class="grid" id="modeGrid" role="radiogroup" aria-label="Difficulty"><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span></div>
       <div class="go-bar"><button type="button" class="act" id="go">Break it live</button></div>
       <p class="hint">Claude investigates live, never told what you broke. Live runs are limited per visitor; replays are free.</p>
     </div>
     <div class="pad" id="replayPanel" role="tabpanel" aria-labelledby="tab-replay" hidden>
       <h2 class="label">Recorded outages</h2>
-      <p class="hint" style="margin:0 0 14px"><span id="replayCount">0</span> recorded from the benchmark. The culprit stays hidden until the end, so you can still guess.</p>
+      <p class="hint first"><span id="replayCount">0</span> recorded from the benchmark. The culprit stays hidden until the end, so you can still guess.</p>
       <h3 class="sub" id="h-start">Start here</h3>
       <div class="picks" id="startHere" role="group" aria-labelledby="h-start"></div>
       <p class="hint" id="replayLegend">H = hard mode: a decoy anomaly at the same time.</p>
@@ -356,8 +367,8 @@
     </div>
     <div class="pad" id="dataPanel" role="tabpanel" aria-labelledby="tab-data" hidden>
       <h2 class="label">Your data</h2>
-      <p class="hint" style="margin:0">Bring 10 minutes of telemetry from your own system, with its call graph (2 to 80 services) or mapped onto the shop's 11, and the same alarm, rankings and checks run on it.</p>
-      <p class="hint" style="margin:6px 0 0"><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format, and how to export your telemetry</a></p>
+      <p class="hint flush">Bring 10 minutes of telemetry from your own system, with its call graph (2 to 80 services) or mapped onto the shop's 11, and the same alarm, rankings and checks run on it.</p>
+      <p class="hint near"><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format, and how to export your telemetry</a></p>
       <p class="sub">1 · Telemetry</p>
       <div class="grid">
         <a class="cell" href="/api/sample-incident" download="sherlog-sample-incident.json"><b>Download</b><small>the shop sample</small></a>
@@ -388,7 +399,7 @@
       <div class="stat"><p class="label">No AI · z-score</p><div class="big" id="statBase">–</div><div class="small" id="statBaseSub">ranking, same outages</div></div>
       <div class="stat"><p class="label">Cost per outage</p><div class="big" id="statCost">–</div><div class="small" id="statCostSub">median</div></div>
     </div>
-    <p class="note" id="statNote">Benchmark on simulated telemetry, so the numbers are optimistic. Details under Evidence.</p>
+    <p class="note" id="statNote">44 hard-mode outages, each with a decoy anomaly at the same time, and 132 normal ones. Simulated telemetry, so the numbers are optimistic. Details under Evidence.</p>
 
     <div class="head" id="teleHead">
       <div class="head-l">
@@ -401,7 +412,7 @@
         <button type="button" class="pause off" id="skipBtn">SKIP TO VERDICT</button>
       </div>
     </div>
-    <div id="telemetry"><p class="empty" style="padding:0 22px 16px">Loading the shop's metrics…</p></div>
+    <div id="telemetry"><p class="empty tele-wait">Loading the shop's metrics…</p></div>
     <a class="jump" id="jumpVerdict" href="#h-verdict" hidden>See the verdict <span aria-hidden="true">&nbsp;↓</span></a>
 
     <div class="head" id="mapHead"><h2 class="label">Who did it?</h2></div>
@@ -441,19 +452,19 @@
   <h2 class="part" id="h-real" tabindex="-1">On <span class="realN">252</span> real outages · a public benchmark</h2>
   <p>Three real microservice systems (12, 15 and 68 services), each broken on purpose and scored by the benchmark's own evaluator. The best published methods were re-run on the same cases with the benchmark's own runner. Ranked first: the root-cause service is the method's first suspect.</p>
   <div class="table-wrap" id="evReal" role="region" tabindex="0" aria-labelledby="h-real"></div>
-  <p id="evRealTest" style="margin-top:12px"></p>
+  <p id="evRealTest" class="ev-gap"></p>
   <p class="source">Data: RCAEval benchmark, MIT licence. <a href="https://github.com/shaunmortal/sherlog/blob/main/docs/real-benchmark.md">The method and every table</a></p>
   <h2 class="part" id="h-controlled">The controlled benchmark · a simulated shop</h2>
   <p><span class="evN">132</span> outages, three for every service × fault type, on seeds that were never looked at while the agent was built. "Cause first" means the true cause was ranked first <i>and</i> its citations were verified. Every run, with each tool call and the model's reasoning, can be replayed under Replay.</p>
   <p>The telemetry is simulated: caller logs name the failing service and faults are single and clean, so the absolute numbers are optimistic. The no-AI baselines run on exactly the same data, so the comparison is fair.</p>
   <h2 class="sub" id="h-methods">What each capability and model adds · <span class="evN">132</span> outages · [95% interval]</h2>
   <div class="table-wrap" id="evMethods" role="region" tabindex="0" aria-labelledby="h-methods"></div>
-  <p id="evTest" style="margin-top:12px"></p>
+  <p id="evTest"></p>
   <h2 class="sub" id="h-robust">Robustness · one input taken away</h2>
   <div class="table-wrap" id="evRobust" role="region" tabindex="0" aria-labelledby="h-robust"></div>
   <h2 class="sub" id="h-hard">Hard mode · a decoy anomaly at the same time, callers log 60% fewer complaints · <span id="hardN">44</span> outages</h2>
   <div class="table-wrap" id="evHard" role="region" tabindex="0" aria-labelledby="h-hard"></div>
-  <p id="evHardTest" style="margin-top:12px"></p>
+  <p id="evHardTest"></p>
   <h2 class="sub" id="h-faults">By fault type · Claude Opus 5.5 agent</h2>
   <div class="table-wrap" id="evFaults" role="region" tabindex="0" aria-labelledby="h-faults"></div>
 </div>
@@ -462,7 +473,7 @@
 
 <footer class="foot">
   <span>Built from scratch for IceHacks 2026.</span>
-  <nav aria-label="Pages"><a href="/status">Status: live mode, recorded outages, version</a><a href="/docs">API</a><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/mcp.md">MCP connector</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
+  <nav aria-label="Pages"><a href="/status">Status: live mode, recorded outages, version</a><a href="/reference">API</a><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/mcp.md">MCP connector</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
 </footer>
 
 <div id="tip" aria-hidden="true" hidden></div>

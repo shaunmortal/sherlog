@@ -15,7 +15,7 @@ Everything here is free and needs no key, except live investigations (POST /api/
 - [Story page](https://sherlog-jade.vercel.app/): what Sherlog does, told with a recorded outage, a guessing game and the benchmark
 - [Console](https://sherlog-jade.vercel.app/console): break a service live, replay a recorded outage for free ([#41](https://sherlog-jade.vercel.app/console#replay/41) is the walk-through), read the evidence, upload your own telemetry
 - [Status](https://sherlog-jade.vercel.app/status): live mode, recorded outages, today's live runs and the deployed version
-- [API reference](https://sherlog-jade.vercel.app/docs): every route, generated from the code
+- [API reference](https://sherlog-jade.vercel.app/reference): every route, generated from the code; the schema itself is at [/openapi.json](https://sherlog-jade.vercel.app/openapi.json), and [Swagger UI](https://sherlog-jade.vercel.app/docs) tries each route
 
 ## MCP connector
 

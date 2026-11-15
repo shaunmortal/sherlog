@@ -1,0 +1,25 @@
+/* Shared by the plain pages (status, API reference, 404): one column, the story page's brand, theme button and pill
+   links in the header, and its page links in the footer. Every target is 48px. */
+a { color: inherit; }
+/* the footer stays at the bottom of the screen, so it does not jump down once a page fills in */
+body { display: flex; flex-direction: column; min-height: 100vh; }
+main { flex: 1; padding: 6vh 0 12vh; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+@media (max-width: 760px) { .wrap { padding: 0 16px; } }
+
+header .wrap { display: flex; align-items: center; gap: 8px; padding-top: 20px; padding-bottom: 20px; }
+.brand { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-right: auto; font: 500 22px/1 var(--sans); letter-spacing: .08em; text-decoration: none; }
+.brand svg { width: 20px; height: 20px; }
+.pill { display: inline-flex; align-items: center; min-height: 48px; padding: 0 18px; border-radius: var(--pill); font: 500 13px var(--sans); letter-spacing: .03em; text-transform: uppercase; text-decoration: none; transition: background-color var(--hover) var(--ease-quad); }
+.pill:hover { background: var(--sunk); }
+.round { flex: none; width: 48px; height: 48px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--sunk); color: var(--text); font-size: 17px; }
+@media (max-width: 480px) { .pill { padding: 0 12px; } .brand { font-size: 18px; } }
+@media (max-width: 400px) { .home { display: none; } }  /* the brand links home too */
+
+h1 { margin: 0 0 12px; font: 500 13px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.lede { margin: 0 0 16px; font: 400 clamp(26px, 3.6vw, 40px)/1.15 var(--sans); letter-spacing: -.02em; }
+
+footer { border-top: 1px solid var(--line); padding: 12px 0 32px; font: 13px var(--sans); color: var(--muted); }
+footer nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 -12px; }  /* the margin keeps the words in line */
+footer a { display: inline-flex; align-items: center; min-height: 48px; padding: 0 12px; text-underline-offset: 3px; }
+footer a:hover { color: var(--text); }
