@@ -29,6 +29,8 @@ def rows(ev: dict, prefix: str) -> list[tuple[str, float, list | None, str]]:
     out = [("No AI · z-score ranking", agent["baseline_ac1"], agent.get("baseline_ac1_ci"), NO_AI)]
     if agent.get("robust_ac1") is not None:
         out.append(("No AI · robust z-score", agent["robust_ac1"], agent.get("robust_ac1_ci"), NO_AI))
+    if agent.get("graph_ac1") is not None:
+        out.append(("No AI · call-graph rule", agent["graph_ac1"], agent.get("graph_ac1_ci"), NO_AI))
     for key, label in [("one-shot", "Opus · one prompt, no tools"), ("haiku", "Haiku agent"),
                        ("sonnet", "Sonnet agent"), ("agent", "Opus agent"), ("auto", "Auto · Haiku, then Opus")]:
         s = ev.get(f"{prefix}{key}")

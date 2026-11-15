@@ -489,6 +489,17 @@ def _explains(inc: sim.Incident, service: str, abnormal: list[str]) -> list[str]
     return [s for s in abnormal if s in reach]
 
 
+def graph_ranking(inc: sim.Incident) -> list[str]:
+    """The strongest no-AI control: rank services by how many of the abnormal services each one explains through
+    the call graph, ties by z-score. It reads the same call graph the blast-radius check does, but no logs, and it
+    always names someone, so unlike the agent it can never hand an outage to a human."""
+    ranked = sim.zscore_ranking(inc)
+    abnormal = [s for s in ranked if _sustained(inc, s)]
+    # a stable sort keeps the z-score order among services that explain equally many; a service that is not
+    # abnormal itself explains none, so the rest follow in z-score order
+    return sorted(ranked, key=lambda s: len(_explains(inc, s, abnormal)), reverse=True)
+
+
 def blast_radius(inc: sim.Incident, service: str) -> dict:
     """Does the answer explain the whole outage? Every abnormal service should be it or one of its callers."""
     abnormal = [s for s in sim.zscore_ranking(inc) if _sustained(inc, s)]

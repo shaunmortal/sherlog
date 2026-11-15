@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app
+import bench
 import investigate
 import sim
 
@@ -67,6 +68,30 @@ def test_every_page_is_served_as_html(api, path, marker):
     assert marker in res.text
 
 
+@pytest.mark.parametrize("path", ["/", "/console", "/status", "/api/health"])
+def test_pages_and_health_answer_head_for_uptime_monitors(api, path):
+    head = api.head(path)
+    assert head.status_code == 200 and head.content == b""
+    assert head.headers["content-type"] == api.get(path).headers["content-type"]
+
+
+OG_MAX_BYTES = 300_000  # link previews skip larger images
+
+
+def test_the_link_preview_image_is_served_and_small(api):
+    res = api.get("/static/og.jpg")
+    assert res.status_code == 200 and res.headers["content-type"] == "image/jpeg"
+    assert len(res.content) <= OG_MAX_BYTES
+
+
+def test_api_docs_name_the_api_and_describe_every_route(api):
+    spec = api.get("/openapi.json").json()
+    assert spec["info"] == {"title": "Sherlog API", "version": app._version()}
+    operations = [op for route in spec["paths"].values() for op in route.values()]
+    assert operations and all(op.get("description") for op in operations)
+    assert not any("head" in route for route in spec["paths"].values())  # HEAD would only repeat each GET
+
+
 def test_status_page_explains_itself_without_javascript(api):
     page = api.get("/status").text
     assert "<noscript>" in page and 'href="/api/health"' in page
@@ -118,9 +143,37 @@ def test_version_falls_back_to_dev_without_git(monkeypatch):
 def test_replays_are_numbered_and_each_plays_to_the_truth(api):
     listed = api.get("/api/replays").json()
     assert [r["id"] for r in listed] == list(range(1, len(listed) + 1))
-    assert all(set(r) == {"id", "hard"} for r in listed)  # numbered, never named: the culprit stays hidden
+    # numbered, never named: the culprit stays hidden
+    assert all(set(r) == {"id", "hard", "caught", "model"} for r in listed)
     kinds = [e["type"] for e in api.get("/api/replays/1").json()]
     assert kinds[0] == "telemetry" and "verdict" in kinds and kinds[-1] == "truth"
+
+
+OPUS_REPLAYS, OPUS_NORMAL_REPLAYS = 176, 132
+
+
+def test_the_opus_replays_keep_their_numbers(api):
+    listed = api.get("/api/replays").json()[:OPUS_REPLAYS]
+    opus = [r["id"] for v in app.REPLAY_VARIANTS for r in bench.load(bench.runs_path(v))]
+    assert [r["record"]["id"] for r in app._replays()[:OPUS_REPLAYS]] == opus and len(opus) == OPUS_REPLAYS
+    assert listed == [{"id": n, "hard": n > OPUS_NORMAL_REPLAYS, "caught": False, "model": investigate.MODELS["opus"]}
+                      for n in range(1, OPUS_REPLAYS + 1)]
+    assert api.get("/api/replays/41").json()[-1]["root"] == "cache"  # the outage the README walks through
+
+
+def test_each_caught_replay_is_a_wrong_answer_its_rollback_does_not_prove(api):
+    caught = [r for r in api.get("/api/replays").json() if r["caught"]]
+    assert [r["id"] for r in caught] == list(range(OPUS_REPLAYS + 1, OPUS_REPLAYS + 1 + len(caught)))
+    # every wrong answer the rollback caught in hard mode, Haiku's first, then Sonnet's
+    evidence = api.get("/api/meta").json()["evidence"]
+    cheap = [investigate.MODELS["haiku"], investigate.MODELS["sonnet"]]
+    assert [r["model"] for r in caught] == sorted((r["model"] for r in caught), key=cheap.index)
+    assert len(caught) == evidence["hard-haiku"]["rollback_caught"] + evidence["hard-sonnet"]["rollback_caught"] > 0
+    for r in caught:
+        events = api.get(f"/api/replays/{r['id']}").json()
+        verdict, truth = next(e for e in events if e["type"] == "verdict"), events[-1]
+        assert r["hard"] and verdict["answer"] and verdict["rollback"]["proves"] is False
+        assert truth["type"] == "truth" and truth["ai_answer"] == verdict["answer"] != truth["root"]
 
 
 @pytest.mark.parametrize("number", [0, -1, 10_000])

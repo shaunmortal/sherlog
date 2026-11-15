@@ -222,6 +222,17 @@ def test_blast_radius_flags_an_answer_that_cannot_explain_the_outage():
     assert inv.blast_radius(inc, "cart")["unexplained"] == ["cache"]  # cart's trouble can't slow the cache
 
 
+def test_graph_ranking_names_who_explains_the_most_abnormal_services_and_breaks_ties_by_z_score():
+    # cart is louder than the slow cache it calls, but only the cache explains cart, checkout and frontend
+    inc = sim.simulate("cache", "latency", 1041)
+    assert sim.zscore_ranking(inc)[0] == "cart" and inv.graph_ranking(inc)[0] == "cache"
+    assert sorted(inv.graph_ranking(inc)) == sorted(sim.SERVICES)
+    # a leak slows no caller, so it explains only itself, as the decoy does: the tie goes to the louder decoy
+    hard = sim.simulate("checkout", "memory", 2011, hard=True)
+    abnormal = inv.blast_radius(hard, "checkout")["abnormal"]
+    assert abnormal == [hard.decoy, "checkout"] and inv.graph_ranking(hard)[:2] == abnormal
+
+
 def test_hard_mode_decoy_is_harmless_and_unrelated_to_the_real_fault():
     for seed in range(20):
         inc = sim.simulate("cart", "latency", seed, hard=True)

@@ -1,3 +1,6 @@
-anthropic>=2.8
-fastapi>=0.115
-uvicorn
+# exact versions the tests pass with; starlette (fastapi's web layer) too, so routes and HEAD answers stay as tested
+anthropic==2.8.0
+fastapi==0.162.7
+pydantic==2.14.3
+starlette==1.10.0
+uvicorn==0.54.0

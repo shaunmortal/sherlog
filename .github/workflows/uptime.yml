@@ -1,0 +1,29 @@
+name: uptime
+
+# checks the live site every 30 minutes: a failed run means the health check is down, and the repo gets the alert
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HEALTH_URL: https://sherlog-jade.vercel.app/api/health
+    steps:
+      # monitors send HEAD, so it must answer 200 like GET does
+      - name: HEAD answers 200
+        run: |
+          code=$(curl -sS -I -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 "$HEALTH_URL")
+          echo "HEAD $HEALTH_URL -> $code"
+          test "$code" = 200
+      - name: GET answers 200 with "ok" true
+        run: |
+          code=$(curl -sS -o health.json -w '%{http_code}' --max-time 20 --retry 2 "$HEALTH_URL")
+          echo "GET $HEALTH_URL -> $code: $(cat health.json)"
+          test "$code" = 200
+          jq -e '.ok == true' health.json

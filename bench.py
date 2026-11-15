@@ -195,7 +195,7 @@ def deep_stats(records: list[dict]) -> dict:
 
 
 @lru_cache(maxsize=None)
-def _rollback_proves(root: str, fault: str, seed: int, hard: bool, answer: str) -> bool:
+def rollback_proves(root: str, fault: str, seed: int, hard: bool, answer: str) -> bool:
     # cached: every variant ran the same outages, and most answers name the same service
     return investigate.rollback_check(sim.simulate(root, fault, seed, hard), answer)["proves"]
 
@@ -207,7 +207,7 @@ def rollback_stats(records: list[dict]) -> dict:
     answered = [(r, r["truth"]["ai_answer"]) for r in records if r["truth"]["ai_answer"]]
     if not answered:
         return {}
-    passed = [_rollback_proves(r["root"], r["fault"], r["seed"], r.get("hard", False), a) for r, a in answered]
+    passed = [rollback_proves(r["root"], r["fault"], r["seed"], r.get("hard", False), a) for r, a in answered]
     right = [a == r["root"] for r, a in answered]
     return {
         "rollback_checked": len(answered),
@@ -237,14 +237,39 @@ def gate_stats(records: list[dict]) -> dict:
     rows = []  # (answered by the confidence gate, rollback proves the verified top suspect, that suspect is right)
     for r in records:
         top = _verified_top(r)
-        proves = top is not None and _rollback_proves(r["root"], r["fault"], r["seed"], r.get("hard", False),
-                                                      top["service"])
+        proves = top is not None and rollback_proves(r["root"], r["fault"], r["seed"], r.get("hard", False),
+                                                     top["service"])
         rows.append((bool(r["truth"]["ai_answer"]), proves, top is not None and top["service"] == r["root"]))
     return {
         "rollback_gate_answered": sum(p for _, p, _ in rows),
         "rollback_gate_right": sum(p and ok for _, p, ok in rows),
         "confidence_or_rollback_answered": sum(a or p for a, p, _ in rows),
         "confidence_or_rollback_right": sum((a or p) and ok for a, p, ok in rows),
+    }
+
+
+@lru_cache(maxsize=None)
+def _graph_ranking(root: str, fault: str, seed: int, hard: bool) -> tuple[str, ...]:
+    # cached: every variant ran the same outages
+    return tuple(investigate.graph_ranking(sim.simulate(root, fault, seed, hard)))
+
+
+def graph_stats(records: list[dict]) -> dict:
+    """The strongest no-AI control, the call-graph rule, on the same outages (re-simulated, no API calls), and the
+    method against it outage by outage. The rule always answers, so every outage it misses is a wrong answer."""
+    if not records:
+        return {}
+    ranks = [_graph_ranking(r["root"], r["fault"], r["seed"], r.get("hard", False)) for r in records]
+    graph_hits = [rk[0] == r["root"] for rk, r in zip(ranks, records)]
+    agent_hits = [r["truth"]["ai_top1"] for r in records]
+    return {
+        "graph_ac1": _share(graph_hits),
+        "graph_ac1_ci": wilson(sum(graph_hits), len(graph_hits)),
+        "graph_ac3": _share([r["root"] in rk[:3] for rk, r in zip(ranks, records)]),
+        "graph_wrong": len(graph_hits) - sum(graph_hits),
+        "only_agent_right_vs_graph": sum(a and not g for a, g in zip(agent_hits, graph_hits)),
+        "only_graph_right": sum(g and not a for a, g in zip(agent_hits, graph_hits)),
+        "graph_mcnemar_p": mcnemar_p(agent_hits, graph_hits),
     }
 
 
@@ -258,7 +283,7 @@ def evidence() -> dict:
     records = {v: load(runs_path(v)) for v in VARIANTS}
     records.update({f"{p}auto": auto_records(f"{p}haiku", f"{p}agent") for p in ("", "hard-")})
     out = {v: {"label": VARIANT_LABELS[v], **summarize(rs), **rollback_stats(rs),
-               **(gate_stats(rs) if v in VARIANTS else {})} for v, rs in records.items()}
+               **(gate_stats(rs) if v in VARIANTS else {}), **graph_stats(rs)} for v, rs in records.items()}
     for prefix in ("", "hard-"):
         if out[f"{prefix}agent"]:
             out[f"{prefix}agent"] = {**out[f"{prefix}agent"], **deep_stats(records[f"{prefix}agent"])}
@@ -324,6 +349,21 @@ def gate_table(ev: dict) -> str:
     return "\n".join([header, "|---|---:|---:|---:|---:|", *rows])
 
 
+def graph_table(ev: dict) -> str:
+    """Each method against the no-AI call-graph rule, on the same outages, paired outage by outage."""
+    rows = [
+        f"| {v} | {s['outages']} | {_pct(s['graph_ac1'])} | {_pct(s['graph_ac3'])} | {s['graph_wrong']} | "
+        f"{_pct(s['agent_ac1'])} | {s['only_agent_right_vs_graph']} | {s['only_graph_right']} | "
+        f"{s['graph_mcnemar_p']:.2g} |"
+        for v, s in ev.items() if "graph_ac1" in s
+    ]
+    if not rows:
+        return ""
+    header = ("| Call-graph rule vs | Outages | Rule AC@1 | Rule AC@3 | Rule wrong | Method AC@1 | Only method right | "
+              "Only rule right | McNemar p |")
+    return "\n".join([header, "|---|---:|---:|---:|---:|---:|---:|---:|---:|", *rows])
+
+
 def report(summary: dict) -> str:
     if not summary:
         return "No benchmark runs yet: run `python bench.py --n 44` first."
@@ -379,6 +419,8 @@ def main() -> None:
     print(rollback_table(ev))
     print()
     print(gate_table(ev))
+    print()
+    print(graph_table(ev))
     EVIDENCE.write_text(json.dumps(ev))
 
 
