@@ -9,8 +9,8 @@
   --nav-bg: rgba(240, 241, 250, .78);
   --shadow: 0 6px 10px rgba(0, 0, 0, .04), 0 2px 4px rgba(0, 0, 0, .04);
   --radius: 18px; --radius-sm: 12px; --pill: 100px;
-  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: "Geist Mono", ui-monospace, monospace;
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
   /* motion: one set of curves and durations for every page (JS reads the curves too) */
   --ease-quad: cubic-bezier(.25, .46, .45, .94);   /* small hovers */
   --ease-glide: cubic-bezier(.4, 0, .1, 1);       /* most movement: fast out, long settle */

@@ -15,7 +15,7 @@ OUT = ROOT / "media" / "results.svg"
 # two identities, validated for colour-blind separation and 3:1 contrast on the card
 NO_AI, CLAUDE = "#c8641e", "#1a2ffb"
 CARD, INK, MUTED, GRID = "#f0f1fa", "#0b0c10", "#5c5f6e", "#d9dbe7"
-FONT = "Geist, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+FONT = "Geist, system-ui, sans-serif"
 
 WIDTH, PAD, LABEL_W, VALUE_W = 900, 32, 250, 64
 ROW_H, BAR_H = 30, 14
