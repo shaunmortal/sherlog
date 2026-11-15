@@ -265,7 +265,8 @@ def export(inc: sim.Incident) -> dict:
     """An outage as a document, without what only the simulator knows: the culprit, fault, seed, decoy, and each
     line's "about" (a reader derives that from the text). An upload's own call graph and metrics are kept."""
     graph = {} if inc.calls is None else {"calls": {s: list(c) for s, c in inc.calls.items()}}
-    own = {} if inc.metrics == sim.METRICS else {"metrics": list(inc.metrics)}
+    shop_metrics = inc.metrics == sim.METRICS and all(inc.measured[s] == sim.METRICS for s in inc.services)
+    own = {} if shop_metrics else {"metrics": list(inc.metrics)}
     return {
         "format": FORMAT,
         "tick_seconds": sim.TICK_SECONDS,

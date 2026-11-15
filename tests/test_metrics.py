@@ -157,6 +157,16 @@ def test_the_telemetry_event_and_the_export_carry_only_what_each_service_reports
     assert (back.alarm, back.measured, sim.zscore_ranking(back)) == (inc.alarm, inc.measured, sim.zscore_ranking(inc))
 
 
+def test_an_upload_naming_the_four_but_leaving_some_out_exports_its_metrics_and_round_trips():
+    doc = json.loads(json.dumps(byo.sample()))
+    doc["metrics"] = list(sim.METRICS)
+    doc["series"]["db"].pop("latency_ms")
+    inc = byo.to_incident(byo.IncidentDoc.model_validate(doc))
+    back = byo.export(inc)
+    assert back["metrics"] == list(sim.METRICS)
+    assert byo.to_incident(byo.IncidentDoc.model_validate(back)).measured == inc.measured
+
+
 def test_the_agent_is_told_the_uploads_metrics():
     fake = FakeClient([_submit("db", 0.9, ["c0"])])
     events = list(inv.investigate(_incident(), client=fake))
