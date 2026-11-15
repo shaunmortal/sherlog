@@ -1500,8 +1500,13 @@ async function init() {
   runIdle();
   $('#go').addEventListener('click', runLive);
   $('#randomReplay').addEventListener('click', () => runReplay(null));
-  // the first-screen button lives in the flight log, which a run clears and an upload puts back as a copy
-  $('#log').addEventListener('click', (e) => { if (e.target.closest('#replayStart')) runReplay(REPLAY_START); });
+  // the first-screen button lives in the flight log, which a run clears and an upload puts back as a copy. Clearing
+  // it would drop keyboard focus to the page, so focus moves to the log the run starts filling
+  $('#log').addEventListener('click', (e) => {
+    if (!e.target.closest('#replayStart')) return;
+    runReplay(REPLAY_START);  // clears the log before its first wait
+    $('#log').focus({ preventScroll: true });
+  });
   new IntersectionObserver(([e]) => { if (e.isIntersecting) $('#jumpVerdict').hidden = true; }).observe($('#verdict'));
   $('#sampleUse').addEventListener('click', useSample);
   $('#dataFile').addEventListener('change', (e) => openFile(e.target));

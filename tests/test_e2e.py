@@ -97,6 +97,15 @@ def test_the_first_screen_button_replays_outage_41_with_precise_labels(page, err
     assert errors == []
 
 
+def test_the_first_screen_button_hands_keyboard_focus_to_the_flight_log(page, errors):
+    # the run clears the button away with the rest of the empty log; focus must not drop to the page
+    page.goto(f"{URL}/console", wait_until="networkidle")
+    page.get_by_role("button", name="Replay outage #41").press("Enter")
+    sync_api.expect(page.locator("#log")).to_be_focused()
+    sync_api.expect(page.locator("#status")).to_contain_text("Done.", timeout=REPLAY_TIMEOUT_MS)
+    assert errors == []
+
+
 def test_a_caught_replay_shows_the_rollback_disproving_its_answer(page, errors):
     caught = [r for r in page.request.get(f"{URL}/api/replays").json() if r.get("caught")]
     if not caught:
