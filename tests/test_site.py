@@ -2,6 +2,7 @@
 every page's own scripts and styles run, robots.txt, the sitemap, security.txt, the 404 page and the API reference."""
 import base64
 import hashlib
+import math
 import re
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
@@ -266,9 +267,18 @@ def test_the_console_starts_with_the_text_it_shows_once_loaded():
     assert f'id="metaSystem">Simulated shop · {len(sim.SERVICES)} services<' in page
     assert f'id="metaModel">{investigate.MODELS["haiku"]} → {investigate.MODELS["opus"]}<' in page
     meta = client.get("/api/meta").json()
-    ev = meta["evidence"]
-    assert (f'id="statNote">{ev["hard-agent"]["outages"]} hard-mode outages, each with a decoy anomaly at the same '
-            f'time, and {ev["agent"]["outages"]} normal ones.') in page
+    # the stats strip, as renderStats writes it from the real-outage benchmark
+    real = meta["real_benchmark"]
+    first = {k: f"{math.floor(m['AC@1'] * 100 + 0.5)}%" for k, m in real["methods"].items()}  # JS Math.round
+    vs, agent = real["auto_vs"]["mmnsigma"], real["agent"]
+    assert (f'id="statReal">{first["auto"]}</div><div class="small" id="statRealSub">{real["cases"]} held-out outages<br>'
+            f'on {real["system_count"]} real systems<br>no AI, same data: {first["graph"]}</div>') in page
+    assert (f'id="statPublished">{first["mmnsigma"]}</div><div class="small" id="statPublishedSub">multi-source n-sigma<br>'
+            f'case by case, Sherlog<br>leads {vs["only_first_right"]} to {vs["only_second_right"]}</div>') in page
+    assert (f'id="statCost">${agent["cost_usd_median"]:.4f}</div><div class="small" id="statCostSub">median, auto route<br>'
+            f'${agent["cost_usd_total"]:.2f} for all {real["cases"]}</div>') in page
+    assert (f'id="statNote">{real["systems"][0].upper()}{real["systems"][1:]}; every method ran on the same cases. '
+            'Details and the simulated benchmark under Evidence.</p>') in page
     # the default picks, as the console describes them: the latency fault and the auto investigator
     fault = meta["faults"][re.search(r"let pick = \{ service: '\w+', fault: '(\w+)'", page).group(1)]
     assert f'id="faultDesc">{fault[0].upper()}{fault[1:]}.</p>' in page

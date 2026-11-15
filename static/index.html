@@ -394,12 +394,13 @@
   </section>
 
   <section class="col" id="middle" aria-label="The shop">
+    <!-- the text the strip shows once /api/meta has loaded (renderStats), so nothing moves or flickers then -->
     <div class="stats">
-      <div class="stat"><p class="label">Opus agent · cause first</p><div class="big" id="statAgent">–</div><div class="small" id="statAgentSub">on recorded outages</div></div>
-      <div class="stat"><p class="label">No AI · z-score</p><div class="big" id="statBase">–</div><div class="small" id="statBaseSub">ranking, same outages</div></div>
-      <div class="stat"><p class="label">Cost per outage</p><div class="big" id="statCost">–</div><div class="small" id="statCostSub">median</div></div>
+      <div class="stat"><p class="label">Real outages · cause first</p><div class="big" id="statReal">92%</div><div class="small" id="statRealSub">252 held-out outages<br>on 3 real systems<br>no AI, same data: 83%</div></div>
+      <div class="stat"><p class="label">Best published method</p><div class="big" id="statPublished">81%</div><div class="small" id="statPublishedSub">multi-source n-sigma<br>case by case, Sherlog<br>leads 39 to 10</div></div>
+      <div class="stat"><p class="label">Cost per real outage</p><div class="big" id="statCost">$0.0024</div><div class="small" id="statCostSub">median, auto route<br>$8.01 for all 252</div></div>
     </div>
-    <p class="note" id="statNote">44 hard-mode outages, each with a decoy anomaly at the same time, and 132 normal ones. Simulated telemetry, so the numbers are optimistic. Details under Evidence.</p>
+    <p class="note" id="statNote">Three real microservice systems (12, 15 and 68 services), each fault injected on purpose; every method ran on the same cases. Details and the simulated benchmark under Evidence.</p>
 
     <div class="head" id="teleHead">
       <div class="head-l">
@@ -1472,25 +1473,20 @@ const withCI = (share, ci) => (ci ? `${pct(share)} [${Math.round(ci[0] * 100)}�
 const pValue = (p) => (p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(3)}`);
 const wrongAnswers = (s) => Math.round(s.answered * (1 - s.right_when_answered));
 
-/** The strip leads with hard mode, where a decoy separates the methods; on normal outages every Claude variant scores 100%. */
-function renderStats(ev) {
-  const hard = ev?.['hard-agent'], normal = ev?.agent;
-  if (!hard?.outages || !normal?.outages) return;
-  const lines = (...texts) => texts.flatMap((t, i) => (i ? [el('br'), t] : [t]));
-  countUp($('#statAgent'), hard.agent_ac1, pct);
-  $('#statAgentSub').replaceChildren(...lines('in hard mode', `${wrongAnswers(hard)} wrong answers`, `normal mode: ${pct(normal.agent_ac1)}`));
-  countUp($('#statBase'), hard.baseline_ac1, pct);
-  $('#statBaseSub').replaceChildren(...lines('same hard outages', `normal mode: ${pct(normal.baseline_ac1)}`,
-    ...(hard.graph_ac1 != null ? [`call-graph rule: ${pct(hard.graph_ac1)}`] : [])));
-  $('#statNote').textContent = `${hard.outages} hard-mode outages, each with a decoy anomaly at the same time, and ${normal.outages} normal ones. ` +
-    'Simulated telemetry, so the numbers are optimistic. Details under Evidence.';
-}
-
-/** The cost tile follows the investigator picked for a live run. */
-function renderCost(model) {
-  const s = META.evidence?.[MODEL_VARIANT[model]];
-  $('#statCost').textContent = usd(s?.median_cost_usd);
-  $('#statCostSub').textContent = `${MODEL_NAME[model].replace('Claude ', '')}, median per normal outage`;
+/** The strip leads with the public benchmark of real outages; the simulated one is under Evidence. The page's own
+ * markup holds the same text for the first paint, so no count-up: tests/test_site.py keeps the two equal. */
+function renderStats(r) {
+  if (!r) return;
+  const m = r.methods, vs = r.auto_vs.mmnsigma;
+  const lines = (node, ...texts) => node.replaceChildren(...texts.flatMap((t, i) => (i ? [el('br'), t] : [t])));
+  $('#statReal').textContent = pct(m.auto['AC@1']);
+  lines($('#statRealSub'), `${r.cases} held-out outages`, `on ${r.system_count} real systems`, `no AI, same data: ${pct(m.graph['AC@1'])}`);
+  $('#statPublished').textContent = pct(m.mmnsigma['AC@1']);
+  lines($('#statPublishedSub'), 'multi-source n-sigma', 'case by case, Sherlog', `leads ${vs.only_first_right} to ${vs.only_second_right}`);
+  $('#statCost').textContent = usd(r.agent.cost_usd_median);
+  lines($('#statCostSub'), 'median, auto route', `$${r.agent.cost_usd_total.toFixed(2)} for all ${r.cases}`);
+  $('#statNote').textContent = `${r.systems[0].toUpperCase()}${r.systems.slice(1)}; every method ran on the same cases. ` +
+    'Details and the simulated benchmark under Evidence.';
 }
 
 function table(head, rows) {
@@ -1585,7 +1581,6 @@ function renderModels(ev) {
     pick = { ...pick, model: k };
     for (const grid of grids) press(grid, k);
     nameRun(state.running ? recorded : null);  // the header names the pick, unless a replay is playing
-    renderCost(k);
     $('#modelDesc').textContent = `${MODEL_HINT[k]} Numbers: cause named first, median cost per outage on the benchmark.`;
   };
   for (const grid of grids) choiceGrid(grid, items, pick.model, choose);
@@ -1652,7 +1647,7 @@ async function init() {
   describeFault();
   choiceGrid($('#modeGrid'), [['normal', 'Normal', 'one clean fault'], ['hard', 'Hard', 'a decoy, fewer logs']], 'normal',
     (m) => { pick = { ...pick, hard: m === 'hard' }; press($('#modeGrid'), m); });
-  renderStats(META.evidence);
+  renderStats(META.real_benchmark);
   renderEvidence(META.evidence);
   renderReal(META.real_benchmark);
   renderModels(META.evidence);

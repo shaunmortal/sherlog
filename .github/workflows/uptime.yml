@@ -1,6 +1,7 @@
 name: uptime
 
-# checks the live site every 30 minutes: a failed run means the health check is down, and the repo gets the alert
+# checks the live site every 30 minutes: a failed run means a page, the health check, the MCP endpoint or the security
+# headers are down, and the repo gets the alert. curl and jq only, no third-party actions
 on:
   schedule:
     - cron: "*/30 * * * *"
@@ -8,22 +9,67 @@ on:
 
 permissions: {}
 
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
 jobs:
-  health:
+  live-site:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      HEALTH_URL: https://sherlog-jade.vercel.app/api/health
+      SITE: https://sherlog-jade.vercel.app
+      CURL: --silent --show-error --max-time 20 --retry 2
     steps:
-      # monitors send HEAD, so it must answer 200 like GET does
-      - name: HEAD answers 200
+      # monitors and link checkers send HEAD, so every page must answer it with 200 like GET does
+      - name: Pages answer HEAD and GET with 200
         run: |
-          code=$(curl -sS -I -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 "$HEALTH_URL")
-          echo "HEAD $HEALTH_URL -> $code"
-          test "$code" = 200
-      - name: GET answers 200 with "ok" true
+          failed=0
+          for path in / /console /status /reference /llms.txt /robots.txt /sitemap.xml /api/health; do
+            head=$(curl $CURL --head --output /dev/null --write-out '%{http_code}' "$SITE$path") || true
+            get=$(curl $CURL --output /dev/null --write-out '%{http_code}' "$SITE$path") || true
+            echo "$path: HEAD $head, GET $get"
+            if [ "$head" != 200 ] || [ "$get" != 200 ]; then
+              echo "::error title=Page down::$SITE$path answered HEAD $head and GET $get, expected 200 to both"
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+      - name: Health check says ok
+        if: ${{ !cancelled() }}  # each check reports, even after an earlier one failed
         run: |
-          code=$(curl -sS -o health.json -w '%{http_code}' --max-time 20 --retry 2 "$HEALTH_URL")
-          echo "GET $HEALTH_URL -> $code: $(cat health.json)"
-          test "$code" = 200
-          jq -e '.ok == true' health.json
+          body=$(curl $CURL --fail "$SITE/api/health") || { echo "::error title=Health check down::GET $SITE/api/health failed"; exit 1; }
+          echo "/api/health: $body"
+          jq -e '.ok == true' <<<"$body" >/dev/null || { echo "::error title=Health check not ok::/api/health answered without \"ok\": true"; exit 1; }
+
+      # initialize as a handshake-era MCP client sends it; the server keeps no session, so this one POST shows it answers
+      - name: MCP endpoint answers initialize
+        if: ${{ !cancelled() }}  # each check reports, even after an earlier one failed
+        run: |
+          version=2025-11-25
+          request=$(jq -cn --arg v "$version" \
+            '{jsonrpc: "2.0", id: 1, method: "initialize", params: {protocolVersion: $v, capabilities: {}, clientInfo: {name: "uptime", version: "1"}}}')
+          body=$(curl $CURL --fail --request POST "$SITE/mcp" \
+            --header 'content-type: application/json' \
+            --header 'accept: application/json, text/event-stream' \
+            --header "mcp-protocol-version: $version" \
+            --data "$request") || { echo "::error title=MCP down::POST $SITE/mcp failed"; exit 1; }
+          echo "/mcp initialize: $(jq -c '.result | {protocolVersion, serverInfo}' <<<"$body")"
+          jq -e --arg v "$version" '.result.protocolVersion == $v and .result.serverInfo.name == "sherlog"' <<<"$body" >/dev/null \
+            || { echo "::error title=MCP initialize failed::$SITE/mcp answered initialize without a result for $version: $body"; exit 1; }
+
+      - name: Security headers on the home page
+        if: ${{ !cancelled() }}  # each check reports, even after an earlier one failed
+        run: |
+          headers=$(curl $CURL --fail --output /dev/null --dump-header - "$SITE/") || { echo "::error title=Page down::GET $SITE/ failed"; exit 1; }
+          failed=0
+          for name in content-security-policy x-content-type-options x-frame-options; do
+            if grep -qi "^$name:" <<<"$headers"; then
+              echo "$name: present"
+            else
+              echo "::error title=Security header missing::$SITE/ answered without $name"
+              failed=1
+            fi
+          done
+          exit "$failed"

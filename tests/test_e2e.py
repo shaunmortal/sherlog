@@ -66,6 +66,16 @@ def test_the_story_pages_one_h1_is_its_visible_headline_and_results_lead_with_th
     assert errors == []
 
 
+def test_the_consoles_first_stat_is_the_real_outages_cause_first_share(page, errors):
+    page.goto(f"{URL}/console", wait_until="networkidle")
+    real = page.request.get(f"{URL}/api/meta").json()["real_benchmark"]
+    tile = page.locator(".stat").first
+    sync_api.expect(tile.locator(".label")).to_have_text("Real outages · cause first")
+    sync_api.expect(tile.locator(".big")).to_have_text(f"{round(real['methods']['auto']['AC@1'] * 100)}%")
+    sync_api.expect(tile.locator(".small")).to_contain_text(f"{real['cases']} held-out outages")
+    assert errors == []
+
+
 def test_clicking_a_guess_card_reveals_the_cause(page, errors):
     page.goto(f"{URL}/")
     page.locator("#cards").scroll_into_view_if_needed()
