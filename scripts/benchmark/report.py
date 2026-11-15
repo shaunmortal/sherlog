@@ -44,7 +44,6 @@ LABELS = {
     "circa": "Published baseline: CIRCA (metrics; systems A and B only, too slow on C)",
     "e_diagnosis": "Published baseline: epsilon-Diagnosis (metrics)",
 }
-RE3_LABELS = LABELS
 LIVE = ("auto", "opus")
 WINDOW_CHECK = ("nsigma", "nsigma-len10", "nsigma-len2")  # the runner's default is 10 min on each side
 KS = (1, 3, 5)
@@ -127,12 +126,12 @@ def paired(a: dict[str, dict], b: dict[str, dict], answers: dict[str, dict]) -> 
             "only_second_right": sum(q and not p for p, q in zip(x, y)), "mcnemar_p": float(f"{mcnemar_p(x, y):.3g}")}
 
 
-def build(suite: str = "re2", labels: dict[str, str] = LABELS) -> dict:
+def build(suite: str = "re2") -> dict:
     runs = SUITES[suite]
     answers = {a["case_id"]: a for a in load(runs / "answers.jsonl")}
     split = json.loads((runs / "split.json").read_text())
     rec = lambda m, subset: records(m, set(split[subset]), subset, runs)  # noqa: E731
-    methods = [m for m in labels if records(m, set(answers), "test", runs)]
+    methods = [m for m in LABELS if records(m, set(answers), "test", runs)]
     out = {"split": {k: len(split[k]) for k in ("dev", "test")}, "methods": {}, "paired": {}, "dev": {}}
     groups = {"all": split["test"], **{f"system {s}": [c for c in split["test"] if answers[c]["dataset"] == d]
                                       for d, s in systems(suite).items()}}
@@ -140,7 +139,7 @@ def build(suite: str = "re2", labels: dict[str, str] = LABELS) -> dict:
     for m in methods:
         recs = rec(m, "test")
         out["methods"][m] = {
-            "label": labels[m],
+            "label": LABELS[m],
             **{g: scores(cases, recs, answers) for g, cases in groups.items()},
             "by_fault": {f: scores([c for c in split["test"] if answers[c]["fault"] == f], recs, answers)
                          for f in faults},
@@ -265,7 +264,7 @@ def main() -> None:
     results = build()
     check_official(results)
     if (SUITES["re3"] / "split.json").exists():  # the code-level suite, under its own key; RE2's keys are unchanged
-        re3 = build("re3", RE3_LABELS)
+        re3 = build("re3")
         if re3["methods"]:
             check_official(re3, SUITES["re3"])
             results["re3"] = re3

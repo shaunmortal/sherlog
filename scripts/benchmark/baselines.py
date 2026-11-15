@@ -5,14 +5,14 @@ by anonymised case id.
     python -I scripts/benchmark/baselines.py MAIN_PY DATA_DIR TASKS_DIR WORK_DIR nsigma/10 nsigma/2   # other windows
     python -I scripts/benchmark/baselines.py MAIN_PY DATA_DIR TASKS_DIR WORK_DIR --suite re3 baro nsigma
 
-main.py reads DATA_DIR/RE2/<system> (DATA_DIR/RE3/<system> for RE3) as it ships (WORK_DIR/<method>-<dataset>/data links to it) and writes one result
-file per case, named after the case's directory. Those names are mapped to case ids through the exporter's answers
-file; the ranking is kept as main.py wrote it, cut to its first 20 entries (scoring reads the first 5 services).
-main.py stops at a method's first exception; such a case is left out, the method re-run on the rest, and the case
-recorded as failed with an empty ranking (a miss at every k).
-Its printed report goes to runs/real-benchmark/baselines/<method>-<dataset>.txt (re3/baselines/ for RE3). `method/LENGTH` passes the
-runner's --length (minutes of data around the injection, half on each side; its default is 20) and records the
-method as <method>-len<LENGTH>. Run in the benchmark's environment.
+main.py reads DATA_DIR/RE2/<system> (DATA_DIR/RE3/<system> for RE3) as it ships (WORK_DIR/<method>-<dataset>/data
+links to it) and writes one result file per case, named after the case's directory. Those names are mapped to case
+ids through the exporter's answers file; the ranking is kept as main.py wrote it, cut to its first 20 entries
+(scoring reads the first 5 services). main.py stops at a method's first exception; such a case is left out, the
+method re-run on the rest, and the case recorded as failed with an empty ranking (a miss at every k).
+Its printed report goes to runs/real-benchmark/baselines/<method>-<dataset>.txt (re3/baselines/ for RE3).
+`method/LENGTH` passes the runner's --length (minutes of data around the injection, half on each side; its default
+is 20) and records the method as <method>-len<LENGTH>. Run in the benchmark's environment.
 """
 from __future__ import annotations
 
@@ -83,9 +83,10 @@ def run(main_py: Path, data: Path, tasks: Path, work: Path, method: str, dataset
     wall = time.monotonic() - started
     start = done.stdout.find("--- Evaluation")
     report = done.stdout[start:] if start >= 0 else done.stdout[-2000:]
-    out_dir(dataset).mkdir(parents=True, exist_ok=True)
+    out = out_dir(dataset)
+    out.mkdir(parents=True, exist_ok=True)
     crashes = "".join(f"left out (main.py stopped on it): a case, {err}\n" for err in excluded.values())
-    (out_dir(dataset) / f"{name}-{dataset}.txt").write_text(f"{wall:.0f} s, {len(excluded)} case(s) left out\n{crashes}{report}")
+    (out / f"{name}-{dataset}.txt").write_text(f"{wall:.0f} s, {len(excluded)} case(s) left out\n{crashes}{report}")
     by_source = {a["source"]: a["case_id"] for a in map(json.loads, (tasks / f"{dataset}.answers.jsonl").open())}
     rows = []
     for source, case_id in by_source.items():

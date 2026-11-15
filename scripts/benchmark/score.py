@@ -4,9 +4,9 @@
 
 Writes, under WORK_DIR, the test cases' answers per system and the predictions file the evaluator reads for each
 method, runs the evaluator on them, and keeps its service-level AC@1, AC@3, AC@5 and Avg@5 in
-runs/real-benchmark/official.json (re3/official.json for RE3). report.py then checks its own numbers against these. A live method that did
-not reach every test case is scored on the cases it ran (the evaluator would count the rest as misses), and
-report.py says how many those are. Run in the benchmark's environment.
+runs/real-benchmark/official.json (re3/official.json for RE3). report.py then checks its own numbers against
+these. A live method that did not reach every test case is scored on the cases it ran (the evaluator would count
+the rest as misses), and report.py says how many those are. Run in the benchmark's environment.
 """
 from __future__ import annotations
 
