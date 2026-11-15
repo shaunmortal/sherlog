@@ -30,6 +30,11 @@ scored by the benchmark's own evaluator; the protocol is in `docs/real-benchmark
 
 Data: RCAEval benchmark, MIT licence, <https://huggingface.co/datasets/phamquiluan/RCAEval>
 
+**Use it from your own Claude.** Sherlog is also an MCP server (`claude mcp add --transport http sherlog
+https://sherlog-jade.vercel.app/mcp`): your model investigates an outage with Sherlog's own read-only tools, then
+Sherlog's plain code re-runs every cited call, applies the citation check, the 80% rule, the blast radius and the
+rollback replay, and says ship or hand to a human. Free, no key, no AI call on the server.
+
 To play with, Sherlog runs a simulated online shop of 11 microservices. You pick a service and a fault (network
 latency, a bad deploy that throws errors, CPU starvation, a memory leak), choose who investigates and
 how hard it is, and break it.
@@ -133,7 +138,7 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
 - **Real outages:** a converter from the public benchmark's cases to Sherlog's upload format, a dev/test split
   frozen before any live call, the published baselines re-run with the benchmark's own runner, scoring by its own
   evaluator, Wilson intervals and exact McNemar tests, and checks of n-sigma's window and of a learned prior.
-- **Tests:** 1,678 pytest tests in CI, 1,285 of which re-run every recorded run from its seed and compare its tool
+- **Tests:** 1,744 pytest tests in CI, 1,285 of which re-run every recorded run from its seed and compare its tool
   results exactly (the agent loop and the auto route against a scripted fake model, the
   call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format,
   uploads with their own call graph, the MCP connector, and a guard that the shop's prompt and tool schemas never
@@ -223,7 +228,7 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
 ## Built with
 
 python, fastapi, anthropic-api, claude-opus-5.5, claude-sonnet-5.5, claude-haiku-5.5, claude-code,
-javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-core, uv, vercel
+model-context-protocol, fireworks-ai, glm-5.3, gpt-oss-120b, javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-core, uv, vercel
 
 ## Links
 
@@ -242,7 +247,7 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-c
 4. Console, Your data, **Use** the shop sample, **Triage (no AI)**: the alarm, the z-score and robust z-score
    rankings and the blast-radius check. Then **Use** a custom-graph sample and **Triage** again: an upload
    with its own call graph of six services replaces the shop on the charts and the map.
-5. In a clone: `pytest -q` (1,678 passed, 1 skipped), `python bench.py --report`, which recomputes every
+5. In a clone: `pytest -q` (1,744 passed, 1 skipped), `python bench.py --report`, which recomputes every
    controlled-benchmark table from the recorded runs with no API calls, and `python scripts/benchmark/report.py`,
    which recomputes every real-outage number.
 
