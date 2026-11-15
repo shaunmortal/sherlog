@@ -109,7 +109,7 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
   `HEAD` for uptime monitors, a scheduled workflow checks the live health endpoint every 30 minutes, `/docs`
   describes every route, `requirements.txt` pins the exact versions the tests pass with, and all three pages
   carry a link preview image.
-- **Tests:** 172 pytest tests in CI (the agent loop and the auto route against a scripted fake model, the
+- **Tests:** 174 pytest tests in CI (the agent loop and the auto route against a scripted fake model, the
   call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format),
   plus 11 browser end-to-end checks.
 - **AI tools used:** Claude Code as a pair programmer; Claude Haiku, Sonnet and Opus 5.5 inside the product.
@@ -207,7 +207,7 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-c
    The Haiku agent names the decoy, 85% sure, with its citations verified; rolling it back leaves the alarm on.
 4. Console, Your data, **Use the sample**, **Triage (no AI)**: the alarm, the z-score and robust z-score
    rankings and the blast-radius check.
-5. In a clone: `pytest -q` (172 passed, 1 skipped) and `python bench.py --report`, which recomputes every
+5. In a clone: `pytest -q` (174 passed, 1 skipped) and `python bench.py --report`, which recomputes every
    table from the recorded runs with no API calls.
 
 ---
