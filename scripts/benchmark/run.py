@@ -9,9 +9,10 @@ POST /api/triage. Methods: zscore, robust and graph are Sherlog's no-AI rankings
 Claude Opus 5.5 when Haiku's answer does not stand) and opus are the agent, live.
 
 Two records per case: the full event stream under --full-dir (outside the repository: tool results quote the
-telemetry), and a slim line in runs/real-benchmark/<method>.jsonl with no telemetry: the ranking, the verdict's
-structure, the tool calls' names, arguments and the services each showed abnormal, usage and cost. Finished cases
-are skipped on a re-run. The live methods stop starting new cases once spend plus a reserve reaches the budget.
+telemetry), and a slim line in runs/real-benchmark/<set>/<method>.jsonl (re3/<set>/ with --suite re3) with no
+telemetry: the ranking, the verdict's structure, the tool calls' names, arguments and the services each showed
+abnormal, usage and cost. Finished cases are skipped on a re-run. The live methods stop starting new cases once
+spend plus a reserve reaches the budget.
 """
 from __future__ import annotations
 
@@ -33,7 +34,7 @@ import investigate  # noqa: E402
 import sim  # noqa: E402
 
 RUNS = ROOT / "runs" / "real-benchmark"
-SPLIT = RUNS / "split.json"
+SUITES = {"re2": RUNS, "re3": RUNS / "re3"}  # as report.SUITES
 NO_AI = {"zscore": sim.zscore_ranking, "robust": sim.robust_ranking, "graph": investigate.graph_ranking}
 LIVE = {"auto": investigate.AUTO, "opus": investigate.MODELS["opus"]}
 SEED = 2026  # the order of the recorded test runs: random.Random(2026).shuffle over split.json's test ids
@@ -129,6 +130,7 @@ def done_ids(path: Path) -> set[str]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("docs", type=Path)
+    parser.add_argument("--suite", choices=tuple(SUITES), default="re2")
     parser.add_argument("--set", choices=("dev", "test"), required=True)
     parser.add_argument("--method", choices=(*NO_AI, *LIVE), required=True)
     parser.add_argument("--cases", nargs="*", help="only these case ids (in this order)")
@@ -142,10 +144,11 @@ def main() -> None:
     parser.add_argument("--full-dir", type=Path, help="where the full event streams go (required for live)")
     args = parser.parse_args()
 
-    split = json.loads(SPLIT.read_text())
+    runs = SUITES[args.suite]
+    split = json.loads((runs / "split.json").read_text())
     ids = args.cases or seeded(split[args.set], args.seed)
     assert set(ids) <= set(split[args.set]), "a case outside the chosen set"
-    out = RUNS / args.set / f"{args.method}.jsonl"
+    out = runs / args.set / f"{args.method}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
     todo = [c for c in ids if c not in done_ids(out)][:args.limit]
 
@@ -191,7 +194,7 @@ def main() -> None:
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         finished = sum(f.result() for f in as_completed([pool.submit(worker) for _ in range(args.workers)]))
     print(f"{finished} of {len(todo)} cases, metered ${client.usd:.4f}; {len(pending)} not started (budget)")
-    with (RUNS / "spend.jsonl").open("a") as f:  # every live session's metered spend, failed calls included
+    with (runs / "spend.jsonl").open("a") as f:  # every live session's metered spend, failed calls included
         f.write(json.dumps({"set": args.set, "method": args.method, "cases": finished, "usd": round(client.usd, 6),
                             "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}) + "\n")
 

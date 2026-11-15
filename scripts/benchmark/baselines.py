@@ -3,18 +3,20 @@ by anonymised case id.
 
     python -I scripts/benchmark/baselines.py MAIN_PY DATA_DIR TASKS_DIR WORK_DIR baro nsigma circa:re2-ob,re2-ss
     python -I scripts/benchmark/baselines.py MAIN_PY DATA_DIR TASKS_DIR WORK_DIR nsigma/10 nsigma/2   # other windows
+    python -I scripts/benchmark/baselines.py MAIN_PY DATA_DIR TASKS_DIR WORK_DIR --suite re3 baro nsigma
 
-main.py reads DATA_DIR/RE2/<suite> as it ships (WORK_DIR/<method>-<dataset>/data links to it) and writes one result
+main.py reads DATA_DIR/RE2/<system> (DATA_DIR/RE3/<system> for RE3) as it ships (WORK_DIR/<method>-<dataset>/data links to it) and writes one result
 file per case, named after the case's directory. Those names are mapped to case ids through the exporter's answers
 file; the ranking is kept as main.py wrote it, cut to its first 20 entries (scoring reads the first 5 services).
 main.py stops at a method's first exception; such a case is left out, the method re-run on the rest, and the case
 recorded as failed with an empty ranking (a miss at every k).
-Its printed report goes to runs/real-benchmark/baselines/<method>-<dataset>.txt. `method/LENGTH` passes the
+Its printed report goes to runs/real-benchmark/baselines/<method>-<dataset>.txt (re3/baselines/ for RE3). `method/LENGTH` passes the
 runner's --length (minutes of data around the injection, half on each side; its default is 20) and records the
 method as <method>-len<LENGTH>. Run in the benchmark's environment.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import shutil
 import subprocess
@@ -22,10 +24,16 @@ import sys
 import time
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parents[2] / "runs" / "real-benchmark" / "baselines"
-DATASETS = {"re2-ob": "RE2-OB", "re2-ss": "RE2-SS", "re2-tt": "RE2-TT"}
+RUNS = Path(__file__).resolve().parents[2] / "runs" / "real-benchmark"
+DATASETS = {"re2-ob": "RE2/RE2-OB", "re2-ss": "RE2/RE2-SS", "re2-tt": "RE2/RE2-TT",
+            "re3-ob": "RE3/RE3-OB", "re3-ss": "RE3/RE3-SS", "re3-tt": "RE3/RE3-TT"}
 KEPT = 20
 MAX_CRASHES = 5
+
+
+def out_dir(dataset: str) -> Path:
+    suite = dataset[:3]
+    return (RUNS if suite == "re2" else RUNS / suite) / "baselines"  # as report.SUITES
 
 
 def _cases(root: Path) -> list[Path]:
@@ -38,11 +46,11 @@ def _data_without(data: Path, folder: str, excluded: set[str], into: Path) -> Pa
     case a method crashes on is left out and the method runs on the rest."""
     if into.exists():
         shutil.rmtree(into)
-    for case in _cases(data / "RE2" / folder):
-        rel = case.relative_to(data / "RE2" / folder)
+    for case in _cases(data / folder):
+        rel = case.relative_to(data / folder)
         if rel.as_posix() not in excluded:
-            (into / "RE2" / folder / rel).parent.mkdir(parents=True, exist_ok=True)
-            (into / "RE2" / folder / rel).symlink_to(case)
+            (into / folder / rel).parent.mkdir(parents=True, exist_ok=True)
+            (into / folder / rel).symlink_to(case)
     return into
 
 
@@ -67,7 +75,7 @@ def run(main_py: Path, data: Path, tasks: Path, work: Path, method: str, dataset
         if done.returncode == 0:
             break
         finished = {p.stem for p in results.glob("*.json")}
-        order = [c.relative_to(data / "RE2" / folder).as_posix() for c in _cases(data / "RE2" / folder)]
+        order = [c.relative_to(data / folder).as_posix() for c in _cases(data / folder)]
         crashed = next(c for c in order if c not in excluded and c.replace("/", "_") not in finished)
         excluded[crashed] = done.stderr.strip().splitlines()[-1][:300]
     else:
@@ -75,9 +83,9 @@ def run(main_py: Path, data: Path, tasks: Path, work: Path, method: str, dataset
     wall = time.monotonic() - started
     start = done.stdout.find("--- Evaluation")
     report = done.stdout[start:] if start >= 0 else done.stdout[-2000:]
-    OUT.mkdir(parents=True, exist_ok=True)
+    out_dir(dataset).mkdir(parents=True, exist_ok=True)
     crashes = "".join(f"left out (main.py stopped on it): a case, {err}\n" for err in excluded.values())
-    (OUT / f"{name}-{dataset}.txt").write_text(f"{wall:.0f} s, {len(excluded)} case(s) left out\n{crashes}{report}")
+    (out_dir(dataset) / f"{name}-{dataset}.txt").write_text(f"{wall:.0f} s, {len(excluded)} case(s) left out\n{crashes}{report}")
     by_source = {a["source"]: a["case_id"] for a in map(json.loads, (tasks / f"{dataset}.answers.jsonl").open())}
     rows = []
     for source, case_id in by_source.items():
@@ -90,15 +98,21 @@ def run(main_py: Path, data: Path, tasks: Path, work: Path, method: str, dataset
 
 
 def main() -> None:
-    main_py, data, tasks, work = (Path(a) for a in sys.argv[1:5])
-    for spec in sys.argv[5:]:  # method[/LENGTH][:dataset,dataset] (some systems only, for a method too slow on one)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    for name in ("main_py", "data", "tasks", "work"):
+        parser.add_argument(name, type=Path)
+    parser.add_argument("specs", nargs="+", help="method[/LENGTH][:dataset,dataset] (some systems only, for a method "
+                                                 "too slow on one)")
+    parser.add_argument("--suite", default="re2", choices=("re2", "re3"))
+    args = parser.parse_args()
+    for spec in args.specs:
         head, _, only = spec.partition(":")
         method, _, length = head.partition("/")
-        rows = [r for d in (only.split(",") if only else DATASETS)
-                for r in run(main_py, data, tasks, work, method, d, length)]
+        datasets = only.split(",") if only else [d for d in DATASETS if d.startswith(args.suite)]
+        rows = [r for d in datasets for r in run(args.main_py, args.data, args.tasks, args.work, method, d, length)]
         rows = sorted(rows, key=lambda r: r["case_id"])
         name = rows[0]["method"]
-        (OUT / f"{name}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+        (out_dir(datasets[0]) / f"{name}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
         print(f"{name}: {len(rows)} cases", flush=True)
 
 
