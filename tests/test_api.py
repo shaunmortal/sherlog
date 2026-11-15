@@ -68,7 +68,8 @@ def test_every_page_is_served_as_html(api, path, marker):
     assert marker in res.text
 
 
-@pytest.mark.parametrize("path", ["/", "/console", "/status", "/api/health"])
+@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/llms.txt", "/robots.txt", "/sitemap.xml",
+                                  "/api/health"])  # what .github/workflows/uptime.yml checks
 def test_pages_and_health_answer_head_for_uptime_monitors(api, path):
     head = api.head(path)
     assert head.status_code == 200 and head.content == b""
