@@ -44,18 +44,30 @@ AC@k: the root-cause service is among the method's first k. Avg@5: the mean of A
   evaluation, dev set and Opus included, metered $9.70 against a $10 cap.
 - **Claude Opus 5.5 alone ran on only 14 test cases**, the most the cap left room for, in a seeded random order:
   12 of 14 first, too few to compare with anything (its paired tests are in `results.json`).
-- BARO's first suspect is a datastore's disk-I/O metric in 149 of the 252 test cases, so its AC@1 is low; its Avg@5 is what the
-  benchmark's runner itself prints for these cases (`runs/real-benchmark/baselines/baro-*.txt`).
+- BARO's first suspect is a datastore's disk-I/O metric in 149 of the 252 test cases, so its AC@1 is low; its
+  Avg@5 is what the benchmark's runner itself prints for these cases (`runs/real-benchmark/baselines/baro-*.txt`).
   epsilon-Diagnosis, as the benchmark ships it, returns three candidates per case and none on system C is right;
   the runner's own report agrees (0.00 on every fault there).
+
+**What Sherlog reads that the baselines do not.** Sherlog reasons over the system's call graph, who calls whom:
+that is its design. The call-graph rule ranks by it, the auto route's hand-off uses it (Haiku's answer does not
+stand if another service explains more of the outage through the graph), and the agent's dependency tool shows
+it. Here the graph comes from traces recorded before the injection, a naming rule for datastores, and calls
+written by hand from each system's published architecture: all of system B's, which has no traces, and those of
+system A's five untraced services. None of the baselines gets a graph. n-sigma, BARO and epsilon-Diagnosis read
+metrics only; the multi-source versions also read logs and traces, but only as time series (log template counts,
+trace error and latency series), not as a graph. The agent also reads the text of WARN and ERROR log lines, which
+the metric-only baselines never see. Like for like, on the metrics alone with no graph and no log text, Sherlog's
+z-score ranking names the cause first in 78% of test cases, against n-sigma's 80%. The graph lifts that to 83%
+(the call-graph rule), and the investigation to 92%.
 
 ## The cases
 
 | System | Services in the telemetry | Cases | Faults | Telemetry Sherlog reads |
 |---|---:|---:|---|---|
-| A | 12 (11 to 14 in a few cases) | 90 | cpu, mem, disk, delay, loss, socket; 5 root-cause services x 3 repetitions each | metrics, logs, traces |
-| B | 15 (16 in two cases) | 90 | the same | metrics, logs (no traces exist) |
-| C | 68 (69 in five cases) | 90 | the same | metrics, logs (one case has none), traces |
+| A | 12 (11 to 14 in a few cases) | 90 | cpu, mem, disk, delay, loss, socket; 5 root-cause services x 3 repetitions each | metrics, logs, a call graph from traces and by hand |
+| B | 15 (16 in two cases) | 90 | the same | metrics, logs, a call graph by hand (no traces exist) |
+| C | 68 (69 in five cases) | 90 | the same | metrics, logs (one case has none), a call graph from traces |
 
 Per service the benchmark records up to seven metric kinds: CPU, memory, disk I/O, open sockets, request rate,
 failed requests and request latency (p50 and p90), once per second, from 12 minutes before the injection to 12
@@ -70,15 +82,33 @@ benchmark's Parquet copy into the case directory (it reads the answers file only
 The converter reads nothing but the case directory. The raw case directories are named after their root cause,
 so neither their names nor the answers file reach Sherlog.
 
-**Split, frozen before any live call.** `scripts/benchmark/split.py` puts 18 cases in a dev set: per system, one
-case per fault, all from repetition 1, the root-cause services taken in turn (6.7% of the cases). The other 252
-are the test set. The split was committed at 11:09 IST (`chore: freeze the benchmark's dev/test split before any
-live run`); the first live call was at 11:15, on dev cases. Only dev cases' telemetry and results were looked at
-while adapting the converter, and they showed nothing that needed changing in the prompt or in Sherlog. Three
-converter fixes came from documents that failed the upload checks, some of them test cases (a CamelCase proxy
-name, an idle service's 0 ms latency), or from reading system C's traces (its untraced gateway); none came from
-a result. They are in the commit that recorded the dev runs, made before any test-set live call. Only test-set
-numbers are reported below; dev is separate.
+**The split, and what its freeze protects.** `scripts/benchmark/split.py` puts 18 cases in a dev set: per
+system, one case per fault, all from repetition 1, the root-cause services taken in turn (6.7% of the cases). The
+other 252 are the test set. The split was committed at 11:09:50 IST (`chore: freeze the benchmark's dev/test split
+before any live run`). The first live call was made at about 11:14:36 (the first dev session ended at 11:15:29
+after 53 s), on dev cases, and no test case went to a model before the dev runs were committed at 11:18:55.
+
+The freeze protects the split and every change made after it. It does not protect what came before it, while the
+test cases' telemetry was already on disk:
+
+- Sherlog's own changes for this benchmark: the per-incident metrics and the 1% noise floor for a metric with no
+  floor of its own (commit 71cf3d9, 10:47).
+- The converter's rules: the log-level rules, the datastore naming rule, the hand-written calls
+  (`adapter.HAND_CALLS`), the gateway rule and the lower-case names (commit 97a3c14, 11:09:50, the same minute as
+  the split).
+- The conversion of every case of systems A and B. Label-free counts were looked at for every case (alarm tick,
+  log lines, services); rankings and tool output only for the six dev cases of system B.
+- Timing runs of the baselines on system B (BARO, n-sigma, their multi-source versions, epsilon-Diagnosis and
+  CIRCA), whose printed per-fault Avg@5 covers its test cases too.
+- One test case of system A failed the upload checks at 11:05 (a CamelCase proxy name); the lower-case names came
+  from that.
+
+After the split, one converter change was made: an idle service's 0 ms latency is raised to the 0.1 ms floor,
+after a test case of system C failed the upload checks. It is in the commit that recorded the dev runs, before
+any test-set live call. No change came from a result on a test case, and the dev runs showed nothing that needed
+changing in the prompt or in Sherlog. (A later fix to how an upload is exported, 103aa52, changes nothing the runs
+used.) The times are this machine's local clock and are self-attested: the split commit was not pushed anywhere
+before the runs. Only test-set numbers are reported below; dev is separate.
 
 **The window, as the benchmark hands it to every method.** Every method in the benchmark is told the injection
 time. Sherlog gets it the same way: the converter cuts a 10-minute window with the injection exactly at tick 60
@@ -101,7 +131,8 @@ sees the telemetry up to 4 ticks (20 s) after the alarm.
   Only WARN and ERROR lines go into the document, since the log tool shows only those; at most 2000, the
   earliest. Which service a line is about is derived from its text, as for any upload.
 - The call graph: in systems A and C, from the spans that started before the injection, so the fault cannot shape
-  it. Traces cover 7 of system A's 12 services and 27 of system C's 68, so three rules fill the rest, all from
+  it. Traces cover 7 of system A's 12 services and 27 of system C's 68 (20 or 21 in 13 of its 90 cases), so three
+  rules fill the rest, all from
   names and each system's published architecture, never from a label: a datastore named after a service is that
   service's (`carts` calls `carts-db`); in system C, the untraced gateway calls every service whose spans start a
   trace; and a short hand-written list (`adapter.HAND_CALLS`) adds the calls to and from system A's five untraced
@@ -114,16 +145,19 @@ sees the telemetry up to 4 ticks (20 s) after the alarm.
   (`investigate.graph_ranking`: rank services by how many abnormal services each explains through the call graph).
 - Published baselines, re-run with the benchmark's `main.py` on every case (`scripts/benchmark/baselines.py`):
   BARO and n-sigma on metrics, their multi-source versions on metrics, logs and traces, and epsilon-Diagnosis.
-  CIRCA ran on systems A and B only: a single case of system C did not finish in 10 minutes on this machine, so
-  its 90 cases would take many hours. RCD and its multi-source version need a separate Python 3.8 environment and were not run;
+  CIRCA ran on systems A and B only: on system C, a run of the runner on a single case was stopped by a 600 s
+  timeout before it finished (`runs/real-benchmark/baselines/circa-re2-tt.txt`), so its 90 cases would take more
+  than 15 hours here. RCD and its multi-source version need a separate Python 3.8 environment and were not run;
   the methods that need a GPU-sized install (CausalRCA and others built on torch) were not run on this 8 GB
   machine.
 - The Sherlog agent, live: the auto route (Claude Haiku 5.5 first; Claude Opus 5.5 investigates afresh when
   Haiku's answer does not stand) on every test case, and Claude Opus 5.5 alone on as many test cases as the spend
-  cap left room for, in a seeded random order.
+  cap left room for. Both took the test cases in one seeded random order, `random.Random(2026).shuffle` over
+  `split.json`'s test ids (`run.py --seed`, default 2026), so the cases the cap left out are a random remainder.
 
-**Scoring.** The benchmark's own evaluator (run by `scripts/benchmark/score.py`), at the service level: AC@k says the root-cause service is among a method's first k, Avg@5 is the mean of AC@1 to AC@5. A
-`-db` container counts as its service, as the evaluator folds it. For the agent, the ranking scored is its
+**Scoring.** The benchmark's own evaluator (run by `scripts/benchmark/score.py`), at the service level: AC@k
+says the root-cause service is among a method's first k, Avg@5 is the mean of AC@1 to AC@5. A `-db` container
+counts as its service, as the evaluator folds it. For the agent, the ranking scored is its
 submitted suspects that the verifier accepted, in its order, as Sherlog scores itself on the shop; the row
 "every submitted suspect" scores all of them. `report.py` recomputes every number from the run records and stops
 if one differs from the evaluator's. 95% intervals for AC@1 are Wilson score intervals; agent-versus-method
@@ -162,6 +196,34 @@ comparisons are exact McNemar tests on AC@1, paired case by case.
 | auto vs Published baseline: multi-source n-sigma (metrics, logs, traces) | 252 | 39 | 10 | 3.9e-05 |
 | auto vs Published baseline: CIRCA (metrics; systems A and B only, too slow on C) | 168 | 51 | 3 | 2.9e-12 |
 | auto vs Published baseline: epsilon-Diagnosis (metrics) | 252 | 218 | 1 | 5.2e-64 |
+
+**n-sigma with other windows.** The runner gives every method 10 minutes on each side of the injection.
+Given 5 or 1 minute instead (`baselines.py ... nsigma/10 nsigma/2`, scored like the rest), n-sigma does about the
+same, and the agent's lead holds at each:
+
+| n-sigma window | AC@1 | Only the auto route right | Only n-sigma right | McNemar p |
+|---|---:|---:|---:|---:|
+| Published baseline: n-sigma (metrics) | 80.2% | 40 | 9 | 9.3e-06 |
+| n-sigma given 5 min on each side of the injection (window check) | 81.3% | 39 | 11 | 9e-05 |
+| n-sigma given 1 min on each side of the injection (window check) | 77.8% | 48 | 11 | 1.2e-06 |
+
+**When the first suspect is wrong** (the check for a learned prior, see Limitations): how often it is a service
+the benchmark breaks in some other case of the same system.
+
+| Method | First suspect wrong | ...and a service broken in another case |
+|---|---:|---:|
+| Sherlog no-AI: z-score ranking | 55 | 13 |
+| Sherlog no-AI: robust (median/MAD) z-score ranking | 85 | 15 |
+| Sherlog no-AI: call-graph rule | 43 | 12 |
+| Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed) | 19 | 6 |
+| Sherlog agent, Claude Opus 5.5 | 2 | 0 |
+| Sherlog agent, auto route, every submitted suspect (verified or not) | 20 | 7 |
+| Published baseline: BARO (metrics) | 179 | 5 |
+| Published baseline: n-sigma (metrics) | 50 | 20 |
+| Published baseline: multi-source BARO (metrics, logs, traces) | 175 | 6 |
+| Published baseline: multi-source n-sigma (metrics, logs, traces) | 48 | 18 |
+| Published baseline: CIRCA (metrics; systems A and B only, too slow on C) | 52 | 33 |
+| Published baseline: epsilon-Diagnosis (metrics) | 236 | 83 |
 
 **What the agent did.** `answered`: a verified suspect with confidence of 80% or more; otherwise
 `handed_to_human`. `citation_check_pass`: the share of submitted suspects whose cited tool calls really showed
@@ -205,7 +267,8 @@ the z-score ranking and the call-graph rule named it first in 13 of 18 each.
   before and after the injection. Sherlog keeps its own window: 5 minutes before as its baseline, and only up to
   20 s after its alarm for the agent (the no-AI rankings average from the alarm to that point too). This is
   Sherlog's design, an investigator that starts while the outage is young, and it sees less of each outage than
-  the baselines do.
+  the baselines do. n-sigma given 5 or 1 minute on each side scores 81% and 78% (the window check above), so the
+  window is not what separates it from the agent.
 - **Logs: WARN and ERROR lines only.** INFO lines are left out of the documents, so the log tool reports zero
   INFO lines; the baselines' multi-source versions read the benchmark's own log template counts instead.
 - **Resampling and units.** Readings are averaged per 5 s tick, latency is in milliseconds, and an idle
@@ -227,6 +290,13 @@ the z-score ranking and the call-graph rule named it first in 13 of 18 each.
 
 ## Limitations
 
+- One live run per case. The agent's run-to-run variance was not measured; the confidence intervals cover the
+  sampling of cases only.
+- The benchmark is public, so its cases or its answers may be in the models' training data. A check for a learned
+  prior: when a method's first suspect is wrong, how often is it a service the benchmark breaks in some other case
+  of the same system? The agent: 6 of its 19 wrong first suspects; n-sigma: 20 of 50; the call-graph rule: 12 of
+  43 (`wrong_first_suspects` in `results.json`). The agent picks such a service no more often than methods that
+  cannot have memorised anything, so there is no sign of a learned prior; this does not rule one out.
 - One benchmark suite, three systems, six injected fault types. Injected faults are cleaner than real
   incidents: one root cause each, injected at a known time, on a system under synthetic load. Code-level faults
   (the benchmark's RE3 suite) were not run.
@@ -264,7 +334,8 @@ python scripts/benchmark/split.py
 # 3. Convert each case to a Sherlog incident document (a few seconds per case, one at a time)
 for d in re2-ob re2-ss re2-tt; do python -I scripts/benchmark/convert.py $W/tasks/$d $W/converted; done
 
-# 4. Run Sherlog: no AI, then live (a key in .env; the budget stops new cases before the cap)
+# 4. Run Sherlog: no AI, then live (a key in .env; cases in the --seed order, default 2026; the budget stops
+#    new cases before the cap)
 for m in zscore robust graph; do
   uv run --with-requirements requirements.txt python scripts/benchmark/run.py $W/converted --set test --method $m
 done
@@ -273,7 +344,7 @@ uv run --env-file .env --with-requirements requirements.txt python scripts/bench
 
 # 5. The published baselines, with the benchmark's runner
 python -I scripts/benchmark/baselines.py <benchmark source>/main.py $W/data $W/tasks $W/baselines \
-    baro nsigma mmbaro mmnsigma e_diagnosis circa:re2-ob,re2-ss
+    baro nsigma mmbaro mmnsigma e_diagnosis circa:re2-ob,re2-ss nsigma/10 nsigma/2
 
 # 6. Score with the benchmark's evaluator, then recompute and cross-check everything
 python -I scripts/benchmark/score.py $W
