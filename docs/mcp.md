@@ -94,6 +94,10 @@ reveal_truth(41) -> cause cache (latency); Sherlog's own agent answered cache; t
 `cart` is the loudest service and its citations check out, since a victim is abnormal too; the blast radius and the
 rollback are what catch it.
 
+### Tried with a real model
+
+On the live server, Claude Haiku 5.5, given only the `investigate_outage` prompt and the tool list in a plain tool-use loop ([`scripts/claude_over_mcp.py`](../scripts/claude_over_mcp.py)), made 11 read-only calls on recorded outage #41, named `cache` with 90% confidence, and called `check_answer`: its citations verified, the blast radius explained all four abnormal services, the rollback replay stopped the alarm, and the decision was **ship**. `reveal_truth` agreed: the cause was `cache`, which the z-score ranking had put second behind `cart`. The whole run cost $0.0067.
+
 ## Tools
 
 | Tool | Arguments | Answers with |

@@ -379,7 +379,7 @@ Sherlog is also an MCP server, free and read-only, with no key. Bring your own C
 claude mcp add --transport http sherlog https://sherlog-jade.vercel.app/mcp
 ```
 
-Then type `/mcp__sherlog__investigate_outage 41` in Claude Code. Investigation tools: `top_anomalies`, `get_metric`, `get_logs`, `get_dependencies`, then `check_answer` (ship, or hand to a human) and `reveal_truth` to score the run. The others list and open the recorded investigations (`list_recorded_outages`, `get_recorded_verdict`), triage telemetry with the no-AI checks (`triage_incident`, `sample_incident`) and report the benchmark (`benchmark_summary`). [`docs/mcp.md`](docs/mcp.md) has a walkthrough of outage #41; [`/llms.txt`](https://sherlog-jade.vercel.app/llms.txt) is a map of the project for AI tools.
+Then type `/mcp__sherlog__investigate_outage 41` in Claude Code. Investigation tools: `top_anomalies`, `get_metric`, `get_logs`, `get_dependencies`, then `check_answer` (ship, or hand to a human) and `reveal_truth` to score the run. The others list and open the recorded investigations (`list_recorded_outages`, `get_recorded_verdict`), triage telemetry with the no-AI checks (`triage_incident`, `sample_incident`) and report the benchmark (`benchmark_summary`). **Tried with a real model:** on the live server, Claude Haiku 5.5 investigated #41 in 11 calls, named `cache`, and `check_answer` verified it and said ship; `reveal_truth` agreed, for $0.0067 ([`scripts/claude_over_mcp.py`](scripts/claude_over_mcp.py)). [`docs/mcp.md`](docs/mcp.md) has a walkthrough of outage #41; [`/llms.txt`](https://sherlog-jade.vercel.app/llms.txt) is a map of the project for AI tools.
 
 ## Reproduce
 
