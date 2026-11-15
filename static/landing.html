@@ -67,6 +67,8 @@
   /* with reduced motion the hero stands still and the scroll bar would sit full width, so both hints go */
   @media (prefers-reduced-motion: reduce) { .motion-only, .progress { display: none; } }
   .ctas { display: flex; flex-wrap: wrap; gap: 12px; }
+  .hero-alt { margin: 14px 0 0; font: 500 15px/1.4 var(--sans); }
+  .hero-alt a { color: var(--ink); text-underline-offset: 3px; }
 
   /* ---- header ---- */
   .nav { position: fixed; z-index: 20; top: 0; left: 0; right: 0; padding: 20px 0; transition: padding .5s var(--ease-glide), background-color .5s ease; }
@@ -372,16 +374,17 @@
         <h1 class="hero-intro" id="heroIntro">An AI on-call investigator that has to prove its answer.</h1>
         <div class="hero-act">
           <!-- the stakes: 1 - the z-score ranking's AC@1 in runs/real-benchmark/results.json (55 of 252 test cases) -->
-          <p class="hero-lede">When one service breaks, everything that calls it breaks too. In 252 real outages, the most abnormal service was not the cause 22% of the time: Sherlog sends a Claude agent to find the one that was, and plain code checks every tool call it cites.</p>
+          <p class="hero-lede">When one service breaks, everything that calls it breaks too, and the one that looks worst is often only a victim: in 252 real outages, the most abnormal service was not the cause about 1 time in 5, and rolling back a victim fixes nothing. Sherlog sends a Claude agent to find the one that broke, and plain code checks its proof before anyone acts.</p>
           <div class="ctas">
             <a class="pbtn dark" href="/console#replay/41"><span class="roll" data-text="Watch outage #41, free"><span>Watch outage #41, free</span></span><span class="dot"></span></a>
             <a class="pbtn light" href="/console"><span class="dot"></span><span class="roll" data-text="Break something"><span>Break something</span></span></a>
           </div>
+          <p class="hero-alt"><a href="/console#replay/177">Or watch a confident wrong answer get caught <span aria-hidden="true">→</span></a></p>
         </div>
       </div>
       <div class="hero-panel">
         <div id="hero3d" role="img" aria-label="The simulated shop's 11 services in 3D. One breaks, the failure travels up to its callers, the agent names the cause, and rolling it back clears the outage."></div>
-        <div class="hud top"><span><span class="live-dot"></span>Outage #41 · replayed from the benchmark</span>
+        <div class="hud top"><span><span class="live-dot"></span>Simulated outage #41 · replayed from the benchmark</span>
           <span class="hud-end"><span class="hide-sm motion-only look-hint">Move to look around</span>
             <button type="button" class="motion-btn" id="motionBtn" aria-pressed="false"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 0h3v10H1zM6 0h3v10H6z"/></svg>Pause motion</button></span></div>
         <div class="hud bottom"><span class="caption" id="heroCaption">Loading the shop…</span></div>

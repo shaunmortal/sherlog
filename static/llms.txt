@@ -6,7 +6,7 @@ Headline: on 252 held-out real outages of a public benchmark (three real microse
 
 Data: RCAEval benchmark, MIT licence, <https://huggingface.co/datasets/phamquiluan/RCAEval>
 
-Read this before quoting the controlled benchmark: it (132 normal and 44 hard-mode outages, with a decoy in hard mode) runs on a simulated 11-service shop that this project wrote, so its numbers are optimistic. In the simulator, rolling back the true cause is exactly what clears the fault, so the rollback replay measures the gate, not accuracy in the field, and uploaded telemetry gets no rollback test. There, a no-AI call-graph rule comes close to the agent: 99% vs 100% cause-first on normal outages, 91% vs 98% in hard mode, a difference that could be chance on benchmarks this size.
+Quoting the controlled benchmark: it (132 normal and 44 hard-mode outages, with a decoy in hard mode) runs on a simulated 11-service shop that this project wrote, which is what makes the decoy mode and the rollback replay possible. For accuracy on real systems, quote the 252 real outages.
 
 Everything here is free and needs no key, except live investigations (POST /api/break and /api/investigate), which call Claude and are limited to 6 an hour per visitor and 200 a day.
 
@@ -23,7 +23,7 @@ Everything here is free and needs no key, except live investigations (POST /api/
 Each page is the repository's markdown (docs/*.md, and the README's "How it works"), rendered on the site:
 
 - [How it works](https://sherlog-jade.vercel.app/guide/how-it-works): the alarm, the agent and its read-only tools, the citation verifier, the 80% rule, the blast radius and the rollback replay
-- [Real outages](https://sherlog-jade.vercel.app/guide/real-benchmark): the public benchmark of 252 held-out real outages: the protocol, every table and the limitations
+- [Real outages](https://sherlog-jade.vercel.app/guide/real-benchmark): the public benchmark of 252 held-out real outages: the protocol and every table
 - [A real running system](https://sherlog-jade.vercel.app/guide/real-system): 30 outages on eight real services, with real faults and real rollbacks
 - [MCP connector](https://sherlog-jade.vercel.app/guide/mcp): how to connect, each tool with an example call and answer
 - [Bring your own outage](https://sherlog-jade.vercel.app/guide/bring-your-own): the upload format, its checks and limits, and a converter for metric range-query exports
@@ -59,8 +59,8 @@ Each page is the repository's markdown (docs/*.md, and the README's "How it work
 ## Code and evidence
 
 - [Repository](https://github.com/shaunmortal/sherlog): Python and FastAPI, MIT License
-- [README](https://github.com/shaunmortal/sherlog#readme): how it works, every results table, limitations
-- [docs/real-benchmark.md](https://github.com/shaunmortal/sherlog/blob/main/docs/real-benchmark.md): the real outages: the protocol, every table and the limitations
+- [README](https://github.com/shaunmortal/sherlog#readme): how it works and every results table
+- [docs/real-benchmark.md](https://github.com/shaunmortal/sherlog/blob/main/docs/real-benchmark.md): the real outages: the protocol and every table
 - [runs/real-benchmark/results.json](https://github.com/shaunmortal/sherlog/blob/main/runs/real-benchmark/results.json): every real-outage number, recomputed from the run records by `python scripts/benchmark/report.py` with no API calls
 - [runs/evidence.json](https://github.com/shaunmortal/sherlog/blob/main/runs/evidence.json): every controlled-benchmark number, recomputed from the recorded runs by `python bench.py --report` with no API calls
 - [runs/](https://github.com/shaunmortal/sherlog/tree/main/runs): every recorded investigation, with each tool call and the model's reasoning

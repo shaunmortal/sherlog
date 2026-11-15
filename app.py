@@ -123,8 +123,23 @@ SECURITY_HEADERS = [(name.encode(), value.encode()) for name, value in {
 }.items()]
 
 
+# Pages, docs and static files change only with a deploy, which starts the CDN's cache afresh, so the CDN may keep
+# them 5 minutes and serve a stale copy while it refetches. Browsers still revalidate (max-age=0). Never the API or
+# MCP, whose answers change with live runs.
+PAGE_CACHE = (b"cache-control", b"public, max-age=0, s-maxage=300, stale-while-revalidate=86400")
+
+
+def cacheable(scope: dict, status: int, headers: list) -> bool:
+    """A successful GET or HEAD of a page or static file that did not set its own Cache-Control."""
+    path = scope["path"]
+    return (scope["method"] in ("GET", "HEAD") and status == 200
+            and not (path in ("/api", "/mcp") or path.startswith(("/api/", "/mcp/")))
+            and all(name.lower() != b"cache-control" for name, _ in headers))
+
+
 class SecurityHeaders:
-    """Adds SECURITY_HEADERS to every HTTP response, streamed ones too (plain ASGI, so nothing is buffered)."""
+    """Adds SECURITY_HEADERS to every HTTP response, streamed ones too (plain ASGI, so nothing is buffered), and
+    PAGE_CACHE to the cacheable ones."""
 
     def __init__(self, inner):
         self.inner = inner
@@ -135,7 +150,9 @@ class SecurityHeaders:
 
         async def send_with_headers(message):
             if message["type"] == "http.response.start":
-                message = {**message, "headers": [*message.get("headers", []), *SECURITY_HEADERS]}
+                headers = message.get("headers", [])
+                cache = [PAGE_CACHE] if cacheable(scope, message["status"], headers) else []
+                message = {**message, "headers": [*headers, *SECURITY_HEADERS, *cache]}
             await send(message)
 
         await self.inner(scope, receive, send_with_headers)

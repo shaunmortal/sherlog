@@ -119,7 +119,7 @@ def test_the_story_pages_stakes_line_is_the_real_outages_z_score_ranking(api):
     # the most abnormal service is the z-score ranking's first pick, so it is wrong as often as that ranking misses
     real = json.loads(app.REAL_RESULTS.read_text())
     cases, wrong = real["split"]["test"], 1 - real["methods"]["zscore"]["all"]["AC@1"]
-    line = f"In {cases} real outages, the most abnormal service was not the cause {round(wrong * 100)}% of the time"
+    line = f"in {cases} real outages, the most abnormal service was not the cause about 1 time in {round(1 / wrong)}"
     assert line in api.get("/").text
 
 

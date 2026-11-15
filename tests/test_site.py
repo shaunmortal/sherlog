@@ -98,6 +98,21 @@ def test_every_response_carries_the_security_headers(path):
     assert policy["frame-ancestors"] == ["'none'"] and policy["object-src"] == ["'none'"]
 
 
+@pytest.mark.parametrize("path", [*PAGES, "/static/shared.css", "/llms.txt", "/robots.txt"])
+def test_pages_and_static_files_may_sit_in_the_cdn_cache(path):
+    assert client.get(path, headers=BROWSER).headers["cache-control"] == app.PAGE_CACHE[1].decode()
+
+
+@pytest.mark.parametrize("path", ["/api/health", "/api/replays/1", "/api/meta", "/no-such-page"])
+def test_the_api_and_errors_are_never_cached_as_pages(path):
+    assert "s-maxage" not in client.get(path, headers=BROWSER).headers.get("cache-control", "")
+
+
+def test_mcp_answers_are_never_cached_as_pages():
+    res = client.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "ping"})
+    assert "s-maxage" not in res.headers.get("cache-control", "")
+
+
 def test_head_answers_carry_the_security_headers_too():
     res = client.head("/api/health")
     assert res.status_code == 200 and res.headers["x-content-type-options"] == "nosniff"

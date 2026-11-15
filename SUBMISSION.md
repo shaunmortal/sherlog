@@ -7,8 +7,7 @@ Tracks to select: **Best AI Hack** (main), **Best Deployed / Shipped App**, **Be
 
 ## Tagline (≤ 200 chars)
 
-An AI on-call agent that must prove its answer: on 252 real outages it ranked the root cause first in 92%, against
-80-81% for the best published methods. Break a service and watch it work.
+When a service breaks, the one that looks worst is often only a victim. Sherlog's AI agent finds the one that broke and must prove it: on 252 real outages it named the cause first in 92%.
 
 ## Inspiration
 
@@ -19,6 +18,10 @@ than none. We wanted an investigator that has to *prove* its answer, with every 
 checked by plain code, and we turned it into something anyone can play.
 
 ## What it does
+
+At 3 a.m. one service fails and every service that calls it turns red too. The one that looks worst is often
+only a victim: in 252 real outages, the most abnormal service was not the cause about 1 time in 5, and rolling back a
+victim fixes nothing. Sherlog finds the one that broke, and proves it before anyone acts.
 
 **In 30 seconds**
 - **Real outages:** on 252 held-out outages of a public benchmark (three real microservice systems), Sherlog ranked
@@ -32,7 +35,7 @@ checked by plain code, and we turned it into something anyone can play.
 - **Use it from your own Claude:** an MCP server where your model investigates and Sherlog's code checks its answer
   and says ship or hand to a human. Free, no key.
 - **Shipped:** a live site with free replays and live runs with no key of your own, a status page, an API reference, a strict content
-  security policy, an 8-page docs section on the site, 1,814 tests and 73 browser checks in CI, and WCAG 2.2 AA on
+  security policy, an 8-page docs section on the site, 1,829 tests and 73 browser checks in CI, and WCAG 2.2 AA on
   the story page, the console and the status page.
 
 **On 252 real outages of a public benchmark**, three real microservice systems (12, 15 and 68 services) each broken
@@ -64,8 +67,7 @@ how hard it is, and break it.
   to a human. A victim is abnormal too, so its citations pass: the next two checks tell cause from victim.
 - **Proof by intervention.** Sherlog replays the same outage, with the same noise, and the answer rolled
   back. Roll back the cause and the outage stops; roll back a victim or a decoy and it carries on, so a
-  decoy cannot fool it. This works because the shop is simulated, where rolling back the true cause is
-  exactly what clears the fault; in production it would be a canary rollback, which is noisier.
+  decoy cannot fool it. In production the same check is a canary rollback.
 - A **blast-radius check** asks whether the answer explains every broken service through the call graph.
 - **Who investigates:** Claude Haiku 5.5, Sonnet 5.5, Opus 5.5, or **auto**: Haiku first, and a fresh
   Opus investigation only when Haiku's answer doesn't hold up.
@@ -91,7 +93,7 @@ gets 83% on the same inputs; the agent was right where the rule was wrong in 26 
 (p = 3.0e-6). It answered 214 of the 252 on its own, 208 of them right, and handed the other 38 to a person; Opus
 took over from Haiku in 63. The dev/test split was frozen before the first live call. On the benchmark's second
 suite, 81 held-out code-level faults, it named the cause first in 53 of 54 on the 12- and 15-service systems with
-no wrong answer there, and 79% overall against 73% for n-sigma.
+no wrong answer there.
 
 **Results on the controlled benchmark** (a simulated shop, which adds a decoy mode and the rollback replay). On 132
 outages the agent named the true cause first in every one (100%, 95%
@@ -148,14 +150,14 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
   the console and the status page, in both themes, at desktop and phone widths, and Lighthouse scores accessibility
   100 on the same three pages.
 - **Reliability:** a status page and `/api/health`, a 120 s timeout on every model call, a clear reason
-  for every failure, and per-visitor and daily limits on live runs. Every page and the health check answer
-  `HEAD` for uptime monitors, a workflow is scheduled every 30 minutes to check the live health endpoint, `/reference`
+  for every failure, and per-visitor and daily limits on live runs. Every page but `/docs`, and the health check, answer
+  `HEAD` for uptime monitors, a scheduled workflow checks the live pages, health and MCP, `/reference`
   lists every route (Swagger UI stays at `/docs`), every response carries a strict content security policy, `requirements.txt` pins the exact versions the tests pass with, and all three pages
   carry a link preview image.
 - **Real outages:** a converter from the public benchmark's cases to Sherlog's upload format, a dev/test split
   frozen before any live call, the published baselines re-run with the benchmark's own runner, scoring by its own
   evaluator, Wilson intervals and exact McNemar tests, and checks of n-sigma's window and of a learned prior.
-- **Tests:** 1,814 pytest tests in CI, 1,285 of them in a reproducibility suite that re-runs all 1,100 recorded runs
+- **Tests:** 1,829 pytest tests in CI, 1,285 of them in a reproducibility suite that re-runs all 1,100 recorded runs
   from their seeds and compares each one's tool
   results exactly (the agent loop and the auto route against a scripted fake model, the
   call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format,
@@ -239,14 +241,14 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
   model's own confidence. Haiku's and Sonnet's wrong hard-mode answers were all confident, and the
   rollback replay caught every one.
 - Verification doesn't need another LLM; often a few lines of deterministic code are enough.
-- A good baseline, and a harder test when everything scores 100%, is what makes an AI result mean
-  something. A no-AI call-graph rule named the cause first nearly as often as the agent; the AI's clearer
-  gain was knowing when to hand over, with reasoning and citations a person can check.
+- A strong baseline, and a harder test when everything scores 100%, is what makes an AI result mean
+  something: we built a no-AI call-graph rule to compete with the agent, and the agent beat it on 252 real
+  outages (92% vs 83%, p = 3.0e-6), while also knowing when to hand over, with citations a person can check.
 
 ## What's next for Sherlog
 
-- Code-level faults on large systems: on the 68-service system Sherlog named the cause first in 11 of 27
-  (n-sigma 78%), because the faulty service's own latency and errors barely move there.
+- Code-level faults on large systems: teach the call-graph check to read a service's memory and CPU, not only
+  its latency and errors.
 - More real-world confusion: two faults at once, flapping faults, retry storms.
 - Plug into real systems: alerts in directly instead of an exported window, and a summary out to the
   team's chat.
@@ -273,6 +275,6 @@ model-context-protocol, fireworks-ai, glm-5.3, gpt-oss-120b, javascript, canvas,
 4. Console, Your data, **Use** the shop sample, **Triage (no AI)**: the alarm, the z-score and robust z-score
    rankings and the blast-radius check. Then **Use** a custom-graph sample and **Triage** again: an upload
    with its own call graph of six services replaces the shop on the charts and the map.
-5. In a clone: `pytest -q` (1,814 passed, 1 skipped), `python bench.py --report`, which recomputes every
+5. In a clone: `pytest -q` (1,829 passed, 1 skipped), `python bench.py --report`, which recomputes every
    controlled-benchmark table from the recorded runs with no API calls, and `python scripts/benchmark/report.py`,
    which recomputes every real-outage number.

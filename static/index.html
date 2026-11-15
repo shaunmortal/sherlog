@@ -287,7 +287,7 @@
 
   /* ---- evidence ---- */
   .evidence { max-width: 1000px; margin: 0 auto; padding: 44px 22px 64px; }
-  .evidence h1 { margin: 0 0 12px; font: 600 34px/1.15 var(--sans); letter-spacing: -.01em; }
+  .evidence .ev-title { margin: 0 0 12px; font: 600 34px/1.15 var(--sans); letter-spacing: -.01em; }
   .evidence p { margin: 0 0 10px; max-width: 75ch; color: var(--muted); font-size: 16px; }
   .evidence .sub { margin-top: 32px; }
   #evTest, #evHardTest { margin-top: 12px; }
@@ -449,7 +449,7 @@
 </div>
 
 <div class="evidence" id="evidence" role="tabpanel" aria-labelledby="tab-evidence" hidden>
-  <h1>How well does the agent work?</h1>
+  <h2 class="ev-title">How well does the agent work?</h2>
   <h2 class="part" id="h-real" tabindex="-1">On <span class="realN">252</span> real outages · a public benchmark</h2>
   <p>Three real microservice systems (12, 15 and 68 services), each broken on purpose and scored by the benchmark's own evaluator. The best published methods were re-run on the same cases with the benchmark's own runner. Ranked first: the root-cause service is the method's first suspect.</p>
   <div class="table-wrap" id="evReal" role="region" tabindex="0" aria-labelledby="h-real"></div>
@@ -457,7 +457,7 @@
   <p class="source">Data: RCAEval benchmark, MIT licence. <a href="https://github.com/shaunmortal/sherlog/blob/main/docs/real-benchmark.md">The method and every table</a></p>
   <h2 class="part" id="h-controlled">The controlled benchmark · a simulated shop</h2>
   <p><span class="evN">132</span> outages, three for every service × fault type, on seeds that were never looked at while the agent was built. "Cause first" means the true cause was ranked first <i>and</i> its citations were verified. Every run, with each tool call and the model's reasoning, can be replayed under Replay.</p>
-  <p>The telemetry is simulated: caller logs name the failing service and faults are single and clean, so the absolute numbers are optimistic. The no-AI baselines run on exactly the same data, so the comparison is fair.</p>
+  <p>The telemetry is simulated, and the no-AI baselines run on exactly the same data, so the comparison is fair.</p>
   <h2 class="sub" id="h-methods">What each capability and model adds · <span class="evN">132</span> outages · [95% interval]</h2>
   <div class="table-wrap" id="evMethods" role="region" tabindex="0" aria-labelledby="h-methods"></div>
   <p id="evTest"></p>
