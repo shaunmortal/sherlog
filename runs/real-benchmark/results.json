@@ -1033,6 +1033,256 @@
     }
    }
   },
+  "nsigma-len10": {
+   "label": "n-sigma given 5 min on each side of the injection (window check)",
+   "all": {
+    "n": 252,
+    "of": 252,
+    "AC@1": 0.8135,
+    "AC@3": 0.9246,
+    "AC@5": 0.9524,
+    "Avg@5": 0.904,
+    "AC@1_ci95": [
+     0.761,
+     0.857
+    ]
+   },
+   "system A": {
+    "n": 84,
+    "of": 84,
+    "AC@1": 0.7976,
+    "AC@3": 0.9286,
+    "AC@5": 0.9881,
+    "Avg@5": 0.9095,
+    "AC@1_ci95": [
+     0.7,
+     0.87
+    ]
+   },
+   "system B": {
+    "n": 84,
+    "of": 84,
+    "AC@1": 0.8571,
+    "AC@3": 0.9881,
+    "AC@5": 0.9881,
+    "Avg@5": 0.9595,
+    "AC@1_ci95": [
+     0.767,
+     0.916
+    ]
+   },
+   "system C": {
+    "n": 84,
+    "of": 84,
+    "AC@1": 0.7857,
+    "AC@3": 0.8571,
+    "AC@5": 0.881,
+    "Avg@5": 0.8429,
+    "AC@1_ci95": [
+     0.687,
+     0.86
+    ]
+   },
+   "by_fault": {
+    "cpu": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 0.8571,
+     "AC@3": 0.9286,
+     "AC@5": 1.0,
+     "Avg@5": 0.9286,
+     "AC@1_ci95": [
+      0.722,
+      0.933
+     ]
+    },
+    "delay": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 0.619,
+     "AC@3": 0.8333,
+     "AC@5": 0.8571,
+     "Avg@5": 0.7857,
+     "AC@1_ci95": [
+      0.468,
+      0.75
+     ]
+    },
+    "disk": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 1.0,
+     "AC@3": 1.0,
+     "AC@5": 1.0,
+     "Avg@5": 1.0,
+     "AC@1_ci95": [
+      0.916,
+      1.0
+     ]
+    },
+    "loss": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 0.6667,
+     "AC@3": 0.8571,
+     "AC@5": 0.9048,
+     "Avg@5": 0.8286,
+     "AC@1_ci95": [
+      0.516,
+      0.79
+     ]
+    },
+    "mem": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 0.9762,
+     "AC@3": 1.0,
+     "AC@5": 1.0,
+     "Avg@5": 0.9952,
+     "AC@1_ci95": [
+      0.877,
+      0.996
+     ]
+    },
+    "socket": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 0.7619,
+     "AC@3": 0.9286,
+     "AC@5": 0.9524,
+     "Avg@5": 0.8857,
+     "AC@1_ci95": [
+      0.615,
+      0.865
+     ]
+    }
+   }
+  },
+  "nsigma-len2": {
+   "label": "n-sigma given 1 min on each side of the injection (window check)",
+   "all": {
+    "n": 252,
+    "of": 252,
+    "AC@1": 0.7778,
+    "AC@3": 0.9206,
+    "AC@5": 0.9524,
+    "Avg@5": 0.8944,
+    "AC@1_ci95": [
+     0.722,
+     0.825
+    ]
+   },
+   "system A": {
+    "n": 84,
+    "of": 84,
+    "AC@1": 0.7143,
+    "AC@3": 0.9048,
+    "AC@5": 0.9643,
+    "Avg@5": 0.881,
+    "AC@1_ci95": [
+     0.61,
+     0.8
+    ]
+   },
+   "system B": {
+    "n": 84,
+    "of": 84,
+    "AC@1": 0.8214,
+    "AC@3": 0.9881,
+    "AC@5": 1.0,
+    "Avg@5": 0.95,
+    "AC@1_ci95": [
+     0.726,
+     0.889
+    ]
+   },
+   "system C": {
+    "n": 84,
+    "of": 84,
+    "AC@1": 0.7976,
+    "AC@3": 0.869,
+    "AC@5": 0.8929,
+    "Avg@5": 0.8524,
+    "AC@1_ci95": [
+     0.7,
+     0.87
+    ]
+   },
+   "by_fault": {
+    "cpu": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 0.7857,
+     "AC@3": 0.9048,
+     "AC@5": 0.9762,
+     "Avg@5": 0.8905,
+     "AC@1_ci95": [
+      0.641,
+      0.883
+     ]
+    },
+    "delay": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 0.5476,
+     "AC@3": 0.7857,
+     "AC@5": 0.8333,
+     "Avg@5": 0.7429,
+     "AC@1_ci95": [
+      0.399,
+      0.688
+     ]
+    },
+    "disk": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 1.0,
+     "AC@3": 1.0,
+     "AC@5": 1.0,
+     "Avg@5": 1.0,
+     "AC@1_ci95": [
+      0.916,
+      1.0
+     ]
+    },
+    "loss": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 0.619,
+     "AC@3": 0.881,
+     "AC@5": 0.9048,
+     "Avg@5": 0.819,
+     "AC@1_ci95": [
+      0.468,
+      0.75
+     ]
+    },
+    "mem": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 0.9286,
+     "AC@3": 1.0,
+     "AC@5": 1.0,
+     "Avg@5": 0.9857,
+     "AC@1_ci95": [
+      0.81,
+      0.975
+     ]
+    },
+    "socket": {
+     "n": 42,
+     "of": 42,
+     "AC@1": 0.7857,
+     "AC@3": 0.9524,
+     "AC@5": 1.0,
+     "Avg@5": 0.9286,
+     "AC@1_ci95": [
+      0.641,
+      0.883
+     ]
+    }
+   }
+  },
   "mmbaro": {
    "label": "Published baseline: multi-source BARO (metrics, logs, traces)",
    "all": {
@@ -1563,6 +1813,18 @@
     "only_second_right": 9,
     "mcnemar_p": 9.26e-06
    },
+   "nsigma-len10": {
+    "n": 252,
+    "only_first_right": 39,
+    "only_second_right": 11,
+    "mcnemar_p": 9.02e-05
+   },
+   "nsigma-len2": {
+    "n": 252,
+    "only_first_right": 48,
+    "only_second_right": 11,
+    "mcnemar_p": 1.24e-06
+   },
    "mmbaro": {
     "n": 252,
     "only_first_right": 165,
@@ -1620,6 +1882,18 @@
     "mcnemar_p": 0.00635
    },
    "nsigma": {
+    "n": 14,
+    "only_first_right": 2,
+    "only_second_right": 1,
+    "mcnemar_p": 1.0
+   },
+   "nsigma-len10": {
+    "n": 14,
+    "only_first_right": 2,
+    "only_second_right": 1,
+    "mcnemar_p": 1.0
+   },
+   "nsigma-len2": {
     "n": 14,
     "only_first_right": 2,
     "only_second_right": 1,
@@ -1714,6 +1988,64 @@
    }
   }
  },
+ "wrong_first_suspects": {
+  "zscore": {
+   "wrong": 55,
+   "names_a_root_cause_of_another_case": 13
+  },
+  "robust": {
+   "wrong": 85,
+   "names_a_root_cause_of_another_case": 15
+  },
+  "graph": {
+   "wrong": 43,
+   "names_a_root_cause_of_another_case": 12
+  },
+  "auto": {
+   "wrong": 19,
+   "names_a_root_cause_of_another_case": 6
+  },
+  "opus": {
+   "wrong": 2,
+   "names_a_root_cause_of_another_case": 0
+  },
+  "auto-submitted": {
+   "wrong": 20,
+   "names_a_root_cause_of_another_case": 7
+  },
+  "baro": {
+   "wrong": 179,
+   "names_a_root_cause_of_another_case": 5
+  },
+  "nsigma": {
+   "wrong": 50,
+   "names_a_root_cause_of_another_case": 20
+  },
+  "nsigma-len10": {
+   "wrong": 47,
+   "names_a_root_cause_of_another_case": 22
+  },
+  "nsigma-len2": {
+   "wrong": 56,
+   "names_a_root_cause_of_another_case": 32
+  },
+  "mmbaro": {
+   "wrong": 175,
+   "names_a_root_cause_of_another_case": 6
+  },
+  "mmnsigma": {
+   "wrong": 48,
+   "names_a_root_cause_of_another_case": 18
+  },
+  "circa": {
+   "wrong": 52,
+   "names_a_root_cause_of_another_case": 33
+  },
+  "e_diagnosis": {
+   "wrong": 236,
+   "names_a_root_cause_of_another_case": 83
+  }
+ },
  "metered_spend_usd": 9.7022,
  "official_match": [
   "auto",
@@ -1725,6 +2057,8 @@
   "mmbaro",
   "mmnsigma",
   "nsigma",
+  "nsigma-len10",
+  "nsigma-len2",
   "opus",
   "robust",
   "zscore"

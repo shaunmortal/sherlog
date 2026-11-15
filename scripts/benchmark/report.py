@@ -29,12 +29,15 @@ LABELS = {
     "auto-submitted": "Sherlog agent, auto route, every submitted suspect (verified or not)",
     "baro": "Published baseline: BARO (metrics)",
     "nsigma": "Published baseline: n-sigma (metrics)",
+    "nsigma-len10": "n-sigma given 5 min on each side of the injection (window check)",
+    "nsigma-len2": "n-sigma given 1 min on each side of the injection (window check)",
     "mmbaro": "Published baseline: multi-source BARO (metrics, logs, traces)",
     "mmnsigma": "Published baseline: multi-source n-sigma (metrics, logs, traces)",
     "circa": "Published baseline: CIRCA (metrics; systems A and B only, too slow on C)",
     "e_diagnosis": "Published baseline: epsilon-Diagnosis (metrics)",
 }
 LIVE = ("auto", "opus")
+WINDOW_CHECK = ("nsigma", "nsigma-len10", "nsigma-len2")  # the runner's default is 10 min on each side
 KS = (1, 3, 5)
 
 
@@ -141,9 +144,23 @@ def build() -> dict:
         if recs:
             out["dev"][m] = {"all": scores(split["dev"], recs, answers),
                              **({"sherlog": agent_stats(recs, answers)} if m in LIVE else {})}
+    out["wrong_first_suspects"] = {m: wrong_first(records(m, set(split["test"]), "test"), answers) for m in methods}
     spend = load(RUNS / "spend.jsonl")
     out["metered_spend_usd"] = round(sum(s["usd"] for s in spend), 4)
     return out
+
+
+def wrong_first(recs: dict[str, dict], answers: dict[str, dict]) -> dict:
+    """A memorisation check: when a method's first suspect is wrong, is it one of the services this benchmark
+    breaks in some other case of the same system? A method that had learnt the benchmark's answers would name
+    those more often than one that only reads the telemetry."""
+    roots: dict[str, set[str]] = {}
+    for a in answers.values():
+        roots.setdefault(a["dataset"], set()).add(a["service"])
+    firsts = {c: (service_ranks(r["ranks"]) or [None])[0] for c, r in recs.items()}
+    wrong = [c for c, f in firsts.items() if f != answers[c]["service"]]
+    return {"wrong": len(wrong), "names_a_root_cause_of_another_case": sum(firsts[c] in roots[answers[c]["dataset"]]
+                                                                         for c in wrong)}
 
 
 def check_official(results: dict) -> None:
@@ -170,6 +187,8 @@ def table(results: dict) -> str:
     rows = ["| Method | Cases | AC@1 (95% CI) | AC@3 | Avg@5 | A: AC@1 / Avg@5 | B: AC@1 / Avg@5 | C: AC@1 / Avg@5 |",
             "|---|---:|---:|---:|---:|---:|---:|---:|"]
     for m, r in results["methods"].items():
+        if m in WINDOW_CHECK[1:]:
+            continue
         a, ci = r["all"], r["all"]["AC@1_ci95"]
         per = " | ".join(f"{_pct(g['AC@1'])} / {g['Avg@5']:.2f}" if g["n"] else "not run"
                          for g in (r[f"system {s}"] for s in "ABC"))
@@ -182,8 +201,9 @@ def table(results: dict) -> str:
 def fault_table(results: dict) -> str:
     faults = list(next(iter(results["methods"].values()))["by_fault"])
     rows = ["| Method (AC@1 by fault) | " + " | ".join(faults) + " |", "|---|" + "---:|" * len(faults)]
-    for r in results["methods"].values():
-        rows.append(f"| {r['label']} | " + " | ".join(_pct(r["by_fault"][f].get("AC@1")) for f in faults) + " |")
+    for m, r in results["methods"].items():
+        if m not in WINDOW_CHECK[1:]:
+            rows.append(f"| {r['label']} | " + " | ".join(_pct(r["by_fault"][f].get("AC@1")) for f in faults) + " |")
     return "\n".join(rows)
 
 
@@ -191,9 +211,27 @@ def paired_table(results: dict) -> str:
     rows = ["| Agent vs | Paired cases | Only the agent right | Only the other right | McNemar p |",
             "|---|---:|---:|---:|---:|"]
     for agent, vs in results["paired"].items():
-        for m, p in vs.items():
+        for m, p in ((m, p) for m, p in vs.items() if m not in WINDOW_CHECK[1:]):
             rows.append(f"| {agent} vs {results['methods'][m]['label']} | {p['n']} | {p['only_first_right']} | "
                         f"{p['only_second_right']} | {p['mcnemar_p']:.2g} |")
+    return "\n".join(rows)
+
+
+def window_table(results: dict) -> str:
+    rows = ["| n-sigma window | AC@1 | Only the auto route right | Only n-sigma right | McNemar p |",
+            "|---|---:|---:|---:|---:|"]
+    for m in WINDOW_CHECK:
+        p = results["paired"]["auto"][m]
+        rows.append(f"| {LABELS[m]} | {results['methods'][m]['all']['AC@1']:.1%} | {p['only_first_right']} | "
+                    f"{p['only_second_right']} | {p['mcnemar_p']:.2g} |")
+    return "\n".join(rows)
+
+
+def prior_table(results: dict) -> str:
+    rows = ["| Method | First suspect wrong | ...and a service broken in another case |", "|---|---:|---:|"]
+    for m, w in results["wrong_first_suspects"].items():
+        if m not in WINDOW_CHECK[1:]:
+            rows.append(f"| {LABELS[m]} | {w['wrong']} | {w['names_a_root_cause_of_another_case']} |")
     return "\n".join(rows)
 
 
@@ -213,7 +251,7 @@ def main() -> None:
     results = build()
     check_official(results)
     (RUNS / "results.json").write_text(json.dumps(results, indent=1) + "\n")
-    for part in (table, fault_table, paired_table, sherlog_table):
+    for part in (table, fault_table, paired_table, sherlog_table, window_table, prior_table):
         print(part(results), end="\n\n")
     print(f"metered live spend, dev and test: ${results['metered_spend_usd']}; official cross-check: "
           f"{results.get('official_match', 'not run')}")

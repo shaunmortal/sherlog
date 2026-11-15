@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import sys
 import threading
 import time
@@ -35,6 +36,7 @@ RUNS = ROOT / "runs" / "real-benchmark"
 SPLIT = RUNS / "split.json"
 NO_AI = {"zscore": sim.zscore_ranking, "robust": sim.robust_ranking, "graph": investigate.graph_ranking}
 LIVE = {"auto": investigate.AUTO, "opus": investigate.MODELS["opus"]}
+SEED = 2026  # the order of the recorded test runs: random.Random(2026).shuffle over split.json's test ids
 RETRIES = 2  # whole-case retries after an API failure the SDK's own retries did not absorb
 API_TIMEOUT_SECONDS, API_RETRIES = 300, 4
 
@@ -114,6 +116,12 @@ def run_no_ai(case_id: str, path: Path, method: str) -> dict:
             "ranks": list(NO_AI[method](inc))}
 
 
+def seeded(ids: list[str], seed: int) -> list[str]:
+    order = list(ids)
+    random.Random(seed).shuffle(order)
+    return order
+
+
 def done_ids(path: Path) -> set[str]:
     return {json.loads(line)["case_id"] for line in path.read_text().splitlines()} if path.exists() else set()
 
@@ -124,6 +132,9 @@ def main() -> None:
     parser.add_argument("--set", choices=("dev", "test"), required=True)
     parser.add_argument("--method", choices=(*NO_AI, *LIVE), required=True)
     parser.add_argument("--cases", nargs="*", help="only these case ids (in this order)")
+    parser.add_argument("--seed", type=int, default=SEED,
+                        help="without --cases, the set's cases in this seeded random order, so a run the budget "
+                             "stops leaves a random remainder")
     parser.add_argument("--limit", type=int, help="at most this many cases")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--budget-usd", type=float, default=0.0, help="live methods: stop before this much spend")
@@ -132,7 +143,7 @@ def main() -> None:
     args = parser.parse_args()
 
     split = json.loads(SPLIT.read_text())
-    ids = args.cases or split[args.set]
+    ids = args.cases or seeded(split[args.set], args.seed)
     assert set(ids) <= set(split[args.set]), "a case outside the chosen set"
     out = RUNS / args.set / f"{args.method}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
