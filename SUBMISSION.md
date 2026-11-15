@@ -112,9 +112,11 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
   `HEAD` for uptime monitors, a scheduled workflow checks the live health endpoint every 30 minutes, `/docs`
   describes every route, `requirements.txt` pins the exact versions the tests pass with, and all three pages
   carry a link preview image.
-- **Tests:** 204 pytest tests in CI (the agent loop and the auto route against a scripted fake model, the
+- **Tests:** 1,200 pytest tests in CI, 933 of which re-run every recorded run from its seed and compare its tool
+  results exactly (the agent loop and the auto route against a scripted fake model, the
   call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format,
-  uploads with their own call graph, and a guard that the shop's prompt and tool schemas never change),
+  uploads with their own call graph, the MCP connector, and a guard that the shop's prompt and tool schemas never
+  change),
   plus 12 browser end-to-end checks.
 - **AI tools used:** Claude Code as a pair programmer; Claude Haiku, Sonnet and Opus 5.5 inside the product.
   Claude Code wrote and tested code under our direction, several features at once in separate agent
@@ -212,7 +214,7 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-c
 4. Console, Your data, **Use** the shop sample, **Triage (no AI)**: the alarm, the z-score and robust z-score
    rankings and the blast-radius check. Then **Use** a custom-graph sample and **Triage** again: an upload
    with its own call graph of six services replaces the shop on the charts and the map.
-5. In a clone: `pytest -q` (204 passed, 1 skipped) and `python bench.py --report`, which recomputes every
+5. In a clone: `pytest -q` (1,200 passed, 1 skipped) and `python bench.py --report`, which recomputes every
    table from the recorded runs with no API calls.
 
 ---

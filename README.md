@@ -32,7 +32,7 @@
 </p>
 <p align="center"><sub>Every number is in <a href="runs/evidence.json"><code>runs/evidence.json</code></a>, from the recorded runs. The shop is simulated, so the absolute numbers are optimistic: see <a href="#limitations">Limitations</a>.</sub></p>
 
-**Contents:** [Built for IceHacks](#built-for-icehacks-2026) · [See it work](#see-it-work) · [Who it is for](#who-it-is-for) · [Evaluate it in 5 minutes](#evaluate-it-in-5-minutes) · [What's new](#whats-new-here) · [Try it in 30 seconds](#try-it-in-30-seconds) · [How it works](#how-it-works) · [Results](#results) · [Accessibility](#accessibility) · [Reliability](#reliability) · [Bring your own outage](#bring-your-own-outage) · [Reproduce](#reproduce) · [Layout](#repository-layout) · [Limitations](#limitations) · [How it was built](#how-it-was-built)
+**Contents:** [Built for IceHacks](#built-for-icehacks-2026) · [See it work](#see-it-work) · [Who it is for](#who-it-is-for) · [Evaluate it in 5 minutes](#evaluate-it-in-5-minutes) · [What's new](#whats-new-here) · [Try it in 30 seconds](#try-it-in-30-seconds) · [How it works](#how-it-works) · [Results](#results) · [Accessibility](#accessibility) · [Reliability](#reliability) · [Bring your own outage](#bring-your-own-outage) · [MCP](#use-it-from-claude-mcp) · [Reproduce](#reproduce) · [Layout](#repository-layout) · [Limitations](#limitations) · [How it was built](#how-it-was-built)
 
 ---
 
@@ -43,7 +43,7 @@ Sherlog was built during IceHacks 2026, on Nov 14 and 15 (IST), with Claude Code
 | Track | Why it fits, and where to check |
 |---|---|
 | **Best&nbsp;AI&nbsp;Hack** | A Claude agent investigates with read-only tools and must cite the tool calls behind each suspect. Plain code checks every citation, and a replay with the answer rolled back tests it. Benchmarked on 176 held-out outages against three no-AI rules: in hard mode the Opus agent named the cause first in 43 of 44 and never answered wrong.<br>**Check it:** [What's new](#whats-new-here) · [How it works](#how-it-works) · [Results](#results) · [a caught wrong answer](https://sherlog-jade.vercel.app/console#replay/177) |
-| **Best&nbsp;Deployed&nbsp;App** | Live, with a status page and a health endpoint. All 183 recorded investigations replay with no API key; live runs are rate-limited and fail with a clear reason; 204 tests run in CI on every push; a scheduled check calls the live health endpoint every 30 minutes.<br>**Check it:** [Live site](https://sherlog-jade.vercel.app) · [`/status`](https://sherlog-jade.vercel.app/status) · [`/api/health`](https://sherlog-jade.vercel.app/api/health) · [CI](https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml) · [uptime check](.github/workflows/uptime.yml) · [Reliability](#reliability) |
+| **Best&nbsp;Deployed&nbsp;App** | Live, with a status page and a health endpoint. All 183 recorded investigations replay with no API key; live runs are rate-limited and fail with a clear reason; 1,200 tests run in CI on every push, 933 of them re-running every recorded run from its seed; an MCP connector at `/mcp` lets Claude use it as a tool; a scheduled check calls the live health endpoint every 30 minutes.<br>**Check it:** [Live site](https://sherlog-jade.vercel.app) · [`/status`](https://sherlog-jade.vercel.app/status) · [`/api/health`](https://sherlog-jade.vercel.app/api/health) · [CI](https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml) · [uptime check](.github/workflows/uptime.yml) · [Reliability](#reliability) |
 | **Best&nbsp;Design&nbsp;&amp;&nbsp;UX** | A scroll story you can play: guess which service broke, then watch the agent investigate, check and roll back. Built to WCAG 2.2 AA, with 0 axe-core violations on all three pages in both themes, at desktop and phone sizes; full keyboard use, screen-reader announcements and pausable motion.<br>**Check it:** [Story page](https://sherlog-jade.vercel.app) · [Console](https://sherlog-jade.vercel.app/console) · [Accessibility](#accessibility) |
 
 ## See it work
@@ -81,7 +81,7 @@ Sherlog was built during IceHacks 2026, on Nov 14 and 15 (IST), with Claude Code
 | 2:40–3:00 | [`/console#replay/41`](https://sherlog-jade.vercel.app/console#replay/41) | A recorded outage, free, in about 11 s. The z-score ranking blames `cart`; the agent names `cache`, 90% sure, citing calls `c0`, `c1` and `c3`, all verified; rolling `cache` back clears all four broken services. |
 | 3:00–3:30 | [`/console#replay/177`](https://sherlog-jade.vercel.app/console#replay/177) (C1 in the Replay tab) | A confident wrong answer the rollback stopped. In hard mode the Haiku agent names `cart`, the decoy, 85% sure, with its citations verified, so it goes out; rolling `cart` back leaves `frontend` abnormal and the alarm on, so the rollback does not prove it. |
 | 3:30–4:00 | [Your data](https://sherlog-jade.vercel.app/console#data) → **Use** the shop sample → **Triage (no AI)**, then **Use** a custom-graph sample → **Triage** | No key needed. The alarm, the z-score ranking (`cart` first), the robust z-score (`cache` first) and the blast-radius check, which says `cache` would explain more of the outage than `cart`. The custom-graph sample brings its own call graph of six services, which replace the shop on the charts and the map. |
-| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 204 passed and 1 skipped (the browser checks, which need a running server), in about 18 s. `python bench.py --report`: every results table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
+| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 1,200 passed and 1 skipped (the browser checks, which need a running server), in about 32 s. `python bench.py --report`: every results table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
 
 ```bash
 uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q
@@ -289,10 +289,12 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 - **Link previews.** All three pages carry a share preview image, [`static/og.jpg`](static/og.jpg).
 - **Clear errors, never a hang.** Every live failure ends the stream with a reason the console shows: a missing or invalid key, a model the key cannot use, the API's rate limit, a timeout, no connection, an API error. The verdict then goes to a human. Each model call gives up after 120 s, with 1 retry.
 - **Limits.** Live runs are limited to 6 an hour per visitor and 200 a day. Over the limit you get a 429, and with live mode off a 503, each saying what to try instead. A bad upload gets a 422 that names the field; a body over 2 MB gets a 413.
-- **Tests.** 204 pytest tests run in CI on every push and pull request:
+- **Tests.** 1,200 pytest tests run in CI on every push and pull request:
   - 117 in [`test_core.py`](test_core.py): the simulator, the agent loop against a scripted fake model, the verifier, the blast radius, the rollback, the auto route and the call-graph rule
   - 32 in [`tests/test_api.py`](tests/test_api.py): every route and every failure path of a live run, `HEAD` answers, the API reference, the preview image and tags, replay numbering and the caught replays
-  - 25 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
+  - 26 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
+  - 62 in [`tests/test_mcp.py`](tests/test_mcp.py): the MCP connector's lifecycle, its five tools and their errors, and `llms.txt`
+  - 933 in [`tests/test_reproducibility.py`](tests/test_reproducibility.py): every recorded run re-simulated from its seed, its tool results compared exactly, its verdict re-checked by today's verifier, and every replay's checks pinned ([how](docs/reproducibility.md))
   - 30 in [`tests/test_topology.py`](tests/test_topology.py): uploads with their own call graph, from the checks on `calls` through triage, the tools, the agent and the routes to the converter, and a guard that the shop's prompt and tool schemas are byte for byte the ones the recorded runs used
 
   Twelve browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, a guess reveals the cause, its sections wait for a person to scroll to them but not for an automated screenshot (two checks), the console plays a recorded outage to its verdict, the first screen's button replays outage #41 with precise check labels and hands keyboard focus to the flight log, the phone's jump link lands focus on the verdict, a caught replay shows the rollback disproving its answer, triaging the sample afterwards replaces that outage on screen, even while paused, triaging the custom-graph sample draws its six services until a replay brings the shop back, and a triage started from the keyboard keeps focus on its button.
@@ -312,6 +314,16 @@ The alarm, both rankings, the call-graph rule, the blast-radius check and the ag
 
 ---
 
+## Use it from Claude (MCP)
+
+Sherlog is also an MCP server, free and read-only, with no key: it can list and open the recorded investigations, triage an uploaded outage with the no-AI checks, hand out the sample uploads and report the benchmark.
+
+```bash
+claude mcp add --transport http sherlog https://sherlog-jade.vercel.app/mcp
+```
+
+Tools: `list_recorded_outages`, `get_recorded_verdict`, `triage_incident`, `sample_incident`, `benchmark_summary`. [`docs/mcp.md`](docs/mcp.md) has the details and an example call; [`/llms.txt`](https://sherlog-jade.vercel.app/llms.txt) is a map of the project for AI tools.
+
 ## Reproduce
 
 Requires Python 3.12 or newer (CI runs 3.12) and uv.
@@ -320,7 +332,7 @@ Requires Python 3.12 or newer (CI runs 3.12) and uv.
 uv venv --python 3.13 && uv pip install -r requirements.txt
 cp .env.example .env                                  # then put your Anthropic API key in .env
 uv run --env-file .env uvicorn app:app --reload       # http://localhost:8000 (story), /console, /status
-uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 204 tests
+uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 1,200 tests
 ```
 
 Without an API key everything except live runs works: replays, the Evidence view, triage.
