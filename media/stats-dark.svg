@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="256" viewBox="0 0 1280 256" font-family="system-ui, sans-serif" role="img" aria-labelledby="t d">
 <title id="t">Sherlog in numbers</title>
-<desc id="d">Hard mode, with a decoy: the Opus agent named the cause first in 43 of 44 outages, with 0 wrong answers. Auto route: a median $0.0015 per outage, all 132 normal outages right. Rollback replay: 7 of 7 wrong answers caught, 0 of 83 right ones rejected. 183 recorded investigations replay free in the console, with no API key.</desc>
+<desc id="d">Hard mode, with a decoy: the Opus agent named the cause first in 43 of 44 outages, with 0 wrong answers. Auto route: a median $0.0015 per outage, all 132 normal outages right. Rollback replay, hard mode: 7 of 7 wrong answers caught, 0 of 83 right ones rejected. 183 recorded investigations replay free in the console, with no API key.</desc>
 <rect width="1280" height="256" rx="28" fill="#0b0c10"/>
 <rect x=".5" y=".5" width="1279" height="255" rx="27.5" fill="none" stroke="#22252f"/>
 <rect x="20.5" y="20.5" width="300.0" height="215" rx="18" fill="#12141b" stroke="#22252f"/>
@@ -12,9 +12,9 @@
 <text x="361.0" y="62" font-size="14" font-weight="600" letter-spacing="1.4" fill="#9599a8">AUTO ROUTE</text>
 <text x="358.0" y="138" font-size="68" letter-spacing="-2.6" fill="#f0f1fa">$0.0015</text>
 <text x="361.0" y="180" font-size="19" font-weight="600" fill="#f0f1fa">Median cost per outage</text>
-<text x="361.0" y="207" font-size="16" fill="#9599a8">all 132 normal ones right</text>
+<text x="361.0" y="207" font-size="16" fill="#9599a8">all 132 normal outages right</text>
 <rect x="646.5" y="20.5" width="300.0" height="215" rx="18" fill="#12141b" stroke="#22252f"/>
-<text x="674.0" y="62" font-size="14" font-weight="600" letter-spacing="1.4" fill="#9599a8">ROLLBACK REPLAY</text>
+<text x="674.0" y="62" font-size="14" font-weight="600" letter-spacing="1.4" fill="#9599a8">ROLLBACK · HARD MODE</text>
 <text x="671.0" y="138" font-size="68" letter-spacing="-2.6" fill="#f0f1fa">7<tspan font-size="40" letter-spacing="-.5" fill="#9599a8">/7</tspan></text>
 <text x="674.0" y="180" font-size="19" font-weight="600" fill="#f0f1fa">Wrong answers caught</text>
 <text x="674.0" y="207" font-size="16" fill="#9599a8">0 of 83 right ones rejected</text>
