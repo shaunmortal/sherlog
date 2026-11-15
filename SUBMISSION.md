@@ -32,7 +32,8 @@ checked by plain code, and we turned it into something anyone can play.
 - **Use it from your own Claude:** an MCP server where your model investigates and Sherlog's code checks its answer
   and says ship or hand to a human. Free, no key.
 - **Shipped:** a live site with free replays and keyless live runs, a status page, an API reference, a strict content
-  security policy, 1,744 tests and 49 browser checks in CI, and WCAG 2.2 AA on every page.
+  security policy, an 8-page docs section on the site, 1,813 tests and 73 browser checks in CI, and WCAG 2.2 AA on
+  every page.
 
 **On 252 real outages of a public benchmark**, three real microservice systems (12, 15 and 68 services) each broken
 on purpose by a known fault, Sherlog ranked the root cause first in **92%** (95% CI 88-95%), against 80% and 81% for
@@ -152,12 +153,12 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
 - **Real outages:** a converter from the public benchmark's cases to Sherlog's upload format, a dev/test split
   frozen before any live call, the published baselines re-run with the benchmark's own runner, scoring by its own
   evaluator, Wilson intervals and exact McNemar tests, and checks of n-sigma's window and of a learned prior.
-- **Tests:** 1,744 pytest tests in CI, 1,285 of which re-run every recorded run from its seed and compare its tool
+- **Tests:** 1,813 pytest tests in CI, 1,285 of which re-run every recorded run from its seed and compare its tool
   results exactly (the agent loop and the auto route against a scripted fake model, the
   call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format,
   uploads with their own call graph, the MCP connector, and a guard that the shop's prompt and tool schemas never
   change),
-  plus 49 browser end-to-end checks that run in CI against the app started on the runner (security policy,
+  plus 73 browser end-to-end checks that run in CI against the app started on the runner (security policy,
   404 page, layout shift, axe-core on five pages in both themes).
 - **AI tools used:** Claude Code as a pair programmer; Claude Haiku, Sonnet and Opus 5.5 inside the product.
   Claude Code wrote and tested code under our direction, several features at once in separate agent
@@ -261,6 +262,6 @@ model-context-protocol, fireworks-ai, glm-5.3, gpt-oss-120b, javascript, canvas,
 4. Console, Your data, **Use** the shop sample, **Triage (no AI)**: the alarm, the z-score and robust z-score
    rankings and the blast-radius check. Then **Use** a custom-graph sample and **Triage** again: an upload
    with its own call graph of six services replaces the shop on the charts and the map.
-5. In a clone: `pytest -q` (1,744 passed, 1 skipped), `python bench.py --report`, which recomputes every
+5. In a clone: `pytest -q` (1,813 passed, 1 skipped), `python bench.py --report`, which recomputes every
    controlled-benchmark table from the recorded runs with no API calls, and `python scripts/benchmark/report.py`,
    which recomputes every real-outage number.

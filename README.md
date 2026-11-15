@@ -32,7 +32,7 @@
 </p>
 <p align="center"><sub>The real-outage numbers are in <a href="runs/real-benchmark/results.json"><code>runs/real-benchmark/results.json</code></a> and the controlled benchmark's in <a href="runs/evidence.json"><code>runs/evidence.json</code></a>, both recomputed from the recorded runs with no API key.</sub></p>
 
-**Contents:** [Built for IceHacks](#built-for-icehacks-2026) · [Real outages](#real-outages-a-public-benchmark) · [Evaluate it in 5 minutes](#evaluate-it-in-5-minutes) · [See it work](#see-it-work) · [Who it is for](#who-it-is-for) · [What's new](#whats-new-here) · [Try it in 30 seconds](#try-it-in-30-seconds) · [How it works](#how-it-works) · [Controlled benchmark](#the-controlled-benchmark-decoy-mode-rollback-replay) · [Accessibility](#accessibility) · [Reliability](#reliability) · [Bring your own outage](#bring-your-own-outage) · [MCP](#use-it-from-claude-mcp) · [Reproduce](#reproduce) · [Layout](#repository-layout) · [Limitations](#limitations) · [How it was built](#how-it-was-built)
+**Contents:** [Built for IceHacks](#built-for-icehacks-2026) · [Real outages](#real-outages-a-public-benchmark) · [Evaluate it in 5 minutes](#evaluate-it-in-5-minutes) · [See it work](#see-it-work) · [Who it is for](#who-it-is-for) · [What's new](#whats-new-here) · [Try it in 30 seconds](#try-it-in-30-seconds) · [How it works](#how-it-works) · [Controlled benchmark](#the-controlled-benchmark-decoy-mode-rollback-replay) · [Accessibility](#accessibility) · [Reliability](#reliability) · [Bring your own outage](#bring-your-own-outage) · [MCP](#use-it-from-claude-mcp) · [Docs](#docs) · [Reproduce](#reproduce) · [Layout](#repository-layout) · [Limitations](#limitations) · [How it was built](#how-it-was-built)
 
 ---
 
@@ -43,7 +43,7 @@ Sherlog was built during IceHacks 2026, on Nov 14 and 15 (IST), with Claude Code
 | Track | Why it fits, and where to check |
 |---|---|
 | **Best&nbsp;AI&nbsp;Hack** | A Claude agent investigates with read-only tools and must cite the tool calls behind each suspect. Plain code checks every citation, and a replay with the answer rolled back tests it. **On 252 real outages of a public benchmark it ranked the root cause first in 92%, against 80–81% for the best published methods re-run on the same cases (against n-sigma, case by case, 40 to 9, p = 9.3e-6) and 83% for the same inputs without the AI**, for a median $0.0024 an outage. In the controlled benchmark's hard mode, the Opus agent named the cause first in 43 of 44 and never answered wrong.<br>**Check it:** [Real outages](#real-outages-a-public-benchmark) · [What's new](#whats-new-here) · [How it works](#how-it-works) · [a caught wrong answer](https://sherlog-jade.vercel.app/console#replay/177) |
-| **Best&nbsp;Deployed&nbsp;App** | Live, with a status page and a health endpoint. All 183 recorded investigations replay with no API key; live runs are rate-limited and fail with a clear reason; 1,744 tests and 49 browser checks run in CI on every push, 1,285 of the tests re-running every recorded run from its seed; every response carries a strict content security policy and the usual security headers; every real-outage number recomputes from the committed run records with no key; an MCP connector at `/mcp` lets Claude use it as a tool; an uptime check of the live health endpoint is scheduled every 30 minutes.<br>**Check it:** [Live site](https://sherlog-jade.vercel.app) · [`/status`](https://sherlog-jade.vercel.app/status) · [`/api/health`](https://sherlog-jade.vercel.app/api/health) · [CI](https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml) · [uptime check](.github/workflows/uptime.yml) · [Reliability](#reliability) |
+| **Best&nbsp;Deployed&nbsp;App** | Live, with a status page and a health endpoint. All 183 recorded investigations replay with no API key; live runs are rate-limited and fail with a clear reason; 1,813 tests and 73 browser checks run in CI on every push, 1,285 of the tests re-running every recorded run from its seed; every response carries a strict content security policy and the usual security headers; every real-outage number recomputes from the committed run records with no key; an MCP connector at `/mcp` lets Claude use it as a tool; an uptime check of the live health endpoint is scheduled every 30 minutes.<br>**Check it:** [Live site](https://sherlog-jade.vercel.app) · [`/status`](https://sherlog-jade.vercel.app/status) · [`/api/health`](https://sherlog-jade.vercel.app/api/health) · [CI](https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml) · [uptime check](.github/workflows/uptime.yml) · [Reliability](#reliability) |
 | **Best&nbsp;Design&nbsp;&amp;&nbsp;UX** | A scroll story you can play: guess which service broke, then watch the agent investigate, check and roll back; the story page's results and the console's evidence lead with the real outages. Built to WCAG 2.2 AA, with 0 axe-core violations on the story page, the console and the status page, in both themes, at desktop and phone sizes; full keyboard use, screen-reader announcements and pausable motion.<br>**Check it:** [Story page](https://sherlog-jade.vercel.app) · [Console](https://sherlog-jade.vercel.app/console) · [Accessibility](#accessibility) |
 
 ## Real outages: a public benchmark
@@ -87,7 +87,7 @@ Sherlog also ran on a real system of 8 services, each its own OS process calling
 | 3:10–3:25 | [`/console#replay/177`](https://sherlog-jade.vercel.app/console#replay/177) (C1 in the Replay tab) | A confident wrong answer the rollback stopped. In hard mode the Haiku agent names `cart`, the decoy, 85% sure, with its citations verified, so it goes out; rolling `cart` back leaves `frontend` abnormal and the alarm on, so the rollback does not prove it. |
 | 3:25–3:40 | [Your data](https://sherlog-jade.vercel.app/console#data) → **Use** the shop sample → **Triage (no AI)**, then **Use** a custom-graph sample → **Triage** | No key needed. The alarm, the z-score ranking (`cart` first), the robust z-score (`cache` first) and the blast-radius check, which says `cache` would explain more of the outage than `cart`. The custom-graph sample brings its own call graph of six services, which replace the shop on the charts and the map. |
 | 3:40–4:00 | [`docs/real-benchmark.md`](docs/real-benchmark.md), then in a clone `python scripts/benchmark/report.py` | The real outages: the protocol and every table. The script recomputes every number in [`runs/real-benchmark/results.json`](runs/real-benchmark/results.json) from the committed run records, with no key, in about 1 s, and stops if one differs from the benchmark's own evaluator. |
-| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 1,744 passed and 1 skipped (the browser checks, which need a running server), in about 35 s. `python bench.py --report`: every controlled-benchmark table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
+| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 1,813 passed and 1 skipped (the browser checks, which need a running server), in about 35 s. `python bench.py --report`: every controlled-benchmark table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
 
 ```bash
 uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q
@@ -319,7 +319,7 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 
 **How it was measured**
 
-- **axe-core 4.10.2**, with the WCAG 2.0, 2.1 and 2.2 A and AA rules plus best practices: **0 violations** on `/`, `/console` and `/status`, in light and dark, at 1440×900 and 390×844. The story page was also checked scrolled through, at the bottom and after a guess. The console was checked idle, on the replay list, while a replay plays, after a replay's verdict, on the Evidence view, and after triaging the shop sample and the custom-graph sample in Your data.
+- **axe-core 4.10.2**, with the WCAG 2.0, 2.1 and 2.2 A and AA rules plus best practices: **0 violations** on `/`, `/console` and `/status`, on `/guide` and every docs page, and on `/docs` (Swagger UI in our own page, also after Try it out), in light and dark, at 1440×900 and 390×844. The story page was also checked scrolled through, at the bottom and after a guess. The console was checked idle, on the replay list, while a replay plays, after a replay's verdict, on the Evidence view, and after triaging the shop sample and the custom-graph sample in Your data.
 - **Lighthouse accessibility: 100** on the story page, the console and the status page, with its mobile and desktop settings.
 
 **Not covered:** forced-colors (high contrast) mode was not tested, and no one who relies on a screen reader or other assistive technology has tested the pages. Automated checks find only some kinds of barrier.
@@ -333,6 +333,7 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 - **Uptime.** Every page and `/api/health` answer `HEAD` as well as `GET`, because uptime monitors send `HEAD`. A workflow, [`uptime.yml`](.github/workflows/uptime.yml), is scheduled every 30 minutes to check the live health endpoint both ways.
 - **API reference.** [`/reference`](https://sherlog-jade.vercel.app/reference) lists every route with its parameters and request body, built from the server's OpenAPI schema in the site's own accessible style; [`/openapi.json`](https://sherlog-jade.vercel.app/openapi.json) is the schema, and Swagger UI at [`/docs`](https://sherlog-jade.vercel.app/docs) lets developers try each route.
 - **Security headers.** Every response carries a content security policy with no `'unsafe-inline'` and no `'unsafe-eval'` (each page's own inline code is allowed by its SHA-256 hash), `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-Frame-Options: DENY`, a `Permissions-Policy` and `Cross-Origin-Opener-Policy`. A browser check loads every page with the policy enforced and expects no violation.
+- **Pinned CDN files.** Every CDN file is pinned to an exact version with Subresource Integrity, and the content security policy allows only those two package folders on the CDN.
 - **For crawlers and security researchers.** [`/robots.txt`](https://sherlog-jade.vercel.app/robots.txt), [`/sitemap.xml`](https://sherlog-jade.vercel.app/sitemap.xml) and [`/.well-known/security.txt`](https://sherlog-jade.vercel.app/.well-known/security.txt).
 - **Dead links.** An unknown address shows a 404 page in the site's style, in both themes; API clients still get JSON.
 - **No layout shift.** The console keeps every box in place while its data loads; a browser check measures under 0.1 on `/`, `/console` and `/status`, on a phone and a laptop.
@@ -340,7 +341,7 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 - **Link previews.** All three pages carry a share preview image, [`static/og.jpg`](static/og.jpg).
 - **Clear errors, never a hang.** Every live failure ends the stream with a reason the console shows: a missing or invalid key, a model the key cannot use, the API's rate limit, a timeout, no connection, an API error. The verdict then goes to a human. Each model call gives up after 120 s, with 1 retry.
 - **Limits.** Live runs are limited to 6 an hour per visitor and 200 a day. Over the limit you get a 429, and with live mode off a 503, each saying what to try instead. A bad upload gets a 422 that names the field; a body over 2 MB gets a 413.
-- **Tests.** 1,744 pytest tests run in CI on every push and pull request:
+- **Tests.** 1,813 pytest tests run in CI on every push and pull request:
   - 117 in [`test_core.py`](test_core.py): the simulator, the agent loop against a scripted fake model, the verifier, the blast radius, the rollback, the auto route and the call-graph rule
   - 33 in [`tests/test_api.py`](tests/test_api.py): every route and every failure path of a live run, `HEAD` answers, the API reference, the preview image and tags, replay numbering, the caught replays and the story page's real-outage line
   - 26 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
@@ -350,11 +351,12 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
   - 30 in [`tests/test_topology.py`](tests/test_topology.py): uploads with their own call graph, from the checks on `calls` through triage, the tools, the agent and the routes to the converter, and a guard that the shop's prompt and tool schemas are byte for byte the ones the recorded runs used
   - 20 in [`tests/test_metrics.py`](tests/test_metrics.py): uploads that bring their own metric names, a service reporting only some of them
   - 8 in [`tests/test_benchmark_adapter.py`](tests/test_benchmark_adapter.py): the converter of the public benchmark's cases, on synthetic rows
+  - 48 in [`tests/test_guide.py`](tests/test_guide.py): the docs pages' renderer (escaping, links, tables, code, heading ids), their routes, and that every internal link and anchor resolves
   - 55 in [`tests/test_site.py`](tests/test_site.py): the security headers and the policy's hashes, robots.txt, the sitemap, security.txt, the 404 page, the API reference, and the console's first paint matching what it shows once loaded
   - 22 in [`tests/test_testbed.py`](tests/test_testbed.py): the real multi-process testbed's fault schedule, telemetry conversion, rollback decision, teardown and Prometheus path
   - 16 in [`tests/test_openmodel.py`](tests/test_openmodel.py): the adapter that runs the same agent loop on open-weights models, against a fake HTTP transport
 
-  49 browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run in CI against the app started on the runner with no API key, among them: the content security policy on every page with no violation, an injected inline script blocked, the 404 page, layout shift under 0.1 on three pages at phone and laptop size, axe-core on five pages in light and dark at 1440 and 390 wide, and these: the story page loads with no console errors, its one `h1` is its visible headline and its results lead with the real outages, a guess reveals the cause, its sections wait for a person to scroll to them but not for an automated screenshot (two checks), the console plays a recorded outage to its verdict, the first screen's button replays outage #41 with precise check labels and hands keyboard focus to the flight log, the phone's jump link lands focus on the verdict, a caught replay shows the rollback disproving its answer, triaging the sample afterwards replaces that outage on screen, even while paused, triaging the custom-graph sample draws its six services until a replay brings the shop back, a triage started from the keyboard keeps focus on its button, the header's link opens the real outages in Evidence, **Skip to verdict** plays the rest of a recording to the same verdict, and a verdict is brought into view and ringed when it lands.
+  73 browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run in CI against the app started on the runner with no API key, among them: the content security policy on every page with no violation, an injected inline script blocked, the 404 page, layout shift under 0.1 on three pages at phone and laptop size, axe-core on five pages in light and dark at 1440 and 390 wide, and these: the story page loads with no console errors, its one `h1` is its visible headline and its results lead with the real outages, a guess reveals the cause, its sections wait for a person to scroll to them but not for an automated screenshot (two checks), the console plays a recorded outage to its verdict, the first screen's button replays outage #41 with precise check labels and hands keyboard focus to the flight log, the phone's jump link lands focus on the verdict, a caught replay shows the rollback disproving its answer, triaging the sample afterwards replaces that outage on screen, even while paused, triaging the custom-graph sample draws its six services until a replay brings the shop back, a triage started from the keyboard keeps focus on its button, the header's link opens the real outages in Evidence, **Skip to verdict** plays the rest of a recording to the same verdict, and a verdict is brought into view and ringed when it lands.
 
 ---
 
@@ -381,6 +383,22 @@ claude mcp add --transport http sherlog https://sherlog-jade.vercel.app/mcp
 
 Then type `/mcp__sherlog__investigate_outage 41` in Claude Code. Investigation tools: `top_anomalies`, `get_metric`, `get_logs`, `get_dependencies`, then `check_answer` (ship, or hand to a human) and `reveal_truth` to score the run. The others list and open the recorded investigations (`list_recorded_outages`, `get_recorded_verdict`), triage telemetry with the no-AI checks (`triage_incident`, `sample_incident`) and report the benchmark (`benchmark_summary`). **Tried with a real model:** on the live server, Claude Haiku 5.5 investigated #41 in 11 calls, named `cache`, and `check_answer` verified it and said ship; `reveal_truth` agreed, for $0.0067 ([`scripts/claude_over_mcp.py`](scripts/claude_over_mcp.py)). [`docs/mcp.md`](docs/mcp.md) has a walkthrough of outage #41; [`/llms.txt`](https://sherlog-jade.vercel.app/llms.txt) is a map of the project for AI tools.
 
+## Docs
+
+The docs are on the site, rendered by the server from this repository's markdown: **[sherlog-jade.vercel.app/guide](https://sherlog-jade.vercel.app/guide)**.
+
+| Page | What it covers |
+|---|---|
+| [How it works](https://sherlog-jade.vercel.app/guide/how-it-works) | The alarm, the agent and its read-only tools, the citation verifier, the 80% rule, the blast radius and the rollback replay |
+| [Real outages](https://sherlog-jade.vercel.app/guide/real-benchmark) | 252 held-out real outages of a public benchmark: the protocol, every table, the limitations |
+| [A real running system](https://sherlog-jade.vercel.app/guide/real-system) | 30 outages on eight real services, with real faults and real rollbacks |
+| [MCP connector](https://sherlog-jade.vercel.app/guide/mcp) | Connect, investigate an outage with your own Claude, every tool with an example |
+| [Bring your own outage](https://sherlog-jade.vercel.app/guide/bring-your-own) | The upload format, what is checked, a converter for metric range-query exports |
+| [Open-weights models](https://sherlog-jade.vercel.app/guide/open-model) | Two open-weights models behind the same gate |
+| [Reproducibility](https://sherlog-jade.vercel.app/guide/reproducibility) | Every recorded run re-run from its seed, and a mutation check |
+
+Also: the [API reference](https://sherlog-jade.vercel.app/reference), built from the server's own schema; [Swagger UI](https://sherlog-jade.vercel.app/docs) to try each route; and [llms.txt](https://sherlog-jade.vercel.app/llms.txt).
+
 ## Reproduce
 
 Requires Python 3.12 or newer (CI runs 3.12) and uv.
@@ -389,7 +407,7 @@ Requires Python 3.12 or newer (CI runs 3.12) and uv.
 uv venv --python 3.13 && uv pip install -r requirements.txt
 cp .env.example .env                                  # then put your Anthropic API key in .env
 uv run --env-file .env uvicorn app:app --reload       # http://localhost:8000 (story), /console, /status
-uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 1,744 tests
+uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 1,813 tests
 ```
 
 Without an API key everything except live runs works: replays, the Evidence view, triage.
