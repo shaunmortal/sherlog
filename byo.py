@@ -3,6 +3,7 @@ same alarm, tools, verifier and blast-radius check run on it. See docs/bring-you
 
 The dependency tool and the blast-radius check reason over a call graph. A document brings its own in `calls`
 (each service and the services it calls), or leaves it out and maps its services onto the shop's 11 (sim.CALLS).
+It may also name its own metrics in `metrics`; then each service reports one or more of them.
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from functools import lru_cache
 from typing import Annotated, Literal
 
 from pydantic import (AfterValidator, BaseModel, ConfigDict, Field, FiniteFloat, TypeAdapter, ValidationError,
-                      ValidationInfo, create_model, field_validator)
+                      ValidationInfo, create_model, field_validator, model_validator)
 from pydantic_core import InitErrorDetails, PydanticCustomError
 
 import investigate
@@ -21,11 +22,14 @@ FORMAT = "sherlog-incident/1"
 LEVELS = ("INFO", "WARN", "ERROR")
 MAX_LOG_LINES = 2000
 MAX_LOG_CHARS = 500
-MIN_SERVICES, MAX_SERVICES = 2, 40
+# a 64-service system sending 7 metrics is about 0.5 MB of series, well inside the request body cap
+MIN_SERVICES, MAX_SERVICES = 2, 80
+MAX_METRICS = 10
 MAX_NAME_CHARS = 40
 # lowercase words joined by dashes, so a name reads the same in a log line, a URL or a metric label
 SERVICE_NAME = re.compile(rf"[a-z](?:[a-z0-9-]{{0,{MAX_NAME_CHARS - 2}}}[a-z0-9])?")
 RPC_NAME = re.compile(rf"[A-Za-z][A-Za-z0-9_]{{0,{MAX_NAME_CHARS - 1}}}")
+METRIC_NAME = re.compile(rf"[a-z][a-z0-9_]{{0,{MAX_NAME_CHARS - 1}}}")
 # the downloadable sample: the classic ranking blames cart, a loud victim; the blast-radius check points at cache
 SAMPLE = ("cache", "latency", 5)
 # the custom-graph sample: six of the sample's services under other names and RPCs, wired as their own call graph
@@ -36,6 +40,8 @@ _STRICT = ConfigDict(extra="forbid", strict=True)  # a typo must fail loudly, no
 
 
 def _within_limits(metric: str):
+    if metric not in sim.LIMITS:  # an upload's own metric: any finite number
+        return lambda values: values
     lo, hi = sim.LIMITS[metric]
     allowed = f"at least {lo:g}" if hi is None else f"between {lo:g} and {hi:g}"
 
@@ -57,11 +63,26 @@ def _ticks(metric: str):
 Metrics = create_model("Metrics", __config__=_STRICT, **{m: (_ticks(m), ...) for m in sim.METRICS})
 
 
+def _reports_one(model: BaseModel) -> BaseModel:
+    if all(v is None for v in model.__dict__.values()):
+        raise ValueError("reports none of the metrics in metrics; give it at least one")
+    return model
+
+
 @lru_cache(maxsize=32)
-def _series_model(services: tuple[str, ...]) -> type[BaseModel]:
-    """Every one of these services, no other, each with every metric. The fields are aliased because a name like
-    api-gateway is not a Python identifier."""
-    fields = {f"s{i}": (Metrics, Field(alias=s)) for i, s in enumerate(services)}
+def _own_metrics_model(metrics: tuple[str, ...]) -> type[BaseModel]:
+    """One service's series under an upload's own metric names: any of them, at least one, no other."""
+    fields = {f"m{i}": (_ticks(m) | None, Field(None, alias=m)) for i, m in enumerate(metrics)}
+    at_least_one = {"one": model_validator(mode="after")(_reports_one)}
+    return create_model("OwnMetrics", __config__=_STRICT, __validators__=at_least_one, **fields)
+
+
+@lru_cache(maxsize=32)
+def _series_model(services: tuple[str, ...], metrics: tuple[str, ...] | None = None) -> type[BaseModel]:
+    """Every one of these services, no other, each with every metric (or, under its own metric names, with some of
+    them). The fields are aliased because a name like api-gateway is not a Python identifier."""
+    each = Metrics if metrics is None else _own_metrics_model(metrics)
+    fields = {f"s{i}": (each, Field(alias=s)) for i, s in enumerate(services)}
     return create_model("Series", __config__=_STRICT, **fields)
 
 
@@ -85,6 +106,25 @@ def _rpc_name(name: str) -> str:
 
 
 ServiceName = Annotated[str, AfterValidator(_service_name)]
+
+
+def _metric_name(name: str) -> str:
+    if not METRIC_NAME.fullmatch(name):
+        raise ValueError(f"{_shown(name)} is not a valid metric name: use 1 to {MAX_NAME_CHARS} lowercase letters, "
+                         "digits and underscores, starting with a letter")
+    return name
+
+
+def _each_once(names: list[str]) -> list[str]:
+    twice = next((n for n in names if names.count(n) > 1), None)
+    if twice:
+        raise ValueError(f"{twice} is listed twice")
+    return names
+
+
+# an upload's own metric names; latency_ms, error_rate, cpu_pct and memory_mb keep their units and limits
+OwnMetrics = Annotated[list[Annotated[str, AfterValidator(_metric_name)]],
+                       Field(min_length=1, max_length=MAX_METRICS), AfterValidator(_each_once)]
 
 
 def _graph(calls: dict[str, list[str]]) -> dict[str, list[str]]:
@@ -126,15 +166,19 @@ class IncidentDoc(BaseModel):
     # before series, rpc and logs, which are checked against its services
     calls: Calls | None = None
     rpc: dict[ServiceName, Annotated[str, AfterValidator(_rpc_name)]] | None = None
+    metrics: OwnMetrics | None = None
     series: dict[str, Metrics]
     logs: list[LogEntry] = Field(default_factory=list, max_length=MAX_LOG_LINES)
 
-    @field_validator("series", mode="plain", json_schema_input_type=dict[str, Metrics])
+    @field_validator("series", mode="plain",
+                     json_schema_input_type=dict[str, Metrics] | dict[str, dict[str, list[FiniteFloat]]])
     @classmethod
     def _series_of_these_services(cls, series, info: ValidationInfo) -> dict:
-        if "calls" not in info.data:  # calls was refused, so there is nothing to check the series against
+        if "calls" not in info.data or "metrics" not in info.data:  # refused: nothing to check the series against
             return series
-        return _series_model(services_of(info.data["calls"])).model_validate(series).model_dump(by_alias=True)
+        metrics = info.data["metrics"]
+        model = _series_model(services_of(info.data["calls"]), None if metrics is None else tuple(metrics))
+        return model.model_validate(series).model_dump(by_alias=True, exclude_none=metrics is not None)
 
     @field_validator("rpc")
     @classmethod
@@ -212,18 +256,23 @@ def to_incident(doc: IncidentDoc) -> sim.Incident:
     series = {s: {m: tuple(v) for m, v in metrics.items()} for s, metrics in doc.series.items()}
     logs = tuple(sim.LogLine(e.tick, e.service, e.level, e.text, about(e.service, e.text, names))
                  for e in sorted(doc.logs, key=lambda e: e.tick))  # the log tool shows the newest lines last
-    return sim.Incident(root=None, fault=None, seed=0, onset=-1, series=series, logs=logs, calls=calls)
+    metrics = sim.METRICS if doc.metrics is None else tuple(doc.metrics)
+    return sim.Incident(root=None, fault=None, seed=0, onset=-1, series=series, logs=logs, calls=calls,
+                        metrics=metrics)
 
 
 def export(inc: sim.Incident) -> dict:
     """An outage as a document, without what only the simulator knows: the culprit, fault, seed, decoy, and each
-    line's "about" (a reader derives that from the text). An upload's own call graph is kept."""
+    line's "about" (a reader derives that from the text). An upload's own call graph and metrics are kept."""
     graph = {} if inc.calls is None else {"calls": {s: list(c) for s, c in inc.calls.items()}}
+    shop_metrics = inc.metrics == sim.METRICS and all(inc.measured[s] == sim.METRICS for s in inc.services)
+    own = {} if shop_metrics else {"metrics": list(inc.metrics)}
     return {
         "format": FORMAT,
         "tick_seconds": sim.TICK_SECONDS,
         **graph,
-        "series": {s: {m: list(inc.series[s][m]) for m in sim.METRICS} for s in inc.services},
+        **own,
+        "series": {s: {m: list(inc.series[s][m]) for m in inc.measured[s]} for s in inc.services},
         "logs": [{"tick": x.tick, "service": x.service, "level": x.level, "text": x.text} for x in inc.logs],
     }
 

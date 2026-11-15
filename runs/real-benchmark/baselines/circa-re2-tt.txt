@@ -1,0 +1,4 @@
+not run on this system.
+A run of the benchmark's runner (main.py --method circa --dataset re2-tt) on a data tree holding a single case of
+this system was stopped by a 600 s timeout before it finished (2026-11-15, about 11:31 IST, on the 8 GB machine
+the rest ran on). At that rate the 90 cases would take more than 15 hours.

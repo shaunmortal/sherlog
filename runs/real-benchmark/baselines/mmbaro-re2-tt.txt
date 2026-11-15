@@ -1,0 +1,11 @@
+56 s, 1 case(s) left out
+left out (main.py stopped on it): a case, ValueError: Found array with 0 sample(s) (shape=(0, 1)) while a minimum of 1 is required by RobustScaler.
+--- Evaluation results ---
+Avg@5-CPU:   0.75
+Avg@5-MEM:   0.99
+Avg@5-DISK:  1.0
+Avg@5-SOCKET: 0.79
+Avg@5-DELAY: 0.61
+Avg@5-LOSS:  0.71
+---
+Avg speed: 0.29

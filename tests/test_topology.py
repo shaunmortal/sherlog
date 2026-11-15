@@ -84,7 +84,7 @@ def _many_services(doc):
     (lambda d: d["calls"]["orders"].append("payments"), ["body", "calls"], "orders lists payments twice"),
     (_rename_auth, ["body", "calls", "Auth", "[key]"], "'Auth' is not a valid service name"),
     (lambda d: d["calls"]["gateway"].append("pay ments"), ["body", "calls", "gateway", 2], "not a valid service name"),
-    (_many_services, ["body", "calls"], "at most 40"),
+    (_many_services, ["body", "calls"], f"at most {byo.MAX_SERVICES}"),
     (lambda d: d.update(calls={"gateway": []}), ["body", "calls"], "at least 2"),
     (lambda d: d["logs"][0].update(service="cart"), ["body", "logs", 0, "service"],
      "'cart' is not one of the 5 services in calls"),
