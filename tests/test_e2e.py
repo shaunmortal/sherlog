@@ -76,6 +76,8 @@ def test_the_first_screen_button_replays_outage_41_with_precise_labels(page, err
     sync_api.expect(verdict).to_contain_text("victim of cache")
     page.get_by_role("tab", name="LIVE").click()
     sync_api.expect(page.locator("#metaMode")).not_to_have_text("replay")
+    # the charts still play the recording's last ticks, so their badge must not call them live
+    assert page.locator("#liveText").text_content() != "LIVE"
     assert errors == []
 
 

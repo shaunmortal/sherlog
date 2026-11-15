@@ -582,7 +582,8 @@ function showView(name) {
   $('#dataPanel').hidden = name !== 'data';
   $('#console').hidden = name === 'evidence';
   $('#evidence').hidden = name !== 'evidence';
-  if (name === 'live' && META && !state.running) onScreen(null);  // back to choosing a live run, unless a replay still plays
+  // back to choosing a live run, unless a replay still plays; the badge keeps naming a recording the charts still show
+  if (name === 'live' && META && !state.running) nameRun(null);
   placeInks();
   const cells = { live: '#breakPanel .cell', replay: '#replayPanel .cell', data: '#dataPanel .cell' }[name];
   if (name === 'evidence') return;  // its blocks reveal as they scroll into view
@@ -884,13 +885,18 @@ function setLive(on) {
   $('#liveText').textContent = !on || still ? 'PAUSED' : recorded ? `REPLAY ${recorded.label} · recorded` : 'LIVE';
 }
 
-/** The header and the telemetry badge say what the charts show: a recorded run and the model that ran it, or the live shop. */
+/** The telemetry badge says what the charts show, a recorded run or the live shop, and the header names it too. */
 function onScreen(source) {
   recorded = source;
-  const picked = pick.model === 'auto' ? `${META.models.haiku} → ${META.models.opus}` : META.models[pick.model];
-  $('#metaModel').textContent = recorded?.model ?? picked;
-  $('#metaMode').textContent = recorded ? 'replay' : META.live ? 'live' : 'replays only';
+  nameRun(source);
   setLive(playing);
+}
+
+/** The header: a recorded run and the model that ran it, or the live run being chosen. */
+function nameRun(source) {
+  const picked = pick.model === 'auto' ? `${META.models.haiku} → ${META.models.opus}` : META.models[pick.model];
+  $('#metaModel').textContent = source?.model ?? picked;
+  $('#metaMode').textContent = source ? 'replay' : META.live ? 'live' : 'replays only';
 }
 
 /** Pause or resume everything that moves on its own: the charts' clock and the looping animations. */
@@ -1413,7 +1419,7 @@ function renderModels(ev) {
   const choose = (k) => {
     pick = { ...pick, model: k };
     for (const grid of grids) press(grid, k);
-    onScreen(recorded);  // the header names the pick, unless a replay is on screen
+    nameRun(state.running ? recorded : null);  // the header names the pick, unless a replay is playing
     renderCost(k);
     $('#modelDesc').textContent = `${MODEL_HINT[k]} Numbers: cause named first, median cost per outage on the benchmark.`;
   };
