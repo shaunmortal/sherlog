@@ -77,6 +77,10 @@ BASE = {
 METRICS = ("latency_ms", "error_rate", "cpu_pct", "memory_mb")
 # a quiet service can go many ticks without a single error; one failed request out of 40 is not an alarm
 STD_FLOOR = {"latency_ms": 2.0, "error_rate": 0.01, "cpu_pct": 1.5, "memory_mb": 6.0}
+# an upload's own metric (bytes, cores, sockets...) has no floor of its own: a wobble under 1% of its normal level
+# is not an alarm, whatever its unit; one that is flat at zero gets a tiny floor so a z-score is still defined
+GENERIC_FLOOR_SHARE = 0.01
+GENERIC_FLOOR_MIN = 1e-6
 LIMITS = {"latency_ms": (0.1, None), "error_rate": (0.0, 1.0), "cpu_pct": (0.0, 100.0), "memory_mb": (1.0, None)}
 DECIMALS = {"latency_ms": 1, "error_rate": 4, "cpu_pct": 1, "memory_mb": 0}
 
@@ -94,6 +98,13 @@ RED_HERRINGS = (
     "retrying connection to config server (attempt 2)", "GC pause 140 ms",
     "slow query log: 310 ms", "TLS certificate expires in 21 days",
 )
+
+
+def std_floor(metric: str, mean: float) -> float:
+    """The smallest spread a metric's baseline is given, so a quiet baseline cannot turn noise into an alarm."""
+    if metric in STD_FLOOR:
+        return STD_FLOOR[metric]
+    return max(GENERIC_FLOOR_SHARE * abs(mean), GENERIC_FLOOR_MIN)
 
 
 @dataclass(frozen=True)
@@ -116,6 +127,8 @@ class Incident:
     decoy: str | None = None  # hard mode: a service with a harmless anomaly at the same time
     # an upload's own call graph, service -> the services it calls; None is the shop's (CALLS)
     calls: dict[str, tuple[str, ...]] | None = None
+    # an upload's own metric names, of which each service reports one or more; the shop's are the four
+    metrics: tuple[str, ...] = METRICS
 
     @cached_property
     def services(self) -> tuple[str, ...]:
@@ -132,13 +145,19 @@ class Incident:
         return CALLERS if self.calls is None else _callers(self.calls)
 
     @cached_property
+    def measured(self) -> dict[str, tuple[str, ...]]:
+        """service -> the metrics it reports, in the order of `metrics`."""
+        return {s: tuple(m for m in self.metrics if m in self.series[s]) for s in self.services}
+
+    @cached_property
     def stats(self) -> dict[tuple[str, str], tuple[float, float]]:
         """(service, metric) -> (mean, std) over the healthy baseline."""
         out = {}
         for s in self.services:
-            for m in METRICS:
+            for m in self.measured[s]:
                 base = self.series[s][m][:BASELINE_TICKS]
-                out[(s, m)] = (statistics.fmean(base), max(statistics.pstdev(base), STD_FLOOR[m]))
+                mean = statistics.fmean(base)
+                out[(s, m)] = (mean, max(statistics.pstdev(base), std_floor(m, mean)))
         return out
 
     def z(self, service: str, metric: str, tick: int) -> float:
@@ -148,13 +167,14 @@ class Incident:
     @cached_property
     def alarm(self) -> int | None:
         """First tick where any metric stayed ALARM_Z above normal for ALARM_SUSTAIN_TICKS ticks."""
-        return self.alarm_on(METRICS)
+        return self.alarm_on(self.metrics)
 
     def alarm_on(self, metrics: tuple[str, ...]) -> int | None:
-        """The alarm, watching only these metrics."""
+        """The alarm, watching only these metrics (on the services that report them)."""
+        watched = [(s, m) for s in self.services for m in metrics if m in self.series[s]]
         for t in range(BASELINE_TICKS, WINDOW_TICKS):
             recent = range(t - ALARM_SUSTAIN_TICKS + 1, t + 1)
-            if any(all(self.z(s, m, k) >= ALARM_Z for k in recent) for s in self.services for m in metrics):
+            if any(all(self.z(s, m, k) >= ALARM_Z for k in recent) for s, m in watched):
                 return t
         return None
 
@@ -172,7 +192,7 @@ class Incident:
 
     def worst(self, service: str) -> tuple[str, float]:
         """The service's most abnormal metric and its window z-score."""
-        return max(((m, self.window_z(service, m)) for m in METRICS), key=lambda mz: mz[1])
+        return max(((m, self.window_z(service, m)) for m in self.measured[service]), key=lambda mz: mz[1])
 
 
 def zscore_ranking(inc: Incident) -> list[str]:
@@ -187,10 +207,10 @@ def robust_ranking(inc: Incident) -> list[str]:
 
     def score(service: str) -> float:
         best = float("-inf")
-        for m in METRICS:
+        for m in inc.measured[service]:
             base = inc.series[service][m][:BASELINE_TICKS]
             centre = statistics.median(base)
-            spread = max(MAD_TO_STD * statistics.median(abs(v - centre) for v in base), STD_FLOOR[m])
+            spread = max(MAD_TO_STD * statistics.median(abs(v - centre) for v in base), std_floor(m, centre))
             best = max(best, (statistics.median(inc.series[service][m][start:inc.now + 1]) - centre) / spread)
         return best
 

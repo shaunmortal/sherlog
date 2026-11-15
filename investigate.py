@@ -87,10 +87,10 @@ def _suspect(service: dict) -> dict:
     }
 
 
-def build_tools(services: tuple[str, ...]) -> list[dict]:
-    """The agent's tools, every service argument limited to these services."""
+def build_tools(services: tuple[str, ...], metrics: tuple[str, ...] = sim.METRICS) -> list[dict]:
+    """The agent's tools, every service argument limited to these services and every metric to these metrics."""
     service = {"type": "string", "enum": list(services)}
-    metric = {"type": "string", "enum": list(sim.METRICS)}
+    metric = {"type": "string", "enum": list(metrics)}
     return [
         _tool("get_metric", "One metric of one service: normal baseline, current value, z-score, how long it has "
               "been abnormal, and recent values.", {"service": service, "metric": metric}),
@@ -115,12 +115,12 @@ def tools_without(*names: str) -> list[dict]:
 
 
 def tools_for(inc: sim.Incident, tools: list[dict]) -> list[dict]:
-    """The offered tools for this incident: as given for the shop; for an upload with its own call graph, the same
-    tools in the same order, rebuilt over its services."""
-    if inc.calls is None:
+    """The offered tools for this incident: as given for the shop; for an upload with its own call graph or its
+    own metrics, the same tools in the same order, rebuilt over its services and metrics."""
+    if inc.calls is None and inc.metrics == sim.METRICS:
         return tools
     offered = {t["name"] for t in tools}
-    return [t for t in build_tools(inc.services) if t["name"] in offered]
+    return [t for t in build_tools(inc.services, inc.metrics) if t["name"] in offered]
 
 
 @dataclass(frozen=True)
@@ -142,7 +142,7 @@ def _at(inc: sim.Incident, tick: int) -> str:
 
 
 def _top_anomalies(inc: sim.Incident, args: dict) -> tuple[str, set[str]]:
-    rows = sorted(((inc.window_z(s, m), s, m) for s in inc.services for m in sim.METRICS), reverse=True)
+    rows = sorted(((inc.window_z(s, m), s, m) for s in inc.services for m in inc.measured[s]), reverse=True)
     rows = rows[:TOP_ANOMALIES_SHOWN]
     lines = [
         f"{s:<10} {m:<11} z={z:+6.1f}   normal {inc.stats[(s, m)][0]:.4g} -> now {inc.series[s][m][inc.now]:.4g}"
@@ -215,8 +215,9 @@ def _check_args(inc: sim.Incident, name: str, args) -> str | None:
         return None
     if args.get("service") not in inc.services:
         return f"unknown service {args.get('service')!r}; known: {', '.join(inc.services)}"
-    if name == "get_metric" and args.get("metric") not in sim.METRICS:
-        return f"unknown metric {args.get('metric')!r}; known: {', '.join(sim.METRICS)}"
+    known = inc.measured[args["service"]]
+    if name == "get_metric" and args.get("metric") not in known:
+        return f"unknown metric {args.get('metric')!r}; known: {', '.join(known)}"
     return None
 
 
@@ -319,7 +320,7 @@ def _alert_text(inc: sim.Incident, first: Call) -> str:
         f"ALERT: a metric stayed {sim.ALARM_Z:g} standard deviations above normal for "
         f"{sim.ALARM_SUSTAIN_TICKS * sim.TICK_SECONDS}s. Times are relative to the alarm (t+0s); telemetry is "
         f"available up to {_at(inc, inc.now)}.\n"
-        f"Services: {', '.join(inc.services)}. Metrics: {', '.join(sim.METRICS)}.\n\n"
+        f"Services: {', '.join(inc.services)}. Metrics: {', '.join(inc.metrics)}.\n\n"
         f"Strongest deviations right now:\n{first.text}"
     )
 
@@ -425,8 +426,8 @@ def telemetry_event(inc: sim.Incident) -> dict:
         "alarm": inc.alarm,
         "now": inc.now,
         "tick_seconds": sim.TICK_SECONDS,
-        "series": {s: {m: inc.series[s][m][:end] for m in sim.METRICS} for s in inc.services},
-        "z": {s: {m: round(inc.window_z(s, m), 1) for m in sim.METRICS} for s in inc.services},
+        "series": {s: {m: inc.series[s][m][:end] for m in inc.measured[s]} for s in inc.services},
+        "z": {s: {m: round(inc.window_z(s, m), 1) for m in inc.measured[s]} for s in inc.services},
     }
 
 
@@ -494,7 +495,8 @@ def upstream(service: str, callers: dict[str, tuple[str, ...]] = sim.CALLERS) ->
     return reach
 
 
-PROPAGATING = ("latency_ms", "error_rate")  # only slowness and failures travel up to callers
+# only slowness and failures travel up to callers; an upload's other metrics are each service's own business
+PROPAGATING = ("latency_ms", "error_rate")
 
 
 def _window(inc: sim.Incident) -> range:
@@ -503,11 +505,12 @@ def _window(inc: sim.Incident) -> range:
     return range(start, inc.now + 1)
 
 
-def _sustained(inc: sim.Incident, service: str, metrics: tuple[str, ...] = sim.METRICS,
+def _sustained(inc: sim.Incident, service: str, metrics: tuple[str, ...] | None = None,
                ticks: range | None = None) -> bool:
     """Abnormal for most of the window the agent saw (or of `ticks`), not just one spike: like the alarm,
-    which needs 15 s."""
+    which needs 15 s. Only the metrics the service reports count, all of them unless `metrics` names some."""
     ticks = _window(inc) if ticks is None else ticks
+    metrics = inc.measured[service] if metrics is None else [m for m in metrics if m in inc.series[service]]
     return any(sum(inc.z(service, m, t) >= EVIDENCE_Z for t in ticks) >= sim.ALARM_SUSTAIN_TICKS for m in metrics)
 
 

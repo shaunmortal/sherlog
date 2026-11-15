@@ -161,7 +161,7 @@ def _sse(events: Iterator[dict]) -> Iterator[str]:
 def _enrich(events: Iterator[dict], inc: sim.Incident) -> Iterator[dict]:
     """Add what the console shows but the agent never sees: the telemetry after the agent's cut-off (so the
     charts keep running while it investigates), and the blast-radius and rollback checks of its answer."""
-    rest = {s: {m: inc.series[s][m][inc.now + 1:] for m in sim.METRICS} for s in inc.services}
+    rest = {s: {m: inc.series[s][m][inc.now + 1:] for m in inc.measured[s]} for s in inc.services}
     for event in events:
         if event["type"] == "telemetry":
             yield {**event, "rest": rest}
@@ -530,7 +530,8 @@ MCP = mcp_server.Server("sherlog", _version(), MCP_INSTRUCTIONS, {
         "The no-AI checks on 10 minutes of telemetry, as POST /api/triage runs them: the tick the alarm fired at "
         "(null if none), the z-score and robust z-score rankings, and the blast-radius check of the z-score ranking's "
         "top suspect, whose `better` names a service that explains more of the outage. Without `calls` the services "
-        "are the shop's 11; with `calls` they are your own 2 to 40. A full document is large (the shop sample is "
+        "are the shop's 11; with `calls` they are your own 2 to 80, and `metrics` may name your own metrics. A full "
+        "document is large (the shop sample is "
         "about 42 KB of JSON), so for a big export POST it to /api/triage instead."),
     "sample_incident": _tool(
         _SampleArgs, lambda args: _sample_incident(args.graph), "Get a sample incident",

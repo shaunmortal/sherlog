@@ -1304,8 +1304,12 @@ function setIncidentText(text, message) {
 function readIncident() {
   const text = $('#dataText').value.trim();
   if (!text) throw new Error('Paste an incident, open a file or use the sample first.');
-  try { return JSON.parse(text); }
+  let doc;
+  try { doc = JSON.parse(text); }
   catch (err) { throw new Error(`That is not valid JSON: ${err.message}`); }
+  // the charts draw the four standard metrics; an upload with its own goes to the API, which takes it
+  if (doc && doc.metrics) throw new Error('This console draws latency, errors, cpu and memory only. Send an upload with its own "metrics" to POST /api/triage or /api/investigate.');
+  return doc;
 }
 
 const SAMPLES = {

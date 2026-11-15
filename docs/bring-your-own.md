@@ -4,7 +4,7 @@ The console breaks a simulated shop. This page is for your own system. Export 10
 Sherlog runs the same alarm, the same no-AI rankings, the same agent tools, the same evidence verifier and the
 same blast-radius check on it.
 
-Sherlog reasons over a call graph: who calls whom. Give it yours in `calls`, with 2 to 40 services under their
+Sherlog reasons over a call graph: who calls whom. Give it yours in `calls`, with 2 to 80 services under their
 own names:
 
 ```json
@@ -90,7 +90,7 @@ jq '{incident: ., model: "opus"}' incident.json | curl -N -X POST localhost:8000
 }
 ```
 
-- **calls** is optional. With it, its keys are the services: 2 to 40 of them, each a name of 1 to 40 lowercase
+- **calls** is optional. With it, its keys are the services: 2 to 80 of them, each a name of 1 to 40 lowercase
   letters, digits and dashes that starts with a letter and does not end with a dash (`api-gateway`, `postgres`).
   Each lists the services it calls. Every one it lists must be a key too, a service cannot call itself, and a
   list cannot name a service twice. Cycles are allowed. Without `calls`, the services are the shop's 11 names
@@ -101,6 +101,14 @@ jq '{incident: ., model: "opus"}' incident.json | curl -N -X POST localhost:8000
 - **series**: every service, every metric, exactly 120 finite numbers, oldest first, one every 5 s.
   The units and limits are `latency_ms` in milliseconds, at least 0.1; `error_rate` as the share of failed
   requests, 0 to 1; `cpu_pct` 0 to 100; and `memory_mb` in megabytes, at least 1.
+- **metrics** is optional: your own metric names, 1 to 10 of them, each 1 to 40 lowercase letters, digits and
+  underscores starting with a letter (`diskio`, `socket`, `latency_ms`). With it, each service in `series`
+  reports one or more of these and no other, so a database that has no request latency simply leaves it out.
+  The four names above keep their units and limits; any other metric takes any finite number. Only
+  `latency_ms` and `error_rate` travel up the call graph to callers: the blast-radius check and the call-graph
+  rule treat every other metric as the service's own. A metric Sherlog has no noise floor for gets one of 1% of
+  its normal level, so a small wobble is not an alarm whatever its unit. The console draws the four standard
+  metrics only, so send these uploads to `/api/triage` or `/api/investigate`.
 - **the window**: the first 60 ticks (5 minutes) are the baseline that defines "normal", so they must be
   healthy. The alarm fires at the first tick from 60 on where some metric has been 4 standard deviations above
   normal for 3 ticks in a row. The agent sees the telemetry up to 4 ticks after the alarm. If no alarm fires,
@@ -183,7 +191,6 @@ shop, and its tools accept only your services. The prompt for the shop is unchan
 log lines to the Claude API, so leave secrets and personal data out of the log text.
 
 **Limits:**
-- 2 to 40 services, each sending all 4 metrics
-- these 4 metrics
+- 2 to 80 services, each sending all 4 metrics, or one or more of up to 10 metrics of your own
 - one 10-minute window at 5 s
 - no traces

@@ -35,7 +35,7 @@ Everything here is free and needs no key, except live investigations (POST /api/
 
 ## Upload format
 
-- `sherlog-incident/1`: 10 minutes at one reading every 5 s (120 ticks) of `latency_ms`, `error_rate`, `cpu_pct` and `memory_mb` for every service, optional log lines, and an optional call graph in `calls` (2 to 40 services under their own names; without it, the shop's 11). Bodies over 2 MB get a 413; a bad document gets a 422 naming the field.
+- `sherlog-incident/1`: 10 minutes at one reading every 5 s (120 ticks) of `latency_ms`, `error_rate`, `cpu_pct` and `memory_mb` for every service, optional log lines, and an optional call graph in `calls` (2 to 80 services under their own names; without it, the shop's 11), and optional own metric names in `metrics` (then each service reports one or more of them). Bodies over 2 MB get a 413; a bad document gets a 422 naming the field.
 - [docs/bring-your-own.md](https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md): the format, its checks and limits, and a converter for metric range-query exports
 
 ## Code and evidence
