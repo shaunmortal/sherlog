@@ -111,7 +111,7 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
   carry a link preview image.
 - **Tests:** 172 pytest tests in CI (the agent loop and the auto route against a scripted fake model, the
   call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format),
-  plus 7 browser end-to-end checks.
+  plus 9 browser end-to-end checks.
 - **AI tools used:** Claude Code as a pair programmer; Claude Haiku, Sonnet and Opus 5.5 inside the product.
   Claude Code wrote and tested code under our direction, several features at once in separate agent
   worktrees joined by the `merge:` commits. The verifier, the blast-radius check, the call-graph rule and the

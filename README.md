@@ -249,7 +249,7 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
   - 32 in [`tests/test_api.py`](tests/test_api.py): every route and every failure path of a live run, `HEAD` answers, the API reference, the preview image and tags, replay numbering and the caught replays
   - 25 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
 
-  Seven browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, a guess reveals the cause, the console plays a recorded outage to its verdict, the first screen's button replays outage #41 with precise check labels, a caught replay shows the rollback disproving its answer, triaging the sample afterwards replaces that outage on screen, even while paused, and a triage started from the keyboard keeps focus on its button.
+  Nine browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, a guess reveals the cause, its sections wait for a person to scroll to them but not for an automated screenshot (two checks), the console plays a recorded outage to its verdict, the first screen's button replays outage #41 with precise check labels, a caught replay shows the rollback disproving its answer, triaging the sample afterwards replaces that outage on screen, even while paused, and a triage started from the keyboard keeps focus on its button.
 
 ---
 
