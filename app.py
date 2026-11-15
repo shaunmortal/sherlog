@@ -280,6 +280,7 @@ def _real_benchmark() -> dict:
                   "calls; the method and every table: docs/real-benchmark.md. Data: RCAEval benchmark, MIT licence.",
         "cases": res["split"]["test"],
         "systems": "three real microservice systems (12, 15 and 68 services), each fault injected on purpose",
+        "system_count": sum(k.startswith("system ") for k in res["methods"]["auto"]),
         "methods": {k: {"label": res["methods"][k]["label"], **{s: res["methods"][k]["all"][s] for s in scores}}
                     for k in REAL_METHODS},
         "auto_vs": {k: res["paired"]["auto"][k] for k in REAL_PAIRED},
