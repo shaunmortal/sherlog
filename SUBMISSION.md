@@ -234,7 +234,7 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-c
 
 **Evaluate it in 5 minutes** (no key needed):
 
-1. The video (2:39), then the real outages: https://github.com/shaunmortal/sherlog/blob/main/docs/real-benchmark.md
+1. The video (2:48), then the real outages: https://github.com/shaunmortal/sherlog/blob/main/docs/real-benchmark.md
 2. https://sherlog-jade.vercel.app/console#replay/41 : the z-score ranking blames cart; the agent names cache,
    citing the tool calls that show it, and rolling cache back clears all four broken services.
 3. https://sherlog-jade.vercel.app/console#replay/177 (C1): a confident wrong answer the rollback stopped.

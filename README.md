@@ -21,8 +21,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2b2e3a" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="VIDEO_URL"><picture><source media="(prefers-color-scheme: dark)" srcset="media/video-thumb-dark.jpg"><img src="media/video-thumb-light.jpg" alt="Play the demo video, 2:39. Its frame shows the shop's call graph after outage #41: the answer, cache, explains all four red services, with cart, checkout and frontend ticked." width="900"></picture></a></p>
-<p align="center"><a href="VIDEO_URL"><b>▶&nbsp;Watch the 2:39 demo</b></a></p>
+<p align="center"><a href="VIDEO_URL"><picture><source media="(prefers-color-scheme: dark)" srcset="media/video-thumb-dark.jpg"><img src="media/video-thumb-light.jpg" alt="Play the demo video, 2:48. Its frame shows the shop's call graph after outage #41: the answer, cache, explains all four red services, with cart, checkout and frontend ticked." width="900"></picture></a></p>
+<p align="center"><a href="VIDEO_URL"><b>▶&nbsp;Watch the 2:48 demo</b></a></p>
 
 <p align="center">
   <picture>
@@ -82,10 +82,10 @@ Sherlog also ran on a real system of 8 services, each its own OS process calling
 
 | Minute | Open | What you should see |
 |---|---|---|
-| 0:00–2:40 | The demo video (link above) | The whole loop: an outage, a guess, the investigation, the checks, the rollback and the results against two no-AI rules. |
-| 2:40–3:00 | [`/console#replay/41`](https://sherlog-jade.vercel.app/console#replay/41) | A recorded outage, free, in about 11 s, or at once with **Skip to verdict**. The z-score ranking blames `cart`; the agent names `cache`, 90% sure, citing calls `c0`, `c1` and `c3`, all verified; rolling `cache` back clears all four broken services. |
-| 3:00–3:20 | [`/console#replay/177`](https://sherlog-jade.vercel.app/console#replay/177) (C1 in the Replay tab) | A confident wrong answer the rollback stopped. In hard mode the Haiku agent names `cart`, the decoy, 85% sure, with its citations verified, so it goes out; rolling `cart` back leaves `frontend` abnormal and the alarm on, so the rollback does not prove it. |
-| 3:20–3:40 | [Your data](https://sherlog-jade.vercel.app/console#data) → **Use** the shop sample → **Triage (no AI)**, then **Use** a custom-graph sample → **Triage** | No key needed. The alarm, the z-score ranking (`cart` first), the robust z-score (`cache` first) and the blast-radius check, which says `cache` would explain more of the outage than `cart`. The custom-graph sample brings its own call graph of six services, which replace the shop on the charts and the map. |
+| 0:00–2:50 | The demo video (link above) | The whole loop: an outage, a guess, the investigation, the checks, the rollback, and the results on the controlled benchmark and on 252 real outages. |
+| 2:50–3:10 | [`/console#replay/41`](https://sherlog-jade.vercel.app/console#replay/41) | A recorded outage, free, in about 11 s, or at once with **Skip to verdict**. The z-score ranking blames `cart`; the agent names `cache`, 90% sure, citing calls `c0`, `c1` and `c3`, all verified; rolling `cache` back clears all four broken services. |
+| 3:10–3:25 | [`/console#replay/177`](https://sherlog-jade.vercel.app/console#replay/177) (C1 in the Replay tab) | A confident wrong answer the rollback stopped. In hard mode the Haiku agent names `cart`, the decoy, 85% sure, with its citations verified, so it goes out; rolling `cart` back leaves `frontend` abnormal and the alarm on, so the rollback does not prove it. |
+| 3:25–3:40 | [Your data](https://sherlog-jade.vercel.app/console#data) → **Use** the shop sample → **Triage (no AI)**, then **Use** a custom-graph sample → **Triage** | No key needed. The alarm, the z-score ranking (`cart` first), the robust z-score (`cache` first) and the blast-radius check, which says `cache` would explain more of the outage than `cart`. The custom-graph sample brings its own call graph of six services, which replace the shop on the charts and the map. |
 | 3:40–4:00 | [`docs/real-benchmark.md`](docs/real-benchmark.md), then in a clone `python scripts/benchmark/report.py` | The real outages: the protocol and every table. The script recomputes every number in [`runs/real-benchmark/results.json`](runs/real-benchmark/results.json) from the committed run records, with no key, in about 1 s, and stops if one differs from the benchmark's own evaluator. |
 | 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 1,678 passed and 1 skipped (the browser checks, which need a running server), in about 35 s. `python bench.py --report`: every controlled-benchmark table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
 
