@@ -1,10 +1,10 @@
 # Use Sherlog from Claude: the MCP connector
 
-Sherlog serves the Model Context Protocol (MCP) at `/mcp`, so Claude, or any other MCP client, can read its
-recorded investigations, check each answer's evidence, run the no-AI triage on telemetry and quote the benchmark
-with its caveats. Every tool is free and read-only: none calls Claude, none needs a key, none runs a live
-investigation. Live runs stay in the [console](https://sherlog-jade.vercel.app/console), where they are rate
-limited.
+Sherlog serves the Model Context Protocol (MCP) at `/mcp`, so Claude, or any other MCP client, can investigate
+an outage itself and have Sherlog's code check the answer, read the recorded investigations, run the no-AI triage on
+telemetry and quote the benchmark with its caveats. Every tool is free and read-only: none calls Claude and none
+needs a key. Sherlog's own agent runs live only in the [console](https://sherlog-jade.vercel.app/console), where it
+is rate limited.
 
 ## Connect
 
@@ -14,8 +14,8 @@ limited.
 claude mcp add --transport http sherlog https://sherlog-jade.vercel.app/mcp
 ```
 
-Then ask, for example, *"Use sherlog: what did the agent conclude in recorded outage 41, and did the rollback prove
-it?"* or *"Summarize Sherlog's benchmark, caveats included."*
+Then type `/mcp__sherlog__investigate_outage 41`, or ask, for example, *"Use sherlog: what did the agent conclude
+in recorded outage 41, and did the rollback prove it?"* or *"Summarize Sherlog's benchmark, caveats included."*
 
 **Any other MCP client** that supports remote servers over Streamable HTTP: give it the URL
 `https://sherlog-jade.vercel.app/mcp`. There is no authentication. For a local server
@@ -44,6 +44,56 @@ curl -s https://sherlog-jade.vercel.app/mcp -H 'content-type: application/json' 
           "params": {"name": "get_recorded_verdict", "arguments": {"number": 41}}}'
 ```
 
+## Investigate an outage with your own Claude
+
+Sherlog's own agent proposes and plain code checks. The connector puts the same gate around any model you bring:
+your Claude investigates with the agent's read-only tools, then `check_answer` re-runs every call it cites and says
+whether the answer ships or goes to a human. It is free: no key, and no AI runs on the server.
+
+1. Connect: `claude mcp add --transport http sherlog https://sherlog-jade.vercel.app/mcp`
+2. In Claude Code, start the prompt with `/mcp__sherlog__investigate_outage 41` (or `shop`, `custom` for a sample;
+   with no argument it is 41). It hands Claude the protocol: start with `top_anomalies`, dig in with `get_metric`,
+   `get_logs` and `get_dependencies`, cite the call ids, call `check_answer` before answering, respect the 80% rule.
+   Or just ask: *"Use sherlog to investigate recorded outage 41, and check your answer with check_answer."* The
+   server's instructions carry the same steps.
+3. Afterwards, `reveal_truth` gives the real cause and what Sherlog's own agent answered, so you can score your model.
+
+Every tool takes the same `incident`: `{"recorded": 41}` (a recorded outage, its cause hidden), `{"sample": "shop"}`
+or `{"sample": "custom"}`, or `{"document": ...}` (your own sherlog-incident/1 telemetry, checked as `POST
+/api/triage` checks it). Nothing is stored between calls: a result's call id, such as `c7016c10ec0`, is a hash of the
+incident, the tool and its arguments, so `check_answer` re-runs each cited call from its id alone. The text of each
+result is exactly what Sherlog's own agent reads; only the id differs.
+
+`check_answer` applies the agent's own checks: a suspect is verified only if a call it cites shows it abnormal; the
+answer goes out only when the first suspect is verified and at least 80% likely; then the blast radius asks whether
+it explains every abnormal service, and the rollback replay runs the same outage with it rolled back. Recorded
+outages and the samples are simulated, so they get the replay; uploaded telemetry does not, and the verdict says so.
+
+A scripted run of #41 with the official MCP Python client, [`scripts/investigate_over_mcp.py`](../scripts/investigate_over_mcp.py)
+(`uv run --with mcp python scripts/investigate_over_mcp.py`), abridged:
+
+```text
+connected: protocol 2026-07-28
+prompt investigate_outage(41) -> incident {'recorded': 41}
+top_anomalies() -> c7016c10ec0
+    cart       latency_ms  z=+200.1   normal 11.97 -> now 412.6
+    cache      latency_ms  z=+200.0   normal 2.05 -> now 402.1
+get_dependencies(cart) -> c8bcbae0903
+    calls (downstream): cache (latency_ms z=+200.0)
+get_metric(cache, latency_ms) -> c737c8cbeeb
+    normal 2.05 ± 2; now 402.1; z over the alarm window +200.0; abnormal since t-10s
+check_answer(cache, 90%) -> ship
+    citations: c7016c10ec0, c737c8cbeeb, cfbbf5edf28 show cache abnormal
+    rollback: alarm after = False, proves = True
+check_answer(cart, 90%) -> hand to a human
+    citations: c7016c10ec0, c8bcbae0903 show cart abnormal
+    reasons: ['cache would explain more of the outage than cart', 'rolling back cart does not stop the alarm']
+reveal_truth(41) -> cause cache (latency); Sherlog's own agent answered cache; the z-score ranking's first pick was cart
+```
+
+`cart` is the loudest service and its citations check out, since a victim is abnormal too; the blast radius and the
+rollback are what catch it.
+
 ## Tools
 
 | Tool | Arguments | Answers with |
@@ -52,6 +102,12 @@ curl -s https://sherlog-jade.vercel.app/mcp -H 'content-type: application/json' 
 | `get_recorded_verdict` | `number` (1 to 183) | One investigation: the agent's tool calls with the text each returned, its verdict (suspects, confidence, cited call ids and whether plain code verified each citation, the answer or the hand-over, a ticket note and a customer update), the blast-radius check, the rollback replay, and the truth, including what the no-AI z-score ranking said. |
 | `triage_incident` | `incident`: a [sherlog-incident/1 document](bring-your-own.md#the-format) | The no-AI checks, as `POST /api/triage` runs them: the alarm tick, the z-score and robust z-score rankings, and the blast-radius check of the z-score ranking's top suspect. The same checks and error messages (with each path under `incident`) and the same 2 MB cap. |
 | `sample_incident` | `graph`: `shop` (default) or `custom` | A sample document, culprit removed, as `GET /api/sample-incident` gives it: the shop's 11 services (about 42 KB of JSON) or six renamed services with their own call graph (about 27 KB). |
+| `top_anomalies` | `incident` | The strongest deviations right now, as the agent's first look shows them. Like every investigation tool, it answers `call_id` and `text`, the text starting with `[call_id]`. |
+| `get_metric` | `incident`, `service`, `metric` | One metric of one service: its normal level, current value, z-score over the alarm window, how long it has been abnormal and its recent values. |
+| `get_logs` | `incident`, `service` | Recent WARN and ERROR lines written by one service, newest last. |
+| `get_dependencies` | `incident`, `service` | The services it calls and is called by, with the health of each. |
+| `check_answer` | `incident`, `suspects` (up to 5, each `service`, `confidence`, `evidence`: up to 20 call ids, and optional `fault_type` and `reason`) | Each suspect verified or rejected with the reason (`verify_note`), the `answer` or the `escalation`, the answer's `blast` radius and `rollback` replay, the `decision` (`ship` or `hand to a human`) and its `reasons`, and for an upload a `note` that it has no rollback replay. |
+| `reveal_truth` | `recorded` | For a recorded outage: the real cause, the fault, the decoy in hard mode, what Sherlog's own recorded agent answered and whether it was right, and the z-score ranking's first three. |
 | `benchmark_summary` | none | The headline numbers. First the 252 real outages of a public benchmark, from [`runs/real-benchmark/results.json`](../runs/real-benchmark/results.json): each method's AC@1 (with its interval), AC@3 and Avg@5, the auto route against the published baselines and its own no-AI rule case by case, and its cost. Then, from [`runs/evidence.json`](../runs/evidence.json), the 132 normal and 44 hard-mode simulated outages: for each method, how often it named the cause first, answered alone and answered wrong, its median cost, what the rollback caught, and how it compares with the no-AI call-graph rule outage by outage; the no-AI baselines; and the caveats. |
 
 Each tool's `inputSchema` is generated from the same models the server validates with, so it lists every field and
@@ -143,12 +199,21 @@ server-sent events).
   403, the check the spec asks for against DNS rebinding. Batches are refused.
 
 **Checked with** the official MCP Python client, version 2.3.0 in both eras and 1.30.0 in the handshake era,
-against a local server: it lists the five tools and calls them. `tests/test_mcp.py` covers the rest.
+against a local server: it lists the tools and the prompt, calls them, and runs the whole scripted investigation
+above. `tests/test_mcp.py` and `tests/test_mcp_investigate.py` cover the rest, among them a test that no tool but
+`get_recorded_verdict` and `reveal_truth` names a recorded outage's cause, fault, seed or decoy, and that every
+investigation tool answers the same about a recorded outage as about its telemetry uploaded with none of those.
 
 ## What it does not do
 
-- No live investigations: the agent costs API credits, so it runs only in the console, rate limited.
-- No resources, prompts or subscriptions, and the tool list never changes while a deploy runs.
+- Sherlog's own agent does not run here: it costs API credits, so it runs only in the console, rate limited.
+  Over MCP, the model is yours.
+- No resources or subscriptions; one prompt. The tool and prompt lists never change while a deploy runs.
+- Being stateless, the server cannot tell whether a model made a call it cites, only that the call exists on this
+  incident and shows what is claimed: an id is a public hash, so a model could compute one without calling. The
+  evidence is re-checked either way.
+- `check_answer`'s rollback replay is a real intervention, so a model that calls it on every service in turn will
+  find the cause, as rolling back every service in production would. Score models on their first `check_answer`.
 - `triage_incident` takes the whole document as an argument. A model writing out 11 services' 10 minutes of
   numbers is slow and costly (the shop sample is about 42 KB of JSON), so for real exports, `POST` the file to
   `/api/triage` instead; the tool suits small incidents and documents a script builds.
