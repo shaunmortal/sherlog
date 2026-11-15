@@ -9,6 +9,10 @@ re-run on the same cases with the benchmark's own runner. Every number here is i
 [`runs/real-benchmark/results.json`](../runs/real-benchmark/results.json), recomputed with no API calls by
 `scripts/benchmark/report.py` from the run records next to it.
 
+A second suite, 90 code-level faults on the same three systems (the benchmark's RE3 suite), was run afterwards
+with the same protocol and is reported on its own, under the key `re3` of the same file:
+[Code-level faults (RE3)](#a-second-suite-code-level-faults-re3). Everything above that section is RE2.
+
 ## Results on the test set (252 cases)
 
 | Method | Cases | AC@1 (95% CI) | AC@3 | Avg@5 | A: AC@1 / Avg@5 | B: AC@1 / Avg@5 | C: AC@1 / Avg@5 |
@@ -299,7 +303,7 @@ the z-score ranking and the call-graph rule named it first in 13 of 18 each.
   cannot have memorised anything, so there is no sign of a learned prior; this does not rule one out.
 - One benchmark suite, three systems, six injected fault types. Injected faults are cleaner than real
   incidents: one root cause each, injected at a known time, on a system under synthetic load. Code-level faults
-  (the benchmark's RE3 suite) were not run.
+  (the benchmark's RE3 suite) were run afterwards and are reported apart, below.
 - The test set is 252 cases, 84 per system, so per-system and per-fault numbers have wide intervals; differences
   of a few cases between methods are not significant (see the McNemar column).
 - Parts of the call graph are hand-written from each system's published architecture (systems A and B), and part
@@ -310,6 +314,217 @@ the z-score ranking and the call-graph rule named it first in 13 of 18 each.
   applied to every response's token counts, including failed and retried calls.
 - The agent's committed run records leave out tool results, thinking and free text (they quote the telemetry);
   the full event streams were kept outside the repository.
+
+## A second suite: code-level faults (RE3)
+
+The benchmark's RE3 suite breaks the same three systems a different way: instead of starving a service of CPU,
+memory, disk or network, a faulty code change is deployed into one service. The dataset labels its five
+code-level fault types F1 to F5 and does not describe them further in the data. The suite has 90 cases, 30 per
+system, and is not a uniform grid: F5 exists only on system A, and the root cause is one of 4 services on
+system A (12 services in the telemetry, 28 in two cases), 3 on system B (15, 26 in one case) and only 2 on
+system C (68, 69 in seven cases). It was run with the protocol above, unchanged except where this section
+says so. Its records are in [`runs/real-benchmark/re3/`](../runs/real-benchmark/re3/) and its numbers under the
+key `re3` of `results.json`; RE2's keys and values there are unchanged.
+
+### Results on the RE3 test set (81 cases)
+
+| Method | Cases | AC@1 (95% CI) | AC@3 | Avg@5 | A: AC@1 / Avg@5 | B: AC@1 / Avg@5 | C: AC@1 / Avg@5 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Sherlog no-AI: z-score ranking | 81 | 74% (64%-82%) | 84% | 0.83 | 96% / 0.96 | 96% / 0.99 | 30% / 0.53 |
+| Sherlog no-AI: robust (median/MAD) z-score ranking | 81 | 52% (41%-62%) | 65% | 0.64 | 74% / 0.92 | 81% / 0.94 | 0% / 0.07 |
+| Sherlog no-AI: call-graph rule | 81 | 59% (48%-69%) | 80% | 0.76 | 74% / 0.90 | 89% / 0.97 | 15% / 0.40 |
+| Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed) | 81 | 79% (69%-86%) | 93% | 0.90 | 100% / 1.00 | 96% / 0.99 | 41% / 0.70 |
+| Sherlog agent, auto route, every submitted suspect (verified or not) | 81 | 79% (69%-86%) | 93% | 0.90 | 100% / 1.00 | 96% / 0.99 | 41% / 0.70 |
+| Published baseline: BARO (metrics) | 81 | 26% (18%-36%) | 98% | 0.82 | 0% / 0.76 | 0% / 0.74 | 78% / 0.96 |
+| Published baseline: n-sigma (metrics) | 81 | 73% (62%-81%) | 94% | 0.89 | 81% / 0.88 | 59% / 0.84 | 78% / 0.96 |
+| Published baseline: multi-source BARO (metrics, logs, traces) | 81 | 25% (17%-35%) | 96% | 0.81 | 0% / 0.76 | 0% / 0.74 | 74% / 0.94 |
+| Published baseline: multi-source n-sigma (metrics, logs, traces) | 81 | 69% (58%-78%) | 93% | 0.88 | 78% / 0.88 | 52% / 0.82 | 78% / 0.95 |
+| Published baseline: CIRCA (metrics; systems A and B only, too slow on C) | 54 | 74% (61%-84%) | 98% | 0.93 | 81% / 0.96 | 67% / 0.90 | not run |
+| Published baseline: epsilon-Diagnosis (metrics) | 81 | 2% (1%-9%) | 21% | 0.16 | 4% / 0.24 | 4% / 0.23 | 0% / 0.00 |
+
+27 test cases per system. The auto route ran on all 81: a first $5 cap stopped it after 71 in its seeded order,
+and the last 10 (2 of system A, 3 of B, 5 of C) ran in a second session once the cap was raised by $2.50, with no
+change to the agent or its runner in between.
+
+- **On systems A and B the auto route named the cause first in 53 of 54 test cases** (27 of 27 and 26 of 27),
+  where n-sigma did in 81% and 59%, and answered 49 of them on its own with no wrong answer.
+- **Overall, 64 of 81 (79%, 95% CI 69% to 86%).** n-sigma named the cause first in 59 and multi-source n-sigma
+  in 56. Paired, the agent was right where n-sigma was wrong 19 times and the reverse 14 times (exact McNemar
+  p = 0.49; against multi-source n-sigma 20 and 12, p = 0.21): not a significant difference. Against Sherlog's
+  own call-graph rule, 17 and 1 (p = 0.00015); against the z-score ranking, 9 and 5 (p = 0.42).
+- **System C is where it fails: 11 of 27 first (41%), against 78% for n-sigma.** It handed 19 of those 27 to a
+  human, and all 3 of its wrong answers in the suite were there (F1, F2 and F4). See below for why.
+- **n-sigma does better with less data here, and then beats the agent.** Given 5 or 1 minute on each side of the
+  injection instead of 10, n-sigma names the cause first in 83% and 88% of the 81 test cases (93% on system C with
+  1 minute). Paired with the 1-minute version, the agent was right alone 8 times and n-sigma 15 times (p = 0.21).
+  On RE2 the agent's lead held at every window; on RE3 it does not.
+- **It answered 57 of the 81 on its own, and 3 of those answers were wrong (5.3%).** The other 24 went to a human
+  (19 of them on system C); in 10 of those 24 its top verified suspect was in fact the cause.
+- **Cost: $5.69 for the 81 cases, $0.070 a case on average, $0.061 at the median**, much more than on RE2
+  because Claude Opus 5.5 took over in 47 of 81 (24 of system C's 27). All RE3 live runs, dev set included,
+  metered $5.97: $4.75 under the first $5 cap and $1.23 for the last 10 cases.
+
+**Why system C goes wrong.** In none of system C's 27 test cases did the faulty service's own latency or error
+rate stay abnormal in the window the agent sees (on system A in 11 of 27, on B in 18). On system C only a few
+services report failed requests at all (the faulty one in 4 of its 27 test cases), and its traces carry no
+status codes (none in any of its 30 cases), so its failures barely reach Sherlog as errors. What moves is the
+faulty service's memory or CPU (its strongest deviation in 23 of the 27), while services that call it slow down
+or fail; in all three system-C dev cases its logs show it shutting down about 20 s after the injection, as the
+faulty version is deployed. Sherlog's call-graph reasoning (the call-graph rule, the blast-radius check and the
+auto route's hand-off) credits a service with its callers' trouble only when its own latency or errors are
+abnormal, so on system C it points away from the cause: the call-graph rule names it first in 15% of the cases
+there and the z-score ranking in 30%. n-sigma reads the same metric file and ranks the cause first in 78% of
+them, and in 93% with 1 minute on each side, where its first entry is the cause's memory in 25 of 27 cases.
+Sherlog's z-score scoring, with its 5-minute baseline and noise floors, ranks that memory jump below other
+services' deviations; why exactly was not established.
+
+**By fault (AC@1).** Test cases per fault: F1 24, F2 11, F3 24, F4 17, F5 5 (system A only).
+
+| Method (AC@1 by fault) | f1 | f2 | f3 | f4 | f5 |
+|---|---:|---:|---:|---:|---:|
+| Sherlog no-AI: z-score ranking | 88% | 55% | 71% | 71% | 80% |
+| Sherlog no-AI: robust (median/MAD) z-score ranking | 67% | 45% | 42% | 41% | 80% |
+| Sherlog no-AI: call-graph rule | 50% | 55% | 67% | 59% | 80% |
+| Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed) | 83% | 64% | 83% | 71% | 100% |
+| Sherlog agent, auto route, every submitted suspect (verified or not) | 83% | 64% | 83% | 71% | 100% |
+| Published baseline: BARO (metrics) | 17% | 55% | 25% | 29% | 0% |
+| Published baseline: n-sigma (metrics) | 83% | 100% | 62% | 59% | 60% |
+| Published baseline: multi-source BARO (metrics, logs, traces) | 21% | 55% | 21% | 24% | 0% |
+| Published baseline: multi-source n-sigma (metrics, logs, traces) | 75% | 100% | 62% | 53% | 60% |
+| Published baseline: CIRCA (metrics; systems A and B only, too slow on C) | 67% | 100% | 67% | 73% | 100% |
+| Published baseline: epsilon-Diagnosis (metrics) | 4% | 0% | 0% | 6% | 0% |
+
+**The agent against each method, case by case (AC@1).**
+
+| Agent vs | Paired cases | Only the agent right | Only the other right | McNemar p |
+|---|---:|---:|---:|---:|
+| auto vs Sherlog no-AI: z-score ranking | 81 | 9 | 5 | 0.42 |
+| auto vs Sherlog no-AI: robust (median/MAD) z-score ranking | 81 | 22 | 0 | 4.8e-07 |
+| auto vs Sherlog no-AI: call-graph rule | 81 | 17 | 1 | 0.00015 |
+| auto vs Published baseline: BARO (metrics) | 81 | 54 | 11 | 6e-08 |
+| auto vs Published baseline: n-sigma (metrics) | 81 | 19 | 14 | 0.49 |
+| auto vs Published baseline: multi-source BARO (metrics, logs, traces) | 81 | 56 | 12 | 6.2e-08 |
+| auto vs Published baseline: multi-source n-sigma (metrics, logs, traces) | 81 | 20 | 12 | 0.21 |
+| auto vs Published baseline: CIRCA (metrics; systems A and B only, too slow on C) | 54 | 14 | 1 | 0.00098 |
+| auto vs Published baseline: epsilon-Diagnosis (metrics) | 81 | 62 | 0 | 4.3e-19 |
+
+**n-sigma with other windows** (`baselines.py ... --suite re3 nsigma/10 nsigma/2`):
+
+| n-sigma window | AC@1 | Only the auto route right | Only n-sigma right | McNemar p |
+|---|---:|---:|---:|---:|
+| Published baseline: n-sigma (metrics) | 72.8% | 19 | 14 | 0.49 |
+| n-sigma given 5 min on each side of the injection (window check) | 82.7% | 13 | 16 | 0.71 |
+| n-sigma given 1 min on each side of the injection (window check) | 87.6% | 8 | 15 | 0.21 |
+
+**When the first suspect is wrong** (the check for a learned prior): each system has only 2 to 4 root-cause
+services here, so the second column has few services to land on.
+
+| Method | First suspect wrong | ...and a service broken in another case |
+|---|---:|---:|
+| Sherlog no-AI: z-score ranking | 21 | 1 |
+| Sherlog no-AI: robust (median/MAD) z-score ranking | 39 | 0 |
+| Sherlog no-AI: call-graph rule | 33 | 3 |
+| Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed) | 17 | 1 |
+| Sherlog agent, auto route, every submitted suspect (verified or not) | 17 | 1 |
+| Published baseline: BARO (metrics) | 60 | 0 |
+| Published baseline: n-sigma (metrics) | 22 | 7 |
+| Published baseline: multi-source BARO (metrics, logs, traces) | 61 | 0 |
+| Published baseline: multi-source n-sigma (metrics, logs, traces) | 25 | 10 |
+| Published baseline: CIRCA (metrics; systems A and B only, too slow on C) | 14 | 2 |
+| Published baseline: epsilon-Diagnosis (metrics) | 79 | 16 |
+
+**What the agent did** (the same measures as for RE2):
+
+| | auto |
+|---|---:|
+| cases | 81 |
+| no_alarm | 0 |
+| answered | 57 |
+| handed_to_human | 24 |
+| wrong_when_answered | 3 |
+| right_when_answered | 0.9474 |
+| citation_check_pass | 0.8638 |
+| top_suspect_verified | 0.9877 |
+| handed_to_opus | 47 |
+| blast_better_than_answer | 10 |
+| blast_unexplained_left | 24 |
+| failed_runs | 0 |
+| cost_usd_total | 5.6885 |
+| cost_usd_mean | 0.07023 |
+| cost_usd_median | 0.06119 |
+| wall_s_mean | 24.7 |
+
+| System | Test cases | Run live | First | Answered | Wrong answers | To a human | Handed to Opus | Cost |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| A (12 services) | 27 | 27 | 27 | 26 | 0 | 1 | 7 | $0.50 |
+| B (15 services) | 27 | 27 | 26 | 23 | 0 | 4 | 16 | $1.25 |
+| C (68 services) | 27 | 27 | 11 | 8 | 3 (f1, f2, f4) | 19 | 24 | $3.93 |
+
+### The RE3 dev set (9 cases, reported apart)
+
+The auto route named the cause first in all 9 dev cases, answered 8 with no wrong answer, and cost $0.286; the
+z-score ranking named it first in 8 and the call-graph rule in 7. The dev set (3 of system C) did not show the
+system-C weakness the test set did, at least not in the agent's first suspect.
+
+### RE3 protocol: what differs from RE2
+
+- **Data: the dataset's Parquet copy only** (about 330 MB for the suite). Its `metrics.parquet` holds the
+  archive's `simple_metrics.csv` value for value (checked on two RE2 cases, every column and timestamp), so
+  `prepare.py` writes it back as that file, for the benchmark's runner and exporter. RE3 ships none of the log and
+  trace series the multi-source methods read (`logts.csv`, `tracets_err.csv`, `tracets_lat.csv`), so
+  `prepare.py` builds them from each case's logs and traces with the benchmark package's own derive step (15 s
+  bins, log templates mined with its default masks). The benchmark documents that this step differs in details
+  from the scripts behind the series it released for RE2 (it counts error spans where those summed status codes,
+  for one), so multi-source BARO and n-sigma read series built as any new user's would be.
+- **Blind cases**: the benchmark's exporter, unchanged (`re3-ob-0001` ...); labels in `re3/answers.jsonl`.
+- **The split**: 9 dev cases, 10% (`split.py re3`). One case per system and fault would be 13 (14%), so per
+  system three faults consecutive in sorted order, chosen so that all five fault types are in dev; per fault, the
+  repetition-1 case of the services with that fault taken in turn. It was committed at 15:53:23 IST
+  (`chore: freeze RE3's dev/test split before any live run`), together with the scripts' suite option one commit
+  earlier at the same second. The first live call was made at about 15:56:50, on dev cases; the dev runs were
+  committed at 15:58:13, and the test session ran from 15:59:09 to 16:07:28.
+- **What the freeze does not protect**: before it, the suite was downloaded and laid out; the file layout and
+  time units of one case per system and the case index's grid (systems, faults, services, repetitions, which
+  the split rule is written for) were looked at. No ranking, tool output, converted document or telemetry
+  content of any RE3 case was looked at before the split.
+- **The converter was checked on the dev cases only, and not changed.** Code-level faults are said to show
+  mostly in logs and error codes, so the dev cases' raw telemetry was read for what the conversion drops. Up to
+  the agent's cut-off, the level rules missed 3 stack-trace lines in all 9 dev cases (2 of them by a root cause
+  that already showed 6 WARN and ERROR lines). System C's traces record no status codes at all, system B has no
+  traces, and on system A the error codes sit on the callers' spans while the root cause's own failed requests
+  already reach the document through its metrics. INFO lines would only change a count the log tool prints. So
+  RE3 is converted exactly as RE2 was; the hand-written calls and the gateway rule are keyed by system, since both
+  suites record the same three systems. The test cases were converted after the dev runs were committed; their
+  label-free counts were then looked at (the alarm fired in all 90 cases, between the injection tick and 9 ticks
+  after it; one case has no WARN or ERROR line).
+- **Published baselines**: BARO, n-sigma, their multi-source versions and epsilon-Diagnosis on all 90 cases (none
+  crashed on any); CIRCA on systems A and B, since a run on a single case of system C was again stopped by a 600 s
+  timeout (`re3/baselines/circa-re3-tt.txt`); and the n-sigma window check. The runner's own printed summary groups
+  results by RE2's fault kinds and prints nothing for code-level faults (`re3/baselines/*.txt`), so for RE3 the
+  benchmark's evaluator (`score.py ... re3`, `re3/official.json`) is the only cross-check, and `report.py` matches
+  it on every method.
+- **Live runs**: the auto route only, in the seeded order, with a hard cap of $5 for every RE3 live call, dev
+  included. The dev set metered $0.286 and projected about $2.60 for the test set; the test cases cost more
+  (system C's averaged $0.13, with Opus taking over in 19 of 22), and the session stopped starting cases at
+  $4.46 with 10 left. The next case in the order was one of system C's, which ran up to $0.26 a case, and $0.25
+  was left under the cap. Projected at the agent's per-system rates, the 10 left out would bring its overall
+  AC@1 to about 79%. A second session, with a $2.50 cap and no change to the agent or its runner, ran those 10 in the same
+  seeded order for $1.23, and the overall AC@1 came out at 79% (7 of the 10 named first: 2 of 2 on system A,
+  3 of 3 on B, 2 of 5 on C). Claude Opus 5.5 alone was not run on RE3.
+
+Everything in RE2's deviations applies unchanged: the agent's 5-minute baseline and 20-second look, WARN and
+ERROR lines only, the resampling and units, the proxy names, CIRCA's fallback and at most 5 submitted suspects.
+
+### RE3 limitations
+
+- 27 test cases per system, and system C has only 2 root-cause services, so per-system and per-fault numbers
+  rest on few cases and few services.
+- In the dev cases, about two thirds of the WARN and ERROR lines in the 10-minute window came after the agent's
+  cut-off (1,636 of 5,098 were before it), so this suite mostly tests what a code-level fault looks like in its
+  first seconds, when the redeployed service's restart dominates the metrics, not the errors that follow.
+- One live run per case, as on RE2. The benchmark is public; the learned-prior check finds nothing (the agent's
+  wrong first suspects name another case's root cause once in 17), but with 2 to 4 root causes per system it says
+  little here.
 
 ## Reproduce
 
@@ -351,5 +566,26 @@ python -I scripts/benchmark/score.py $W
 uv run --with-requirements requirements.txt python scripts/benchmark/report.py
 ```
 
-`report.py` alone (the last line) reproduces `results.json` from the committed records, with no data, no key
-and no network.
+RE3 takes the same steps with the suite named, from the Parquet copy alone (about 330 MB); its layout step also
+needs `drain3==0.9.11` in the benchmark's environment. Its live run had a $5 cap for dev and test together.
+
+```sh
+python -I scripts/benchmark/fetch.py parquet $DATASET_ID $W/data/parquet 're3*/metrics.parquet' \
+    're3*/inject_time.txt' 're3*/logs.parquet' 're3*/traces.parquet'
+python -I scripts/benchmark/prepare.py $W/data/RE3 $W/data/parquet $W/tasks re3-ob re3-ss re3-tt
+python scripts/benchmark/split.py re3
+for d in re3-ob re3-ss re3-tt; do python -I scripts/benchmark/convert.py $W/tasks/$d $W/converted-re3; done
+for m in zscore robust graph; do
+  uv run --with-requirements requirements.txt python scripts/benchmark/run.py $W/converted-re3 --suite re3 \
+      --set test --method $m
+done
+uv run --env-file .env --with-requirements requirements.txt python scripts/benchmark/run.py $W/converted-re3 \
+    --suite re3 --set test --method auto --budget-usd 4.6 --workers 4 --full-dir $W/full-re3
+python -I scripts/benchmark/baselines.py <benchmark source>/main.py $W/data $W/tasks $W/baselines --suite re3 \
+    baro nsigma mmbaro mmnsigma e_diagnosis circa:re3-ob,re3-ss nsigma/10 nsigma/2
+python -I scripts/benchmark/score.py $W re3
+uv run --with-requirements requirements.txt python scripts/benchmark/report.py
+```
+
+`report.py` alone (the last line) reproduces `results.json`, both suites, from the committed records, with no
+data, no key and no network.

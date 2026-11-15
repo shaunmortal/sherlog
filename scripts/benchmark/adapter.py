@@ -152,29 +152,34 @@ def datastore_calls(services: tuple[str, ...]) -> dict[str, set[str]]:
     return out
 
 
+def system(dataset: str) -> str:
+    """'re3-tt' -> 'tt': every suite records the same three systems, so their architecture rules are shared."""
+    return dataset.rsplit("-", 1)[-1]
+
+
 # Calls no trace shows, written by hand from each system's published architecture (docs/real-benchmark.md).
 # The 15-service system records no traces at all, so its whole graph is here.
 HAND_CALLS = {
-    # 7 of its 12 services are traced; these calls involve the other five
-    "re2-ob": {"frontend-external": ["frontend"], "frontend": ["adservice", "cartservice", "shippingservice"],
+    # 7 of its 12 services are traced (in RE2); these calls involve the other five
+    "ob": {"frontend-external": ["frontend"], "frontend": ["adservice", "cartservice", "shippingservice"],
                "checkoutservice": ["cartservice", "shippingservice"], "cartservice": ["redis"]},
-    "re2-ss": {
+    "ss": {
         "front-end": ["carts", "catalogue", "orders", "user", "session-db"],
         "orders": ["carts", "payment", "shipping", "user"],
         "shipping": ["rabbitmq"], "queue-master": ["rabbitmq"], "rabbitmq-exporter": ["rabbitmq"],
     },
-    "re2-tt": {},
+    "tt": {},
 }
 
 
 # the 68-service system's untraced gateway calls whatever service starts a trace (a span with no parent id). The
 # 12-service system's traces start in internal services too, so its entry point is wired by hand above instead.
-ENTRY = {"re2-tt": "ts-ui-dashboard"}
+ENTRY = {"tt": "ts-ui-dashboard"}
 
 
 def hand_calls(dataset: str, services: tuple[str, ...]) -> dict[str, set[str]]:
     known = set(services)
-    return {s: {c for c in HAND_CALLS.get(dataset, {}).get(s, []) if c in known} for s in services}
+    return {s: {c for c in HAND_CALLS.get(system(dataset), {}).get(s, []) if c in known} for s in services}
 
 
 def merge(*graphs: dict[str, set[str]]) -> dict[str, list[str]]:

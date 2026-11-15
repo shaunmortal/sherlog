@@ -1,5 +1,6 @@
 """The benchmark adapter (scripts/benchmark/adapter.py) on synthetic rows: the window, resampling, the metric
-mapping, the call graph, log levels, and that its documents pass the upload checks unchanged."""
+mapping, the call graph, log levels, and that its documents pass the upload checks unchanged; and the RE3 split."""
+import json
 import sys
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import adapter  # noqa: E402
 import byo  # noqa: E402
 import investigate as inv  # noqa: E402
 import sim  # noqa: E402
+import split  # noqa: E402
 
 INJECT = 1_700_000_000
 START = adapter.window_start(INJECT)
@@ -115,3 +117,17 @@ def test_a_converted_case_is_a_valid_upload_that_sherlog_reads_as_the_benchmark_
     assert inc.alarm == sim.BASELINE_TICKS + sim.ALARM_SUSTAIN_TICKS - 1
     assert inc.logs[0].about == "cart"  # the caller's complaint names the callee
     assert inv.graph_ranking(inc)[0] == "cart"  # cart explains frontend's slowness through the call graph
+
+
+def test_the_re3_split_is_a_tenth_of_the_cases_and_covers_every_fault_type():
+    runs = ROOT / "runs" / "real-benchmark" / "re3"
+    answers = [json.loads(line) for line in (runs / "answers.jsonl").read_text().splitlines()]
+    out = split.split_re3(answers)
+    assert out == json.loads((runs / "split.json").read_text())  # the committed freeze is this rule's output
+    by_id = {a["case_id"]: a for a in answers}
+    dev = [by_id[c] for c in out["dev"]]
+    assert len(dev) <= len(answers) // 10 and {a["fault"] for a in dev} == {a["fault"] for a in answers}
+    assert sorted(a["dataset"] for a in dev) == ["re3-ob"] * 3 + ["re3-ss"] * 3 + ["re3-tt"] * 3
+    assert all(a["repetition"] == 1 for a in dev) and not set(out["dev"]) & set(out["test"])
+    # both suites record the same three systems, so they share its hand-written calls
+    assert adapter.hand_calls("re3-ss", ("front-end", "carts")) == adapter.hand_calls("re2-ss", ("front-end", "carts"))

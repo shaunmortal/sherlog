@@ -19,7 +19,15 @@ sys.path.insert(0, str(ROOT))
 from bench import mcnemar_p, wilson  # noqa: E402  (stdlib-only helpers shared with the shop's benchmark)
 
 RUNS = ROOT / "runs" / "real-benchmark"
-SYSTEMS = {"re2-ob": "A", "re2-ss": "B", "re2-tt": "C"}  # docs name the systems by letter and size
+SUITES = {"re2": RUNS, "re3": RUNS / "re3"}  # each suite's records (RE2's stay where its first run put them)
+
+
+def systems(suite: str) -> dict[str, str]:
+    """dataset -> the letter docs name its system by: every suite records the same three systems."""
+    return {f"{suite}-{x}": s for x, s in zip(("ob", "ss", "tt"), "ABC")}
+
+
+SYSTEMS = systems("re2")  # docs name the systems by letter and size
 LABELS = {
     "zscore": "Sherlog no-AI: z-score ranking",
     "robust": "Sherlog no-AI: robust (median/MAD) z-score ranking",
@@ -58,12 +66,12 @@ def load(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()] if path.exists() else []
 
 
-def records(method: str, cases: set[str], subset: str) -> dict[str, dict]:
+def records(method: str, cases: set[str], subset: str, runs: Path = RUNS) -> dict[str, dict]:
     """case id -> record, for one method on one set."""
     if method == "auto-submitted":
-        return {r["case_id"]: {**r, "ranks": r["submitted"]} for r in records("auto", cases, subset).values()}
-    path = RUNS / subset / f"{method}.jsonl"
-    rows = load(path) if path.exists() else load(RUNS / "baselines" / f"{method}.jsonl")
+        return {r["case_id"]: {**r, "ranks": r["submitted"]} for r in records("auto", cases, subset, runs).values()}
+    path = runs / subset / f"{method}.jsonl"
+    rows = load(path) if path.exists() else load(runs / "baselines" / f"{method}.jsonl")
     return {r["case_id"]: r for r in rows if r["case_id"] in cases}
 
 
@@ -118,16 +126,18 @@ def paired(a: dict[str, dict], b: dict[str, dict], answers: dict[str, dict]) -> 
             "only_second_right": sum(q and not p for p, q in zip(x, y)), "mcnemar_p": float(f"{mcnemar_p(x, y):.3g}")}
 
 
-def build() -> dict:
-    answers = {a["case_id"]: a for a in load(RUNS / "answers.jsonl")}
-    split = json.loads((RUNS / "split.json").read_text())
-    methods = [m for m in LABELS if records(m, set(answers), "test")]
+def build(suite: str = "re2") -> dict:
+    runs = SUITES[suite]
+    answers = {a["case_id"]: a for a in load(runs / "answers.jsonl")}
+    split = json.loads((runs / "split.json").read_text())
+    rec = lambda m, subset: records(m, set(split[subset]), subset, runs)  # noqa: E731
+    methods = [m for m in LABELS if records(m, set(answers), "test", runs)]
     out = {"split": {k: len(split[k]) for k in ("dev", "test")}, "methods": {}, "paired": {}, "dev": {}}
     groups = {"all": split["test"], **{f"system {s}": [c for c in split["test"] if answers[c]["dataset"] == d]
-                                      for d, s in SYSTEMS.items()}}
+                                      for d, s in systems(suite).items()}}
     faults = sorted({a["fault"] for a in answers.values()})
     for m in methods:
-        recs = records(m, set(split["test"]), "test")
+        recs = rec(m, "test")
         out["methods"][m] = {
             "label": LABELS[m],
             **{g: scores(cases, recs, answers) for g, cases in groups.items()},
@@ -136,16 +146,16 @@ def build() -> dict:
             **({"sherlog": agent_stats(recs, answers)} if m in LIVE else {}),
         }
     for agent in (m for m in LIVE if m in methods):
-        a = records(agent, set(split["test"]), "test")
-        out["paired"][agent] = {m: paired(a, records(m, set(split["test"]), "test"), answers)
+        a = rec(agent, "test")
+        out["paired"][agent] = {m: paired(a, rec(m, "test"), answers)
                                 for m in methods if m not in (agent, "auto-submitted")}
     for m in (*LIVE, "zscore", "graph"):
-        recs = records(m, set(split["dev"]), "dev")
+        recs = rec(m, "dev")
         if recs:
             out["dev"][m] = {"all": scores(split["dev"], recs, answers),
                              **({"sherlog": agent_stats(recs, answers)} if m in LIVE else {})}
-    out["wrong_first_suspects"] = {m: wrong_first(records(m, set(split["test"]), "test"), answers) for m in methods}
-    spend = load(RUNS / "spend.jsonl")
+    out["wrong_first_suspects"] = {m: wrong_first(rec(m, "test"), answers) for m in methods}
+    spend = load(runs / "spend.jsonl")
     out["metered_spend_usd"] = round(sum(s["usd"] for s in spend), 4)
     return out
 
@@ -163,9 +173,9 @@ def wrong_first(recs: dict[str, dict], answers: dict[str, dict]) -> dict:
                                                                          for c in wrong)}
 
 
-def check_official(results: dict) -> None:
+def check_official(results: dict, runs: Path = RUNS) -> None:
     """Every number the benchmark's own evaluator produced (score.py) must match ours."""
-    path = RUNS / "official.json"
+    path = runs / "official.json"
     if not path.exists():
         print("note: official.json missing; run score.py in the benchmark's environment to cross-check")
         return
@@ -221,7 +231,9 @@ def window_table(results: dict) -> str:
     rows = ["| n-sigma window | AC@1 | Only the auto route right | Only n-sigma right | McNemar p |",
             "|---|---:|---:|---:|---:|"]
     for m in WINDOW_CHECK:
-        p = results["paired"]["auto"][m]
+        p = results["paired"]["auto"].get(m)
+        if p is None:  # the window check ran on RE2 only
+            return ""
         rows.append(f"| {LABELS[m]} | {results['methods'][m]['all']['AC@1']:.1%} | {p['only_first_right']} | "
                     f"{p['only_second_right']} | {p['mcnemar_p']:.2g} |")
     return "\n".join(rows)
@@ -231,7 +243,8 @@ def prior_table(results: dict) -> str:
     rows = ["| Method | First suspect wrong | ...and a service broken in another case |", "|---|---:|---:|"]
     for m, w in results["wrong_first_suspects"].items():
         if m not in WINDOW_CHECK[1:]:
-            rows.append(f"| {LABELS[m]} | {w['wrong']} | {w['names_a_root_cause_of_another_case']} |")
+            rows.append(f"| {results['methods'][m]['label']} | {w['wrong']} | "
+                        f"{w['names_a_root_cause_of_another_case']} |")
     return "\n".join(rows)
 
 
@@ -250,11 +263,20 @@ def sherlog_table(results: dict) -> str:
 def main() -> None:
     results = build()
     check_official(results)
+    if (SUITES["re3"] / "split.json").exists():  # the code-level suite, under its own key; RE2's keys are unchanged
+        re3 = build("re3")
+        if re3["methods"]:
+            check_official(re3, SUITES["re3"])
+            results["re3"] = re3
     (RUNS / "results.json").write_text(json.dumps(results, indent=1) + "\n")
-    for part in (table, fault_table, paired_table, sherlog_table, window_table, prior_table):
-        print(part(results), end="\n\n")
-    print(f"metered live spend, dev and test: ${results['metered_spend_usd']}; official cross-check: "
-          f"{results.get('official_match', 'not run')}")
+    for suite, res in (("RE2", results), ("RE3", results.get("re3"))):
+        if not res:
+            continue
+        print(f"## {suite}\n")
+        for part in (table, fault_table, paired_table, sherlog_table, window_table, prior_table):
+            print(part(res), end="\n\n")
+        print(f"{suite} metered live spend, dev and test: ${res['metered_spend_usd']}; official cross-check: "
+              f"{res.get('official_match', 'not run')}\n")
 
 
 if __name__ == "__main__":

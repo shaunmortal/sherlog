@@ -1,0 +1,4 @@
+52 s, 0 case(s) left out
+--- Evaluation results ---
+---
+Avg speed: 0.83

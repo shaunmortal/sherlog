@@ -68,7 +68,7 @@ def convert(case: Path) -> tuple[dict, dict]:
     columns = {c: rows[c].astype(float).tolist() for c in rows.columns if c != "time"}
     series = adapter.series_of(columns, rows["time"].astype(float).tolist(), start)
     services = tuple(series)
-    edges = read_edges(case, inject_time, adapter.ENTRY.get(dataset))
+    edges = read_edges(case, inject_time, adapter.ENTRY.get(adapter.system(dataset)))
     calls = adapter.merge(adapter.calls_from_edges(edges, services), adapter.datastore_calls(services),
                           adapter.hand_calls(dataset, services))
     logs = adapter.log_lines(read_logs(case, start), services, start)
