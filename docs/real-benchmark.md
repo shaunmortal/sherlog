@@ -333,8 +333,8 @@ key `re3` of `results.json`; RE2's keys and values there are unchanged.
 | Sherlog no-AI: z-score ranking | 81 | 74% (64%-82%) | 84% | 0.83 | 96% / 0.96 | 96% / 0.99 | 30% / 0.53 |
 | Sherlog no-AI: robust (median/MAD) z-score ranking | 81 | 52% (41%-62%) | 65% | 0.64 | 74% / 0.92 | 81% / 0.94 | 0% / 0.07 |
 | Sherlog no-AI: call-graph rule | 81 | 59% (48%-69%) | 80% | 0.76 | 74% / 0.90 | 89% / 0.97 | 15% / 0.40 |
-| Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed) | 71 | 80% (70%-88%) | 92% | 0.89 | 100% / 1.00 | 96% / 0.99 | 41% / 0.66 |
-| Sherlog agent, auto route, every submitted suspect (verified or not) | 71 | 80% (70%-88%) | 92% | 0.89 | 100% / 1.00 | 96% / 0.99 | 41% / 0.66 |
+| Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed) | 81 | 79% (69%-86%) | 93% | 0.90 | 100% / 1.00 | 96% / 0.99 | 41% / 0.70 |
+| Sherlog agent, auto route, every submitted suspect (verified or not) | 81 | 79% (69%-86%) | 93% | 0.90 | 100% / 1.00 | 96% / 0.99 | 41% / 0.70 |
 | Published baseline: BARO (metrics) | 81 | 26% (18%-36%) | 98% | 0.82 | 0% / 0.76 | 0% / 0.74 | 78% / 0.96 |
 | Published baseline: n-sigma (metrics) | 81 | 73% (62%-81%) | 94% | 0.89 | 81% / 0.88 | 59% / 0.84 | 78% / 0.96 |
 | Published baseline: multi-source BARO (metrics, logs, traces) | 81 | 25% (17%-35%) | 96% | 0.81 | 0% / 0.76 | 0% / 0.74 | 74% / 0.94 |
@@ -342,27 +342,27 @@ key `re3` of `results.json`; RE2's keys and values there are unchanged.
 | Published baseline: CIRCA (metrics; systems A and B only, too slow on C) | 54 | 74% (61%-84%) | 98% | 0.93 | 81% / 0.96 | 67% / 0.90 | not run |
 | Published baseline: epsilon-Diagnosis (metrics) | 81 | 2% (1%-9%) | 21% | 0.16 | 4% / 0.24 | 4% / 0.23 | 0% / 0.00 |
 
-27 test cases per system. The auto route ran on 71 of the 81: the spend cap stopped it before the last 10 in its
-seeded order (2 of system A, 3 of B, 5 of C), so its row is over those 71 and its paired tests are on the cases
-both methods ran.
+27 test cases per system. The auto route ran on all 81: a first $5 cap stopped it after 71 in its seeded order,
+and the last 10 (2 of system A, 3 of B, 5 of C) ran in a second session once the cap was raised by $2.50, with no
+change to the agent or its runner in between.
 
-- **On systems A and B the auto route named the cause first in 48 of 49 test cases** (25 of 25 and 23 of 24),
-  where n-sigma did in 81% and 59% of their 27 cases each, and answered 44 of them on its own with no wrong answer.
-- **Overall, 57 of 71 (80%, 95% CI 70% to 88%).** On the same 71 cases n-sigma named the cause first in 51 and
-  multi-source n-sigma in 48. Paired, the agent was right where n-sigma was wrong 17 times and the reverse 11
-  times (exact McNemar p = 0.34; against multi-source n-sigma 18 and 9, p = 0.12): not a significant difference.
-  Against Sherlog's own call-graph rule, 14 and 1 (p = 0.00098); against the z-score ranking, 6 and 5 (p = 1).
-- **System C is where it fails: 9 of 22 first (41%), against 78% for n-sigma.** It handed 14 of those 22 to a
+- **On systems A and B the auto route named the cause first in 53 of 54 test cases** (27 of 27 and 26 of 27),
+  where n-sigma did in 81% and 59%, and answered 49 of them on its own with no wrong answer.
+- **Overall, 64 of 81 (79%, 95% CI 69% to 86%).** n-sigma named the cause first in 59 and multi-source n-sigma
+  in 56. Paired, the agent was right where n-sigma was wrong 19 times and the reverse 14 times (exact McNemar
+  p = 0.49; against multi-source n-sigma 20 and 12, p = 0.21): not a significant difference. Against Sherlog's
+  own call-graph rule, 17 and 1 (p = 0.00015); against the z-score ranking, 9 and 5 (p = 0.42).
+- **System C is where it fails: 11 of 27 first (41%), against 78% for n-sigma.** It handed 19 of those 27 to a
   human, and all 3 of its wrong answers in the suite were there (F1, F2 and F4). See below for why.
 - **n-sigma does better with less data here, and then beats the agent.** Given 5 or 1 minute on each side of the
   injection instead of 10, n-sigma names the cause first in 83% and 88% of the 81 test cases (93% on system C with
-  1 minute). Paired with the 1-minute version, the agent was right alone 7 times and n-sigma 13 times (p = 0.26).
+  1 minute). Paired with the 1-minute version, the agent was right alone 8 times and n-sigma 15 times (p = 0.21).
   On RE2 the agent's lead held at every window; on RE3 it does not.
-- **It answered 52 of the 71 on its own, and 3 of those answers were wrong (5.8%).** The other 19 went to a human
-  (14 of them on system C); in 8 of those 19 its top verified suspect was in fact the cause.
-- **Cost: $4.46 for the 71 cases, $0.063 a case on average, $0.058 at the median**, much more than on RE2
-  because Claude Opus 5.5 took over in 40 of 71 (19 of system C's 22). All RE3 live runs, dev set included,
-  metered $4.75 against a $5 cap.
+- **It answered 57 of the 81 on its own, and 3 of those answers were wrong (5.3%).** The other 24 went to a human
+  (19 of them on system C); in 10 of those 24 its top verified suspect was in fact the cause.
+- **Cost: $5.69 for the 81 cases, $0.070 a case on average, $0.061 at the median**, much more than on RE2
+  because Claude Opus 5.5 took over in 47 of 81 (24 of system C's 27). All RE3 live runs, dev set included,
+  metered $5.97: $4.75 under the first $5 cap and $1.23 for the last 10 cases.
 
 **Why system C goes wrong.** In none of system C's 27 test cases did the faulty service's own latency or error
 rate stay abnormal in the window the agent sees (on system A in 11 of 27, on B in 18). On system C only a few
@@ -378,16 +378,15 @@ them, and in 93% with 1 minute on each side, where its first entry is the cause'
 Sherlog's z-score scoring, with its 5-minute baseline and noise floors, ranks that memory jump below other
 services' deviations; why exactly was not established.
 
-**By fault (AC@1).** Test cases per fault: F1 24, F2 11, F3 24, F4 17, F5 5 (system A only); the auto route ran
-on 23, 8, 20, 16 and 4 of them.
+**By fault (AC@1).** Test cases per fault: F1 24, F2 11, F3 24, F4 17, F5 5 (system A only).
 
 | Method (AC@1 by fault) | f1 | f2 | f3 | f4 | f5 |
 |---|---:|---:|---:|---:|---:|
 | Sherlog no-AI: z-score ranking | 88% | 55% | 71% | 71% | 80% |
 | Sherlog no-AI: robust (median/MAD) z-score ranking | 67% | 45% | 42% | 41% | 80% |
 | Sherlog no-AI: call-graph rule | 50% | 55% | 67% | 59% | 80% |
-| Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed) | 83% | 75% | 80% | 75% | 100% |
-| Sherlog agent, auto route, every submitted suspect (verified or not) | 83% | 75% | 80% | 75% | 100% |
+| Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed) | 83% | 64% | 83% | 71% | 100% |
+| Sherlog agent, auto route, every submitted suspect (verified or not) | 83% | 64% | 83% | 71% | 100% |
 | Published baseline: BARO (metrics) | 17% | 55% | 25% | 29% | 0% |
 | Published baseline: n-sigma (metrics) | 83% | 100% | 62% | 59% | 60% |
 | Published baseline: multi-source BARO (metrics, logs, traces) | 21% | 55% | 21% | 24% | 0% |
@@ -399,23 +398,23 @@ on 23, 8, 20, 16 and 4 of them.
 
 | Agent vs | Paired cases | Only the agent right | Only the other right | McNemar p |
 |---|---:|---:|---:|---:|
-| auto vs Sherlog no-AI: z-score ranking | 71 | 6 | 5 | 1 |
-| auto vs Sherlog no-AI: robust (median/MAD) z-score ranking | 71 | 16 | 0 | 3e-05 |
-| auto vs Sherlog no-AI: call-graph rule | 71 | 14 | 1 | 0.00098 |
-| auto vs Published baseline: BARO (metrics) | 71 | 48 | 8 | 4.7e-08 |
-| auto vs Published baseline: n-sigma (metrics) | 71 | 17 | 11 | 0.34 |
-| auto vs Published baseline: multi-source BARO (metrics, logs, traces) | 71 | 50 | 9 | 5.3e-08 |
-| auto vs Published baseline: multi-source n-sigma (metrics, logs, traces) | 71 | 18 | 9 | 0.12 |
-| auto vs Published baseline: CIRCA (metrics; systems A and B only, too slow on C) | 49 | 13 | 1 | 0.0018 |
-| auto vs Published baseline: epsilon-Diagnosis (metrics) | 71 | 55 | 0 | 5.6e-17 |
+| auto vs Sherlog no-AI: z-score ranking | 81 | 9 | 5 | 0.42 |
+| auto vs Sherlog no-AI: robust (median/MAD) z-score ranking | 81 | 22 | 0 | 4.8e-07 |
+| auto vs Sherlog no-AI: call-graph rule | 81 | 17 | 1 | 0.00015 |
+| auto vs Published baseline: BARO (metrics) | 81 | 54 | 11 | 6e-08 |
+| auto vs Published baseline: n-sigma (metrics) | 81 | 19 | 14 | 0.49 |
+| auto vs Published baseline: multi-source BARO (metrics, logs, traces) | 81 | 56 | 12 | 6.2e-08 |
+| auto vs Published baseline: multi-source n-sigma (metrics, logs, traces) | 81 | 20 | 12 | 0.21 |
+| auto vs Published baseline: CIRCA (metrics; systems A and B only, too slow on C) | 54 | 14 | 1 | 0.00098 |
+| auto vs Published baseline: epsilon-Diagnosis (metrics) | 81 | 62 | 0 | 4.3e-19 |
 
 **n-sigma with other windows** (`baselines.py ... --suite re3 nsigma/10 nsigma/2`):
 
 | n-sigma window | AC@1 | Only the auto route right | Only n-sigma right | McNemar p |
 |---|---:|---:|---:|---:|
-| Published baseline: n-sigma (metrics) | 72.8% | 17 | 11 | 0.34 |
-| n-sigma given 5 min on each side of the injection (window check) | 82.7% | 12 | 13 | 1 |
-| n-sigma given 1 min on each side of the injection (window check) | 87.6% | 7 | 13 | 0.26 |
+| Published baseline: n-sigma (metrics) | 72.8% | 19 | 14 | 0.49 |
+| n-sigma given 5 min on each side of the injection (window check) | 82.7% | 13 | 16 | 0.71 |
+| n-sigma given 1 min on each side of the injection (window check) | 87.6% | 8 | 15 | 0.21 |
 
 **When the first suspect is wrong** (the check for a learned prior): each system has only 2 to 4 root-cause
 services here, so the second column has few services to land on.
@@ -425,8 +424,8 @@ services here, so the second column has few services to land on.
 | Sherlog no-AI: z-score ranking | 21 | 1 |
 | Sherlog no-AI: robust (median/MAD) z-score ranking | 39 | 0 |
 | Sherlog no-AI: call-graph rule | 33 | 3 |
-| Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed) | 14 | 1 |
-| Sherlog agent, auto route, every submitted suspect (verified or not) | 14 | 1 |
+| Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed) | 17 | 1 |
+| Sherlog agent, auto route, every submitted suspect (verified or not) | 17 | 1 |
 | Published baseline: BARO (metrics) | 60 | 0 |
 | Published baseline: n-sigma (metrics) | 22 | 7 |
 | Published baseline: multi-source BARO (metrics, logs, traces) | 61 | 0 |
@@ -438,28 +437,28 @@ services here, so the second column has few services to land on.
 
 | | auto |
 |---|---:|
-| cases | 71 |
+| cases | 81 |
 | no_alarm | 0 |
-| answered | 52 |
-| handed_to_human | 19 |
+| answered | 57 |
+| handed_to_human | 24 |
 | wrong_when_answered | 3 |
-| right_when_answered | 0.9423 |
-| citation_check_pass | 0.8641 |
-| top_suspect_verified | 0.9859 |
-| handed_to_opus | 40 |
+| right_when_answered | 0.9474 |
+| citation_check_pass | 0.8638 |
+| top_suspect_verified | 0.9877 |
+| handed_to_opus | 47 |
 | blast_better_than_answer | 10 |
-| blast_unexplained_left | 21 |
+| blast_unexplained_left | 24 |
 | failed_runs | 0 |
-| cost_usd_total | 4.4616 |
-| cost_usd_mean | 0.06284 |
-| cost_usd_median | 0.05765 |
-| wall_s_mean | 23.6 |
+| cost_usd_total | 5.6885 |
+| cost_usd_mean | 0.07023 |
+| cost_usd_median | 0.06119 |
+| wall_s_mean | 24.7 |
 
 | System | Test cases | Run live | First | Answered | Wrong answers | To a human | Handed to Opus | Cost |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| A (12 services) | 27 | 25 | 25 | 24 | 0 | 1 | 6 | $0.37 |
-| B (15 services) | 27 | 24 | 23 | 20 | 0 | 4 | 15 | $1.19 |
-| C (68 services) | 27 | 22 | 9 | 8 | 3 (f1, f2, f4) | 14 | 19 | $2.90 |
+| A (12 services) | 27 | 27 | 27 | 26 | 0 | 1 | 7 | $0.50 |
+| B (15 services) | 27 | 27 | 26 | 23 | 0 | 4 | 16 | $1.25 |
+| C (68 services) | 27 | 27 | 11 | 8 | 3 (f1, f2, f4) | 19 | 24 | $3.93 |
 
 ### The RE3 dev set (9 cases, reported apart)
 
@@ -508,22 +507,23 @@ system-C weakness the test set did, at least not in the agent's first suspect.
   included. The dev set metered $0.286 and projected about $2.60 for the test set; the test cases cost more
   (system C's averaged $0.13, with Opus taking over in 19 of 22), and the session stopped starting cases at
   $4.46 with 10 left. The next case in the order was one of system C's, which ran up to $0.26 a case, and $0.25
-  was left under the cap, so no more were run. Had the 10 left out gone at the agent's per-system rates, its
-  overall AC@1 would be about 79% rather than 80%, since 5 of them are from system C, its weakest. Claude Opus
-  5.5 alone was not run on RE3.
+  was left under the cap. Projected at the agent's per-system rates, the 10 left out would bring its overall
+  AC@1 to about 79%. A second session, with a $2.50 cap and no change to the agent or its runner, ran those 10 in the same
+  seeded order for $1.23, and the overall AC@1 came out at 79% (7 of the 10 named first: 2 of 2 on system A,
+  3 of 3 on B, 2 of 5 on C). Claude Opus 5.5 alone was not run on RE3.
 
 Everything in RE2's deviations applies unchanged: the agent's 5-minute baseline and 20-second look, WARN and
 ERROR lines only, the resampling and units, the proxy names, CIRCA's fallback and at most 5 submitted suspects.
 
 ### RE3 limitations
 
-- The agent ran on 71 of the 81 test cases; 27 per system, and system C has only 2 root-cause services, so
-  per-system and per-fault numbers rest on few cases and few services.
+- 27 test cases per system, and system C has only 2 root-cause services, so per-system and per-fault numbers
+  rest on few cases and few services.
 - In the dev cases, about two thirds of the WARN and ERROR lines in the 10-minute window came after the agent's
   cut-off (1,636 of 5,098 were before it), so this suite mostly tests what a code-level fault looks like in its
   first seconds, when the redeployed service's restart dominates the metrics, not the errors that follow.
 - One live run per case, as on RE2. The benchmark is public; the learned-prior check finds nothing (the agent's
-  wrong first suspects name another case's root cause once in 14), but with 2 to 4 root causes per system it says
+  wrong first suspects name another case's root cause once in 17), but with 2 to 4 root causes per system it says
   little here.
 
 ## Reproduce

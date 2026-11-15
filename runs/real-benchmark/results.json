@@ -2411,243 +2411,243 @@
    "auto": {
     "label": "Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed)",
     "all": {
-     "n": 71,
+     "n": 81,
      "of": 81,
-     "AC@1": 0.8028,
-     "AC@3": 0.9155,
-     "AC@5": 0.9155,
-     "Avg@5": 0.893,
+     "AC@1": 0.7901,
+     "AC@3": 0.9259,
+     "AC@5": 0.9259,
+     "Avg@5": 0.8963,
      "AC@1_ci95": [
-      0.696,
-      0.879
+      0.689,
+      0.865
      ]
     },
     "system A": {
-     "n": 25,
+     "n": 27,
      "of": 27,
      "AC@1": 1.0,
      "AC@3": 1.0,
      "AC@5": 1.0,
      "Avg@5": 1.0,
      "AC@1_ci95": [
-      0.867,
+      0.875,
       1.0
      ]
     },
     "system B": {
-     "n": 24,
+     "n": 27,
      "of": 27,
-     "AC@1": 0.9583,
+     "AC@1": 0.963,
      "AC@3": 1.0,
      "AC@5": 1.0,
-     "Avg@5": 0.9917,
+     "Avg@5": 0.9926,
      "AC@1_ci95": [
-      0.798,
+      0.817,
       0.993
      ]
     },
     "system C": {
-     "n": 22,
+     "n": 27,
      "of": 27,
-     "AC@1": 0.4091,
-     "AC@3": 0.7273,
-     "AC@5": 0.7273,
-     "Avg@5": 0.6636,
+     "AC@1": 0.4074,
+     "AC@3": 0.7778,
+     "AC@5": 0.7778,
+     "Avg@5": 0.6963,
      "AC@1_ci95": [
-      0.233,
-      0.613
+      0.245,
+      0.593
      ]
     },
     "by_fault": {
      "f1": {
-      "n": 23,
+      "n": 24,
       "of": 24,
-      "AC@1": 0.8261,
-      "AC@3": 0.9565,
-      "AC@5": 0.9565,
-      "Avg@5": 0.9304,
+      "AC@1": 0.8333,
+      "AC@3": 0.9583,
+      "AC@5": 0.9583,
+      "Avg@5": 0.9333,
       "AC@1_ci95": [
-       0.629,
-       0.93
+       0.641,
+       0.933
       ]
      },
      "f2": {
-      "n": 8,
+      "n": 11,
       "of": 11,
-      "AC@1": 0.75,
-      "AC@3": 0.875,
-      "AC@5": 0.875,
-      "Avg@5": 0.85,
+      "AC@1": 0.6364,
+      "AC@3": 0.9091,
+      "AC@5": 0.9091,
+      "Avg@5": 0.8364,
       "AC@1_ci95": [
-       0.409,
-       0.929
+       0.354,
+       0.848
       ]
      },
      "f3": {
-      "n": 20,
+      "n": 24,
       "of": 24,
-      "AC@1": 0.8,
-      "AC@3": 0.9,
-      "AC@5": 0.9,
-      "Avg@5": 0.88,
+      "AC@1": 0.8333,
+      "AC@3": 0.9167,
+      "AC@5": 0.9167,
+      "Avg@5": 0.9,
       "AC@1_ci95": [
-       0.584,
-       0.919
+       0.641,
+       0.933
       ]
      },
      "f4": {
-      "n": 16,
+      "n": 17,
       "of": 17,
-      "AC@1": 0.75,
-      "AC@3": 0.875,
-      "AC@5": 0.875,
-      "Avg@5": 0.85,
+      "AC@1": 0.7059,
+      "AC@3": 0.8824,
+      "AC@5": 0.8824,
+      "Avg@5": 0.8471,
       "AC@1_ci95": [
-       0.505,
-       0.898
+       0.469,
+       0.867
       ]
      },
      "f5": {
-      "n": 4,
+      "n": 5,
       "of": 5,
       "AC@1": 1.0,
       "AC@3": 1.0,
       "AC@5": 1.0,
       "Avg@5": 1.0,
       "AC@1_ci95": [
-       0.51,
+       0.566,
        1.0
       ]
      }
     },
     "sherlog": {
-     "cases": 71,
+     "cases": 81,
      "no_alarm": 0,
-     "answered": 52,
-     "handed_to_human": 19,
+     "answered": 57,
+     "handed_to_human": 24,
      "wrong_when_answered": 3,
-     "right_when_answered": 0.9423,
-     "suspects_submitted": 184,
-     "citation_check_pass": 0.8641,
-     "top_suspect_verified": 0.9859,
-     "handed_to_opus": 40,
+     "right_when_answered": 0.9474,
+     "suspects_submitted": 213,
+     "citation_check_pass": 0.8638,
+     "top_suspect_verified": 0.9877,
+     "handed_to_opus": 47,
      "blast_better_than_answer": 10,
-     "blast_unexplained_left": 21,
+     "blast_unexplained_left": 24,
      "failed_runs": 0,
-     "cost_usd_total": 4.4616,
-     "cost_usd_mean": 0.06284,
-     "cost_usd_median": 0.05765,
-     "wall_s_mean": 23.6
+     "cost_usd_total": 5.6885,
+     "cost_usd_mean": 0.07023,
+     "cost_usd_median": 0.06119,
+     "wall_s_mean": 24.7
     }
    },
    "auto-submitted": {
     "label": "Sherlog agent, auto route, every submitted suspect (verified or not)",
     "all": {
-     "n": 71,
+     "n": 81,
      "of": 81,
-     "AC@1": 0.8028,
-     "AC@3": 0.9155,
-     "AC@5": 0.9155,
-     "Avg@5": 0.893,
+     "AC@1": 0.7901,
+     "AC@3": 0.9259,
+     "AC@5": 0.9259,
+     "Avg@5": 0.8963,
      "AC@1_ci95": [
-      0.696,
-      0.879
+      0.689,
+      0.865
      ]
     },
     "system A": {
-     "n": 25,
+     "n": 27,
      "of": 27,
      "AC@1": 1.0,
      "AC@3": 1.0,
      "AC@5": 1.0,
      "Avg@5": 1.0,
      "AC@1_ci95": [
-      0.867,
+      0.875,
       1.0
      ]
     },
     "system B": {
-     "n": 24,
+     "n": 27,
      "of": 27,
-     "AC@1": 0.9583,
+     "AC@1": 0.963,
      "AC@3": 1.0,
      "AC@5": 1.0,
-     "Avg@5": 0.9917,
+     "Avg@5": 0.9926,
      "AC@1_ci95": [
-      0.798,
+      0.817,
       0.993
      ]
     },
     "system C": {
-     "n": 22,
+     "n": 27,
      "of": 27,
-     "AC@1": 0.4091,
-     "AC@3": 0.7273,
-     "AC@5": 0.7273,
-     "Avg@5": 0.6636,
+     "AC@1": 0.4074,
+     "AC@3": 0.7778,
+     "AC@5": 0.7778,
+     "Avg@5": 0.6963,
      "AC@1_ci95": [
-      0.233,
-      0.613
+      0.245,
+      0.593
      ]
     },
     "by_fault": {
      "f1": {
-      "n": 23,
+      "n": 24,
       "of": 24,
-      "AC@1": 0.8261,
-      "AC@3": 0.9565,
-      "AC@5": 0.9565,
-      "Avg@5": 0.9304,
+      "AC@1": 0.8333,
+      "AC@3": 0.9583,
+      "AC@5": 0.9583,
+      "Avg@5": 0.9333,
       "AC@1_ci95": [
-       0.629,
-       0.93
+       0.641,
+       0.933
       ]
      },
      "f2": {
-      "n": 8,
+      "n": 11,
       "of": 11,
-      "AC@1": 0.75,
-      "AC@3": 0.875,
-      "AC@5": 0.875,
-      "Avg@5": 0.85,
+      "AC@1": 0.6364,
+      "AC@3": 0.9091,
+      "AC@5": 0.9091,
+      "Avg@5": 0.8364,
       "AC@1_ci95": [
-       0.409,
-       0.929
+       0.354,
+       0.848
       ]
      },
      "f3": {
-      "n": 20,
+      "n": 24,
       "of": 24,
-      "AC@1": 0.8,
-      "AC@3": 0.9,
-      "AC@5": 0.9,
-      "Avg@5": 0.88,
+      "AC@1": 0.8333,
+      "AC@3": 0.9167,
+      "AC@5": 0.9167,
+      "Avg@5": 0.9,
       "AC@1_ci95": [
-       0.584,
-       0.919
+       0.641,
+       0.933
       ]
      },
      "f4": {
-      "n": 16,
+      "n": 17,
       "of": 17,
-      "AC@1": 0.75,
-      "AC@3": 0.875,
-      "AC@5": 0.875,
-      "Avg@5": 0.85,
+      "AC@1": 0.7059,
+      "AC@3": 0.8824,
+      "AC@5": 0.8824,
+      "Avg@5": 0.8471,
       "AC@1_ci95": [
-       0.505,
-       0.898
+       0.469,
+       0.867
       ]
      },
      "f5": {
-      "n": 4,
+      "n": 5,
       "of": 5,
       "AC@1": 1.0,
       "AC@3": 1.0,
       "AC@5": 1.0,
       "Avg@5": 1.0,
       "AC@1_ci95": [
-       0.51,
+       0.566,
        1.0
       ]
      }
@@ -3552,70 +3552,70 @@
   "paired": {
    "auto": {
     "zscore": {
-     "n": 71,
-     "only_first_right": 6,
+     "n": 81,
+     "only_first_right": 9,
      "only_second_right": 5,
-     "mcnemar_p": 1.0
+     "mcnemar_p": 0.424
     },
     "robust": {
-     "n": 71,
-     "only_first_right": 16,
+     "n": 81,
+     "only_first_right": 22,
      "only_second_right": 0,
-     "mcnemar_p": 3.05e-05
+     "mcnemar_p": 4.77e-07
     },
     "graph": {
-     "n": 71,
+     "n": 81,
+     "only_first_right": 17,
+     "only_second_right": 1,
+     "mcnemar_p": 0.000145
+    },
+    "baro": {
+     "n": 81,
+     "only_first_right": 54,
+     "only_second_right": 11,
+     "mcnemar_p": 6.03e-08
+    },
+    "nsigma": {
+     "n": 81,
+     "only_first_right": 19,
+     "only_second_right": 14,
+     "mcnemar_p": 0.487
+    },
+    "nsigma-len10": {
+     "n": 81,
+     "only_first_right": 13,
+     "only_second_right": 16,
+     "mcnemar_p": 0.711
+    },
+    "nsigma-len2": {
+     "n": 81,
+     "only_first_right": 8,
+     "only_second_right": 15,
+     "mcnemar_p": 0.21
+    },
+    "mmbaro": {
+     "n": 81,
+     "only_first_right": 56,
+     "only_second_right": 12,
+     "mcnemar_p": 6.21e-08
+    },
+    "mmnsigma": {
+     "n": 81,
+     "only_first_right": 20,
+     "only_second_right": 12,
+     "mcnemar_p": 0.215
+    },
+    "circa": {
+     "n": 54,
      "only_first_right": 14,
      "only_second_right": 1,
      "mcnemar_p": 0.000977
     },
-    "baro": {
-     "n": 71,
-     "only_first_right": 48,
-     "only_second_right": 8,
-     "mcnemar_p": 4.69e-08
-    },
-    "nsigma": {
-     "n": 71,
-     "only_first_right": 17,
-     "only_second_right": 11,
-     "mcnemar_p": 0.345
-    },
-    "nsigma-len10": {
-     "n": 71,
-     "only_first_right": 12,
-     "only_second_right": 13,
-     "mcnemar_p": 1.0
-    },
-    "nsigma-len2": {
-     "n": 71,
-     "only_first_right": 7,
-     "only_second_right": 13,
-     "mcnemar_p": 0.263
-    },
-    "mmbaro": {
-     "n": 71,
-     "only_first_right": 50,
-     "only_second_right": 9,
-     "mcnemar_p": 5.26e-08
-    },
-    "mmnsigma": {
-     "n": 71,
-     "only_first_right": 18,
-     "only_second_right": 9,
-     "mcnemar_p": 0.122
-    },
-    "circa": {
-     "n": 49,
-     "only_first_right": 13,
-     "only_second_right": 1,
-     "mcnemar_p": 0.00183
-    },
     "e_diagnosis": {
-     "n": 71,
-     "only_first_right": 55,
+     "n": 81,
+     "only_first_right": 62,
      "only_second_right": 0,
-     "mcnemar_p": 5.55e-17
+     "mcnemar_p": 4.34e-19
     }
    }
   },
@@ -3696,11 +3696,11 @@
     "names_a_root_cause_of_another_case": 3
    },
    "auto": {
-    "wrong": 14,
+    "wrong": 17,
     "names_a_root_cause_of_another_case": 1
    },
    "auto-submitted": {
-    "wrong": 14,
+    "wrong": 17,
     "names_a_root_cause_of_another_case": 1
    },
    "baro": {
@@ -3736,7 +3736,7 @@
     "names_a_root_cause_of_another_case": 16
    }
   },
-  "metered_spend_usd": 4.7479,
+  "metered_spend_usd": 5.9748,
   "official_match": [
    "auto",
    "auto-submitted",
