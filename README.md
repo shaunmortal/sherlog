@@ -43,7 +43,7 @@ Sherlog was built during IceHacks 2026, on Nov 14 and 15 (IST), with Claude Code
 | Track | Why it fits, and where to check |
 |---|---|
 | **Best&nbsp;AI&nbsp;Hack** | A Claude agent investigates with read-only tools and must cite the tool calls behind each suspect. Plain code checks every citation, and a replay with the answer rolled back tests it. **On 252 real outages of a public benchmark it ranked the root cause first in 92%, against 80–81% for the best published methods re-run on the same cases (against n-sigma, case by case, 40 to 9, p = 9.3e-6) and 83% for the same inputs without the AI**, for a median $0.0024 an outage. In the controlled benchmark's hard mode, the Opus agent named the cause first in 43 of 44 and never answered wrong.<br>**Check it:** [Real outages](#real-outages-a-public-benchmark) · [What's new](#whats-new-here) · [How it works](#how-it-works) · [a caught wrong answer](https://sherlog-jade.vercel.app/console#replay/177) |
-| **Best&nbsp;Deployed&nbsp;App** | Live, with a status page and a health endpoint. All 183 recorded investigations replay with no API key; live runs are rate-limited and fail with a clear reason; 1,233 tests run in CI on every push, 933 of them re-running every recorded run from its seed; every real-outage number recomputes from the committed run records with no key; an MCP connector at `/mcp` lets Claude use it as a tool; an uptime check of the live health endpoint is scheduled every 30 minutes.<br>**Check it:** [Live site](https://sherlog-jade.vercel.app) · [`/status`](https://sherlog-jade.vercel.app/status) · [`/api/health`](https://sherlog-jade.vercel.app/api/health) · [CI](https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml) · [uptime check](.github/workflows/uptime.yml) · [Reliability](#reliability) |
+| **Best&nbsp;Deployed&nbsp;App** | Live, with a status page and a health endpoint. All 183 recorded investigations replay with no API key; live runs are rate-limited and fail with a clear reason; 1,601 tests run in CI on every push, 1,285 of them re-running every recorded run from its seed; every real-outage number recomputes from the committed run records with no key; an MCP connector at `/mcp` lets Claude use it as a tool; an uptime check of the live health endpoint is scheduled every 30 minutes.<br>**Check it:** [Live site](https://sherlog-jade.vercel.app) · [`/status`](https://sherlog-jade.vercel.app/status) · [`/api/health`](https://sherlog-jade.vercel.app/api/health) · [CI](https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml) · [uptime check](.github/workflows/uptime.yml) · [Reliability](#reliability) |
 | **Best&nbsp;Design&nbsp;&amp;&nbsp;UX** | A scroll story you can play: guess which service broke, then watch the agent investigate, check and roll back; the story page's results and the console's evidence lead with the real outages. Built to WCAG 2.2 AA, with 0 axe-core violations on the story page, the console and the status page, in both themes, at desktop and phone sizes; full keyboard use, screen-reader announcements and pausable motion.<br>**Check it:** [Story page](https://sherlog-jade.vercel.app) · [Console](https://sherlog-jade.vercel.app/console) · [Accessibility](#accessibility) |
 
 ## Real outages: a public benchmark
@@ -78,7 +78,7 @@ The protocol (blind cases, the frozen split, the deviations from the benchmark's
 | 3:00–3:20 | [`/console#replay/177`](https://sherlog-jade.vercel.app/console#replay/177) (C1 in the Replay tab) | A confident wrong answer the rollback stopped. In hard mode the Haiku agent names `cart`, the decoy, 85% sure, with its citations verified, so it goes out; rolling `cart` back leaves `frontend` abnormal and the alarm on, so the rollback does not prove it. |
 | 3:20–3:40 | [Your data](https://sherlog-jade.vercel.app/console#data) → **Use** the shop sample → **Triage (no AI)**, then **Use** a custom-graph sample → **Triage** | No key needed. The alarm, the z-score ranking (`cart` first), the robust z-score (`cache` first) and the blast-radius check, which says `cache` would explain more of the outage than `cart`. The custom-graph sample brings its own call graph of six services, which replace the shop on the charts and the map. |
 | 3:40–4:00 | [`docs/real-benchmark.md`](docs/real-benchmark.md), then in a clone `python scripts/benchmark/report.py` | The real outages: the protocol and every table. The script recomputes every number in [`runs/real-benchmark/results.json`](runs/real-benchmark/results.json) from the committed run records, with no key, in about 1 s, and stops if one differs from the benchmark's own evaluator. |
-| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 1,233 passed and 1 skipped (the browser checks, which need a running server), in about 35 s. `python bench.py --report`: every controlled-benchmark table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
+| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 1,601 passed and 1 skipped (the browser checks, which need a running server), in about 35 s. `python bench.py --report`: every controlled-benchmark table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
 
 ```bash
 uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q
@@ -284,6 +284,19 @@ The z-score ranking's 15 misses name the decoy 7 times; the call-graph rule's 4 
 
 ---
 
+### Open-weights models behind the same gate
+
+Would a cheaper or open model do? Two open-weights models ran the same 176 outages behind exactly the same prompt, tools, citation check, 80% rule, blast-radius check and rollback replay, through a small adapter ([`openmodel.py`](openmodel.py)). Write-up: [docs/open-model.md](docs/open-model.md).
+
+| Hard mode, 44 outages with a decoy | Cause first | Wrong answers that passed the gate | Caught by the rollback replay | Median cost |
+|---|---:|---:|---:|---:|
+| Sherlog on Claude Opus 5.5 | 98% | 0 | – | $0.056 |
+| Sherlog on GLM-5.3 (open weights) | 91% | **0** | – | $0.071 |
+| Sherlog on gpt-oss-120b (open weights) | 80% | 6 | **all 6** | $0.0027 |
+
+- **The gate makes a strong open model safe:** GLM-5.3 gave 0 wrong answers in all 176 outages; without the gate it would have shipped 3, each held back by the 80% rule.
+- **The rollback catches an overconfident one:** gpt-oss-120b named the decoy at 90–97% confidence with citations that check out, and the rollback replay caught every one of those answers.
+
 ## Accessibility
 
 The story page, the console and the status page were built to WCAG 2.2 AA.
@@ -314,15 +327,16 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 - **Link previews.** All three pages carry a share preview image, [`static/og.jpg`](static/og.jpg).
 - **Clear errors, never a hang.** Every live failure ends the stream with a reason the console shows: a missing or invalid key, a model the key cannot use, the API's rate limit, a timeout, no connection, an API error. The verdict then goes to a human. Each model call gives up after 120 s, with 1 retry.
 - **Limits.** Live runs are limited to 6 an hour per visitor and 200 a day. Over the limit you get a 429, and with live mode off a 503, each saying what to try instead. A bad upload gets a 422 that names the field; a body over 2 MB gets a 413.
-- **Tests.** 1,233 pytest tests run in CI on every push and pull request:
+- **Tests.** 1,601 pytest tests run in CI on every push and pull request:
   - 117 in [`test_core.py`](test_core.py): the simulator, the agent loop against a scripted fake model, the verifier, the blast radius, the rollback, the auto route and the call-graph rule
   - 33 in [`tests/test_api.py`](tests/test_api.py): every route and every failure path of a live run, `HEAD` answers, the API reference, the preview image and tags, replay numbering, the caught replays and the story page's real-outage line
   - 26 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
   - 66 in [`tests/test_mcp.py`](tests/test_mcp.py): the MCP connector's lifecycle, its five tools and their errors, `llms.txt`, and that the README, the submission and `llms.txt` quote the real outages as `results.json` has them
-  - 933 in [`tests/test_reproducibility.py`](tests/test_reproducibility.py): every recorded run re-simulated from its seed, its tool results compared exactly, its verdict re-checked by today's verifier, and every replay's checks pinned ([how](docs/reproducibility.md))
+  - 1,285 in [`tests/test_reproducibility.py`](tests/test_reproducibility.py): every recorded run re-simulated from its seed, its tool results compared exactly, its verdict re-checked by today's verifier, and every replay's checks pinned ([how](docs/reproducibility.md))
   - 30 in [`tests/test_topology.py`](tests/test_topology.py): uploads with their own call graph, from the checks on `calls` through triage, the tools, the agent and the routes to the converter, and a guard that the shop's prompt and tool schemas are byte for byte the ones the recorded runs used
   - 20 in [`tests/test_metrics.py`](tests/test_metrics.py): uploads that bring their own metric names, a service reporting only some of them
   - 8 in [`tests/test_benchmark_adapter.py`](tests/test_benchmark_adapter.py): the converter of the public benchmark's cases, on synthetic rows
+  - 16 in [`tests/test_openmodel.py`](tests/test_openmodel.py): the adapter that runs the same agent loop on open-weights models, against a fake HTTP transport
 
   Sixteen browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, its one `h1` is its visible headline and its results lead with the real outages, a guess reveals the cause, its sections wait for a person to scroll to them but not for an automated screenshot (two checks), the console plays a recorded outage to its verdict, the first screen's button replays outage #41 with precise check labels and hands keyboard focus to the flight log, the phone's jump link lands focus on the verdict, a caught replay shows the rollback disproving its answer, triaging the sample afterwards replaces that outage on screen, even while paused, triaging the custom-graph sample draws its six services until a replay brings the shop back, a triage started from the keyboard keeps focus on its button, the header's link opens the real outages in Evidence, **Skip to verdict** plays the rest of a recording to the same verdict, and a verdict is brought into view and ringed when it lands.
 
@@ -359,7 +373,7 @@ Requires Python 3.12 or newer (CI runs 3.12) and uv.
 uv venv --python 3.13 && uv pip install -r requirements.txt
 cp .env.example .env                                  # then put your Anthropic API key in .env
 uv run --env-file .env uvicorn app:app --reload       # http://localhost:8000 (story), /console, /status
-uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 1,233 tests
+uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 1,601 tests
 ```
 
 Without an API key everything except live runs works: replays, the Evidence view, triage.
@@ -441,7 +455,7 @@ A dated log from what the repository shows: local file timestamps and `git log -
 
 ## Built with
 
-Python, FastAPI and the Anthropic Python SDK, with Claude Haiku 5.5, Sonnet 5.5 and Opus 5.5 (tool use, adaptive thinking, strict tool schemas); vanilla JavaScript, canvas and SVG; three.js (MIT) for the 3D call graph, the ribbon and the liquid surface; the Geist and Geist Mono fonts (SIL Open Font License); pytest, Playwright and axe-core for the tests and audits; deployed on Vercel. Developed with Claude Code as an AI pair programmer.
+Python, FastAPI and the Anthropic Python SDK, with Claude Haiku 5.5, Sonnet 5.5 and Opus 5.5 (tool use, adaptive thinking, strict tool schemas); vanilla JavaScript, canvas and SVG; three.js (MIT) for the 3D call graph, the ribbon and the liquid surface; the Geist and Geist Mono fonts (SIL Open Font License); pytest, Playwright and axe-core for the tests and audits; deployed on Vercel. GLM-5.3 and gpt-oss-120b (open weights), served by the Fireworks AI API, for the open-model comparison ([docs/open-model.md](docs/open-model.md)). Developed with Claude Code as an AI pair programmer.
 
 **AI use.** Claude Code wrote and tested code under our direction, several features at once in separate agent worktrees, which the `merge:` commits in the history join back together. Claude Haiku 5.5, Sonnet 5.5 and Opus 5.5 power the investigator, and every recorded investigation in [`runs/`](runs) is theirs. The verifier, the blast-radius check, the call-graph rule and the rollback check are plain code, with no AI.
 
