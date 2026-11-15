@@ -302,6 +302,14 @@ def test_rollback_check_reports_what_the_rollback_cleared():
     assert victim["still_abnormal"] == inv.blast_radius(inc, "cart")["abnormal"]
 
 
+def test_rollback_check_cannot_prove_a_cause_when_noise_raised_the_alarm_before_the_fault():
+    # the limit the README states: in hard seed 2031, checkout's latency noise crosses the alarm line a tick
+    # before email's leak begins, and a rollback replays that same noise, so even the true cause is not proven
+    inc = sim.simulate("email", "memory", 2031, hard=True)
+    assert inc.alarm_on(inv.PROPAGATING) == inc.alarm < inc.onset
+    assert not inv.rollback_check(inc, "email")["proves"]
+
+
 def test_rollback_gate_answers_the_verified_top_suspect_its_rollback_proves(monkeypatch):
     import bench
 
