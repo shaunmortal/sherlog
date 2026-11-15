@@ -3,8 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sherlog</title>
+<title>Sherlog: an AI on-call investigator that proves its answer</title>
 <meta name="description" content="An AI on-call investigator that has to prove its answer: break a service, guess the culprit, and watch Claude find it.">
+<!-- the preview a link gets when it is shared; the image needs an absolute address -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Sherlog: an AI on-call investigator that proves its answer">
+<meta property="og:description" content="An AI on-call investigator that has to prove its answer: break a service, guess the culprit, and watch Claude find it.">
+<meta property="og:image" content="https://sherlog-jade.vercel.app/static/og.jpg">
+<meta property="og:image:alt" content="The Sherlog story page: the shop's eleven services in 3D, with cache, cart, checkout and frontend turning red as one slowdown spreads.">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='13' cy='13' r='8' fill='none' stroke='%231a2ffb' stroke-width='3.5'/><path d='M19 19l8 8' stroke='%231a2ffb' stroke-width='4' stroke-linecap='square'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -67,17 +74,23 @@
   .links a:hover { background: var(--card); }
   @media (max-width: 980px) { .links { display: none; } }
 
-  /* ---- hero: a sentence, a dark panel with the shop in 3D, a scroll hint ---- */
+  /* ---- hero: what it is, the two ways in, then a dark panel with the shop in 3D and a scroll hint ---- */
   .hero { padding-top: 104px; }
-  .hero-intro { margin: 0 0 32px 25%; max-width: 21ch; font: 400 clamp(26px, 2.9vw, 44px)/1.1 var(--sans); letter-spacing: -.025em; }
-  @media (max-width: 860px) { .hero-intro { margin-left: 0; } }
+  /* the sentence, the lede and both buttons fit the first screen on a laptop and on a phone */
+  .hero-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 20px 4vw; margin-bottom: 28px; }
+  .hero-intro { margin: 0; max-width: 21ch; font: 400 clamp(26px, 2.9vw, 44px)/1.1 var(--sans); letter-spacing: -.025em; }
+  .hero-lede { margin: 0 0 20px; max-width: 52ch; font: 400 clamp(16px, 1.25vw, 19px)/1.5 var(--sans); color: var(--muted); }
+  @media (max-width: 860px) { .hero-head { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+  @media (max-width: 400px) { .hero-act .pbtn { padding: 0 20px; gap: 10px; font-size: 13px; } }  /* both labels fit a 320px screen */
   @media (max-width: 760px) {
     .hero .hero-panel { height: 400px; min-height: 0; }
     .lbl3d .name { display: none; }  /* too small to read on a phone; the tags stay */
     .nav .pbtn.sm { padding: 0 16px; font-size: 12px; gap: 10px; }
     .brand { font-size: 20px; }
   }
-  .hero-panel { position: relative; height: min(74vh, 760px); min-height: 440px; overflow: hidden; border-radius: var(--radius);
+  /* on the narrowest phones the console button needs the room; the link keeps its name, "Sherlog home" */
+  @media (max-width: 360px) { .brand .wordmark { display: none; } }
+  .hero-panel { position: relative; height: clamp(440px, calc(100vh - 330px), 760px); overflow: hidden; border-radius: var(--radius);
     background: radial-gradient(120% 100% at 72% 18%, #1c2148 0%, #0c0d12 58%); color: var(--on-panel);
     --bg: #12141c; --text: #f0f1fa; --line-strong: #3a3f50; }
   #hero3d { position: absolute; inset: 0; cursor: grab; }
@@ -287,6 +300,7 @@
   .flag.bad { background: var(--bad-soft); color: var(--bad); }
   @media (max-width: 620px) { .bar-row { grid-template-columns: minmax(0, 1fr) 64px; } .bar-track { grid-column: 1 / -1; grid-row: 2; } }
   .note { margin: 28px 0 0; max-width: 80ch; font-size: 15px; line-height: 1.6; color: var(--muted); }
+  .note a { color: var(--text); text-decoration: underline 2px var(--accent); text-underline-offset: 4px; }
   /* hard mode's rollback what-if: two numbers under their own heading */
   .rb-proof { margin-top: 14vh; }
   .rb-proof h3 { margin: 0 0 20px; max-width: 18ch; font: 400 clamp(34px, 4.4vw, 68px)/1 var(--sans); letter-spacing: -.04em; }
@@ -329,7 +343,7 @@
   <div class="wrap">
     <a class="brand" href="/" aria-label="Sherlog home">
       <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13" cy="13" r="8" fill="none" stroke="var(--accent)" stroke-width="4"/><path d="M19 19l8 8" stroke="var(--accent)" stroke-width="4.5" stroke-linecap="square"/></svg>
-      SHERLOG
+      <span class="wordmark">SHERLOG</span>
     </a>
     <nav class="links" aria-label="Sections">
       <a href="#problem">Problem</a><a href="#how">How it works</a><a href="#results">Results</a><a href="#hard">Hard mode</a>
@@ -342,7 +356,16 @@
 <main id="main">
   <section class="hero" aria-labelledby="heroIntro">
     <div class="wrap">
-      <p class="hero-intro" id="heroIntro">An AI on-call investigator that has to prove its answer.</p>
+      <div class="hero-head">
+        <p class="hero-intro" id="heroIntro">An AI on-call investigator that has to prove its answer.</p>
+        <div class="hero-act">
+          <p class="hero-lede">When one service breaks, everything that calls it breaks too: Sherlog sends a Claude agent to find the one that broke, and plain code checks every tool call it cites.</p>
+          <div class="ctas">
+            <a class="pbtn dark" href="/console#replay/41"><span class="roll" data-text="Watch outage #41, free"><span>Watch outage #41, free</span></span><span class="dot"></span></a>
+            <a class="pbtn light" href="/console"><span class="dot"></span><span class="roll" data-text="Break something"><span>Break something</span></span></a>
+          </div>
+        </div>
+      </div>
       <div class="hero-panel">
         <div id="hero3d" role="img" aria-label="The simulated shop's 11 services in 3D. One breaks, the failure travels up to its callers, the agent names the cause, and rolling it back clears the outage."></div>
         <div class="hud top"><span><span class="live-dot"></span>Outage #41 · replayed from the benchmark</span>
@@ -360,11 +383,7 @@
       <div class="split">
         <div></div>
         <div>
-          <p class="lede">When one service breaks, everything that calls it breaks too. Sherlog sends a Claude agent to investigate with real tools, and plain code checks every piece of evidence before it answers.</p>
-          <div class="ctas">
-            <a class="pbtn light" href="/console"><span class="dot"></span><span class="roll" data-text="Break something"><span>Break something</span></span></a>
-            <a class="pbtn dark" href="/console#replay/41"><span class="roll" data-text="Watch an outage"><span>Watch an outage</span></span><span class="dot"></span></a>
-          </div>
+          <p class="lede">The agent investigates with read-only tools: metrics, logs and the call graph. Plain code checks every tool call it cites, then a replay with its answer rolled back shows whether the outage stops.</p>
           <p class="fine">No sign-up. Recorded outages replay for free.</p>
         </div>
       </div>
@@ -397,11 +416,11 @@
           <article class="step" data-step="1"><span class="num">Step 2</span><h3>Claude investigates.</h3>
             <p>With read-only tools: metrics, logs and the call graph. Nobody tells it what broke. Every tool result gets an id like <span class="mono">c3</span>, so each claim it makes can be traced.</p></article>
           <article class="step" data-step="2"><span class="num">Step 3</span><h3>Code checks the evidence.</h3>
-            <p>A suspect counts only if a tool call it cites really showed it abnormal. Then a blast-radius check asks whether the answer explains every red service through the call graph. No second AI, no trust.</p></article>
+            <p>A suspect counts only if a tool call it cites really showed it abnormal. Victims pass that too, since they really are abnormal, so a blast-radius check then asks whether the answer explains every red service through the call graph. No second AI, no trust.</p></article>
           <article class="step" data-step="3"><span class="num">Step 4</span><h3>An answer, or a human.</h3>
-            <p>Verified and at least 80% confident: Sherlog answers, and drafts the ticket note for engineers and the update for customers. Anything less goes to a person.</p></article>
+            <p>Citations checked and at least 80% confident: Sherlog answers, and drafts the ticket note for engineers and the update for customers. Anything less goes to a person.</p></article>
           <article class="step" data-step="4"><span class="num">Step 5</span><h3>Prove it: roll it back.</h3>
-            <p>Sherlog replays the same outage, with the same noise, and its answer rolled back. Roll back the cause and the slowness and errors stop. Roll back a victim or a decoy and they carry on, so a decoy that fools every check that only looks cannot fool this one. It works because the shop is simulated; in production the same idea is a canary rollback.</p></article>
+            <p>Sherlog replays the same outage, with the same noise, and its answer rolled back. In the simulator, rolling back the true cause is exactly what clears the fault: roll back a victim or a decoy and the slowness and errors carry on. So the rollback numbers show how this gate behaves, not accuracy in the field. In production the same check is a canary rollback, which is noisier.</p></article>
         </div>
         <!-- the stage shows one step at a time; screen readers get every step's content in order -->
         <div class="stage">
@@ -422,7 +441,7 @@
       <p class="eyebrow"><span class="dot"></span><span class="num">03</span> Results</p>
       <div class="head2">
         <h2>Tested on <span class="evN">132</span> outages it had never seen.</h2>
-        <p class="sub">Three outages for every service and fault type, on seeds kept apart while the agent was built. "Cause first": the true cause ranked first and accepted by the verifier.</p>
+        <p class="sub">Three outages for every service and fault type, on seeds kept apart while the agent was built. "Cause first": the true cause ranked first, with its citations checked.</p>
       </div>
       <div class="bigstats" id="bigstats"></div>
       <div class="bars" id="bars"></div>
@@ -442,9 +461,10 @@
         <p class="note" id="hardNote"></p>
         <div class="rb-proof" id="rbProof">
           <h3>Then we rolled every answer back.</h3>
-          <p class="sub">Each hard outage replayed with the answer rolled back, as in step 5: if the slowness and errors carry on, the answer was wrong. A what-if on the recorded answers, re-simulated with no API calls; those answers went out without it.</p>
+          <p class="sub">Each hard outage replayed with the answer rolled back, as in step 5: if the slowness and errors carry on, the answer was wrong. In the simulator only the true cause's rollback clears the fault, so this shows how a rollback gate behaves, not accuracy in the field, where a canary rollback is noisier. A what-if on the recorded answers, re-simulated with no API calls; those answers went out without it.</p>
           <div class="bigstats two" id="rbStats"></div>
           <p class="note" id="rbNote"></p>
+          <p class="note" id="caughtLink" hidden><a href="/console">See the rollback catch a confident wrong answer <span aria-hidden="true">→</span></a></p>
         </div>
       </div>
     </section>
@@ -469,7 +489,7 @@
 <footer>
   <div class="wrap">
     <p class="byo"><b>Bring your own outage.</b> Upload telemetry from your own services in the <a href="/console#data">console</a> and Sherlog investigates it the same way, short of the rollback, which needs the simulated shop. <a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format and a converter</a></p>
-    <nav aria-label="Pages"><a href="/console">Console</a><a href="/status">Status</a></nav>
+    <nav aria-label="Pages"><a href="/console">Console</a><a href="/status">Status</a><a href="/docs">API</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
   </div>
   <div class="wrap">
     <span>Built from scratch for IceHacks 2026 · Claude Haiku, Sonnet and Opus 5.5 · MIT</span>
@@ -483,6 +503,8 @@ const STORY_REPLAY = 41;          // the outage the page tells: cache slows down
 const STEP_NAMES = ['ALARM', 'INVESTIGATION', 'VERIFIER', 'VERDICT', 'ROLLBACK'];
 const ALARM_WINDOW_TICKS = 36;   // the alarm chart shows 3 minutes before the alarm
 const ROLLBACK_STAGGER_S = 0.45; // one red service recovers after another in the rollback layer
+const FIRST_WATCH_MS = 600;      // the hero's first loop gets to the red at once: a first visit decides in seconds
+const WATCH_MS = 3000;           // later loops let the healthy shop settle before it breaks again
 const MOTION_KEY = 'sherlog-motion';  // 'paused' or 'on': the visitor's choice; without one, the reduced-motion setting decides
 // auto is left out of the rollback totals: it reuses the Haiku and Opus runs, so its answers would count twice
 const CLAUDE_METHODS = { 'one-shot': 'Opus with one prompt', haiku: 'Haiku agent', sonnet: 'Sonnet agent', agent: 'Opus agent' };
@@ -538,7 +560,7 @@ async function beat(ms) {
 // ---- hero ---------------------------------------------------------------------------------
 
 function heroIn() {
-  enter([$('#heroIntro')], { ...REVEAL, delay: 100 });
+  enter([$('#heroIntro'), $('.hero-act')], { ...REVEAL, delay: 100, stagger: 120 });
   enter([$('.hero-panel')], { duration: 1400, delay: 250, easing: 'glide', y: 40, scale: .97, blur: 0 });
   enter([$('.crosses')], { duration: 900, delay: 900, y: 0 });
 }
@@ -609,7 +631,7 @@ async function makeHeroShop() {
   }
 }
 
-/** The hero plays the recorded outage on a loop: the fault, the spread, the agent's calls, the verified answer, the rollback. */
+/** The hero plays the recorded outage on a loop: the fault, the spread, the agent's calls, the checked answer, the rollback. */
 async function heroLoop() {
   heroShop = await makeHeroShop();
   const shop = heroShop;
@@ -619,16 +641,16 @@ async function heroLoop() {
   const caption = $('#heroCaption');
   const say = (text) => { caption.textContent = text; enter([caption], { duration: 500, y: 6, blur: 4, easing: 'glide' }); };
   const answered = () => {
-    shop.tag(truth.root, [['ai', 'AI', 22], ['verified', 'VERIFIED', 64]]);
-    say(`${verdict.answer}: verified, and it explains all ${broken.length} broken services.`);
+    shop.tag(truth.root, [['ai', 'AI', 22], ['verified', 'CHECKED', 58]]);
+    say(`${verdict.answer}: its citations check out, and it explains all ${broken.length} broken services.`);
   };
   // paused from the start (reduced motion, or the visitor's choice): show the answer and wait for play
   if (motionPaused) { for (const s of broken) shop.setLevel(s, 'bad'); answered(); await beat(0); }
-  for (;;) {
+  for (let loop = 0; ; loop++) {
     for (const s of META.services) shop.setLevel(s, 'ok');
     shop.tag(truth.root, []);
     say(`Watching ${META.services.length} services. Requests flow from callers to the services they call.`);
-    await beat(3000);
+    await beat(loop ? WATCH_MS : FIRST_WATCH_MS);
     shop.setLevel(truth.root, 'bad');
     say(`${truth.root} slows down: ${META.faults[truth.fault]}.`);
     await beat(1600);
@@ -790,7 +812,7 @@ function buildChecks() {
     return el('li', {},
       el('span', { class: 's-name' }, c.service),
       el('span', { class: 'chips' }, el('span', { class: 'sr-only' }, 'cites'), chips.length ? chips : el('span', { class: 'chip' }, 'no evidence')),
-      el('span', { class: `badge ${c.verified ? 'ok' : 'bad'}`, style: `--d:${d}s` }, c.verified ? 'verified' : 'rejected'),
+      el('span', { class: `badge ${c.verified ? 'ok' : 'bad'}`, style: `--d:${d}s` }, c.verified ? 'citations checked' : 'rejected'),
       el('span', { class: 'conf', role: 'img', 'aria-label': `confidence ${pct(c.confidence)}` }, el('span', { style: `width:${pct(c.confidence)};--d:${d}s` })));
   }));
   const b = verdict.blast;
@@ -807,7 +829,7 @@ function buildVerdict() {
   const top = verdict.causes[0];
   const words = (text) => text.split(' ').flatMap((w, i) => [i ? ' ' : '', el('span', { class: 'wd', style: `--d:${0.5 + i * 0.014}s` }, w)]);
   $('#verdictLayer').replaceChildren(
-    el('div', { class: 'banner' }, el('strong', {}, `Root cause: ${verdict.answer}`), ` · ${top.fault_type} · ${pct(top.confidence)} confident · evidence verified`),
+    el('div', { class: 'banner' }, el('strong', {}, `Root cause: ${verdict.answer}`), ` · ${top.fault_type} · ${pct(top.confidence)} confident · citations checked`),
     el('div', { class: 'note-card', style: '--d:.3s' }, el('h4', {}, 'Ticket note · engineers'), el('p', {}, words(verdict.ticket_note))),
     el('div', { class: 'note-card', style: '--d:1.4s' }, el('h4', {}, 'Customer update'), el('p', {}, verdict.customer_update)));
 }
@@ -873,6 +895,10 @@ function barRows(container, rows) {
 }
 
 const answeredOf = (s) => `answered alone ${s.answered} of ${s.outages} · ${usd(s.median_cost_usd)}`;
+const pOf = (p) => (p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(3)}`);
+const GRAPH_RULE = 'the abnormal service that explains the most of the others';
+/** The call-graph rule's bar, only once the evidence file has it. */
+const graphRow = (s, flag) => ('graph_ac1' in s) && ['No AI · call-graph rule', GRAPH_RULE, s.graph_ac1, 'muted', flag];
 
 function buildResults() {
   const ev = META.evidence, a = ev.agent;
@@ -891,6 +917,7 @@ function buildResults() {
   const rows = [
     ['No AI · z-score ranking', 'the standard baseline', a.baseline_ac1, 'muted'],
     ['No AI · robust z-score', 'median and MAD', a.robust_ac1, 'muted'],
+    graphRow(a),
     ev['one-shot'] && ['Opus · one prompt, no tools', answeredOf(ev['one-shot']), ev['one-shot'].agent_ac1, ''],
     ev.haiku && ['Haiku agent', answeredOf(ev.haiku), ev.haiku.agent_ac1, ''],
     ev.sonnet && ['Sonnet agent', answeredOf(ev.sonnet), ev.sonnet.agent_ac1, ''],
@@ -899,8 +926,9 @@ function buildResults() {
   ].filter(Boolean);
   barRows($('#bars'), rows);
   const rb = rollbackTotals('');
-  $('#resultsNote').textContent = `On the same outages the Opus agent alone was right in ${a.only_agent_right} and the no-AI ranking alone in ${a.only_baseline_right} ` +
-    `(exact McNemar test, ${a.mcnemar_p < 0.001 ? 'p < 0.001' : `p = ${a.mcnemar_p.toFixed(3)}`}). The blast-radius check flags ${a.baseline_wrong_caught} of the ranking's ${a.baseline_wrong} wrong answers.` +
+  $('#resultsNote').textContent = `On the same outages the Opus agent alone was right in ${a.only_agent_right} and the z-score ranking alone in ${a.only_baseline_right} ` +
+    `(exact McNemar test, ${pOf(a.mcnemar_p)}). The blast-radius check flags ${a.baseline_wrong_caught} of the ranking's ${a.baseline_wrong} wrong answers.` +
+    ('graph_ac1' in a ? ` A no-AI rule that follows the call graph is wrong in ${a.graph_wrong} of ${a.outages}; hard mode shows what the agent adds over it.` : '') +
     (rb.answers ? ` Replayed with the answer rolled back, ${passedOf(rb)} answers the ${rb.methods.length} Claude methods sent out pass the rollback test of step 5 ` +
       '(auto aside: it reuses their runs).' : '');
 }
@@ -938,16 +966,27 @@ function buildRollbackStats() {
     'Auto is left out: it reuses the Haiku and Opus runs.';
 }
 
+/** Link a recorded run whose confident wrong answer went out and failed the rollback test; the list says which, so no id is hard-coded. */
+async function linkCaughtReplay() {
+  let caught;
+  try { caught = (await getJSON('/api/replays')).find((r) => r.caught); }
+  catch { return; }  // an extra: without the list the line just stays hidden
+  if (!caught) return;
+  $('#caughtLink a').href = `/console#replay/${caught.id}`;
+  $('#caughtLink').hidden = false;
+}
+
 function buildHard() {
   const ev = META.evidence, h = ev['hard-agent'];
   if (!h?.outages) { $('#hard').hidden = true; return; }
   const flag = (s) => (s.right_when_answered === 1 ? el('span', { class: 'flag' }, 'never wrong')
-    : el('span', { class: 'flag bad' }, `${s.answered - Math.round(s.right_when_answered * s.answered)} wrong`));
+    : el('span', { class: 'flag bad' }, `${wrongAnswers(s)} wrong`));
   const model = (key, label, tone = '') => ev[key]?.outages && [label, `${answeredOf(ev[key])} · right when it answered ${pct(ev[key].right_when_answered)}`,
     ev[key].agent_ac1, tone, ev[key].answered ? flag(ev[key]) : null];
   barRows($('#hardBars'), [
     ['No AI · z-score ranking', 'fooled by the decoy, or by a loud victim', h.baseline_ac1, 'muted'],
     ['No AI · robust z-score', 'median and MAD', h.robust_ac1, 'muted'],
+    graphRow(h, el('span', { class: 'flag bad' }, `${h.graph_wrong} wrong`)),  // a rule always answers, so its misses are wrong answers
     model('hard-one-shot', 'Opus · one prompt, no tools'),
     model('hard-haiku', 'Haiku agent'),
     model('hard-sonnet', 'Sonnet agent'),
@@ -955,7 +994,18 @@ function buildHard() {
     model('hard-auto', 'Auto · Haiku, then Opus if needed'),
   ].filter(Boolean));
   $('#hardNote').textContent = `${h.outages} outages. An agent that is not sure hands the outage to a human instead of guessing, ` +
-    `which is why "answered alone" is lower here; what matters is that its answers are right.`;
+    `which is why "answered alone" is lower here; what matters is that its answers are right.` + graphVersusAgent(h);
+}
+
+const wrongAnswers = (s) => s.answered - Math.round(s.right_when_answered * s.answered);
+
+/** The Opus agent against the no-AI call-graph rule, in hard mode: how often each names the cause, and what each does when unsure. */
+function graphVersusAgent(h) {
+  if (!('graph_ac1' in h)) return '';
+  const wrong = wrongAnswers(h);
+  return ` The call-graph rule names the cause first in ${pct(h.graph_ac1)} against the Opus agent's ${pct(h.agent_ac1)} ` +
+    `(exact McNemar test, ${pOf(h.graph_mcnemar_p)}), but it always answers, so it was wrong in ${h.graph_wrong}; ` +
+    `the agent answered ${h.answered} on its own, ${wrong ? `${wrong} of them wrong` : 'none wrong'}, and handed the other ${h.outages - h.answered} to a human.`;
 }
 
 // ---- start-up -----------------------------------------------------------------------------
@@ -996,6 +1046,7 @@ async function init() {
   buildResults();
   buildHard();
   buildRollbackStats();
+  linkCaughtReplay();
 }
 
 init();
