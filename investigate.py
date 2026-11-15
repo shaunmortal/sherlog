@@ -35,14 +35,18 @@ LOG_LINES_SHOWN = 12
 SERIES_POINTS_SHOWN = 12
 FAULT_TYPES = (*sim.FAULTS, "unknown")
 
+# how to tell the cause from its victims: in the agent's prompt, and in the MCP connector's investigate_outage prompt
+CAUSE_VS_VICTIMS = (
+    "A broken service makes everything that calls it look unhealthy too, so tell the cause apart from its victims: "
+    "the cause is an unhealthy service whose problem is not explained by anything it calls. A caller's log line about "
+    "a failed or slow RPC points at the callee, not at the caller. Some warnings are routine noise.")
+
 
 def _system(system: str, users: str) -> str:
     return f"""You are the on-call engineer for {system}. \
 An alarm just fired; find the service that caused it.
 
-A broken service makes everything that calls it look unhealthy too, so tell the cause apart from its victims: \
-the cause is an unhealthy service whose problem is not explained by anything it calls. A caller's log line about \
-a failed or slow RPC points at the callee, not at the caller. Some warnings are routine noise.
+{CAUSE_VS_VICTIMS}
 
 Your tools are read-only, and every result starts with a call id such as [c3]. Investigate as much as you need \
 (at most {MAX_TOOL_ROUNDS} rounds of tool calls), then call submit_ranking with up to {MAX_SUSPECTS} suspects, \
@@ -547,14 +551,16 @@ def blast_radius(inc: sim.Incident, service: str) -> dict:
     }
 
 
-def rollback_check(inc: sim.Incident, service: str) -> dict:
+def rollback_check(inc: sim.Incident, service: str, after: sim.Incident | None = None) -> dict:
     """Proof by intervention: replay the same outage, same noise, with the answer rolled back. Rolling back the
     cause ends the outage; a victim has nothing of its own to roll back, and a decoy loses only its harmless
     anomaly, so the alarm stays. A check that only looks can be fooled by a decoy; this one cannot. The shop is
-    simulated, so the replay is free; in production the equivalent is a canary rollback or a kill switch."""
-    if inc.root is None:
-        raise ValueError("the rollback replay needs a simulated outage; uploaded telemetry has no seed to replay")
-    after = sim.simulate(inc.root, inc.fault, inc.seed, hard=inc.decoy is not None, rolled_back=service)
+    simulated, so the replay is free; in production the equivalent is a canary rollback or a kill switch.
+    `after` is that replay when the caller made it: a simulated outage handed over as an upload, like the samples."""
+    if after is None:
+        if inc.root is None:
+            raise ValueError("the rollback replay needs a simulated outage; uploaded telemetry has no seed to replay")
+        after = sim.simulate(inc.root, inc.fault, inc.seed, hard=inc.decoy is not None, rolled_back=service)
     ranked, ticks = sim.zscore_ranking(inc), _window(inc)
     still = [s for s in ranked if _sustained(after, s, ticks=ticks)]
     alarm_after = after.alarm is not None

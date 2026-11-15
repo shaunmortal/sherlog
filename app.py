@@ -32,6 +32,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import bench
 import byo
 import investigate
+import mcp_investigation as inquiry
 import mcp_server
 import reference
 import sim
@@ -555,9 +556,16 @@ async def investigate_upload(request: Request) -> StreamingResponse:
 MCP_INSTRUCTIONS = (
     "Sherlog is an AI on-call investigator that has to prove its answer, benchmarked on 252 real outages of a "
     "public benchmark and on a simulated 11-service shop. These tools are free and read-only: none calls Claude or "
-    "needs a key. benchmark_summary gives the headline numbers and their caveats; list_recorded_outages and "
-    "get_recorded_verdict show recorded investigations with the checks of each answer; sample_incident and "
-    "triage_incident run the no-AI checks on telemetry in the sherlog-incident/1 format. Live investigations are not offered here: they run in the console.")
+    "needs a key. To investigate an outage yourself, pass the same incident to every tool ({\"recorded\": 41} for a "
+    "recorded outage, {\"sample\": \"shop\"} or {\"sample\": \"custom\"}, or {\"document\": ...} for your own "
+    "telemetry): start with top_anomalies, dig in with get_metric, get_logs and get_dependencies, and cite the call "
+    "id each result starts with. Before you answer, call check_answer: Sherlog's code re-runs every cited call, "
+    "rejects a suspect its citations do not show abnormal, hands an answer under 80% confidence to a human, and "
+    "checks the answer's blast radius and a replay with it rolled back. Report its decision as it is. "
+    "get_recorded_verdict and reveal_truth show a recorded outage's answer, so call them only after check_answer; "
+    "the investigate_outage prompt has the steps. benchmark_summary gives the headline numbers and their caveats; "
+    "list_recorded_outages lists the recorded investigations; sample_incident and triage_incident run the no-AI "
+    "checks on telemetry in the sherlog-incident/1 format.")
 HEADLINE_METHODS = ("one-shot", "haiku", "sonnet", "agent", "auto")  # the README's results table, in its order
 
 
@@ -598,11 +606,17 @@ def _tool(args: type[BaseModel], run: Callable[[BaseModel], dict], title: str, d
     return mcp_server.Tool(title, description, args.model_json_schema(), call)
 
 
+def _replay_entry(number: int) -> dict:
+    """A recorded outage's record and whether it is a caught wrong answer; a tool error if there is none."""
+    entries = _replays()
+    if number > len(entries):
+        raise mcp_server.ToolError(f"No recorded outage with that number: they are numbered 1 to {len(entries)}.")
+    return entries[number - 1]
+
+
 def _recorded_verdict(args: _ReplayArgs) -> dict:
-    listed = replays()
-    if args.number > len(listed):
-        raise mcp_server.ToolError(f"No recorded outage with that number: they are numbered 1 to {len(listed)}.")
-    events = replay(args.number)
+    _replay_entry(args.number)
+    listed, events = replays(), replay(args.number)
     verdict = next((e for e in events if e["type"] == "verdict"), None)
     return {
         **listed[args.number - 1],
@@ -665,6 +679,55 @@ def _benchmark_summary(_: BaseModel) -> dict:
     }
 
 
+# --- Sherlog as an MCP investigator: the caller's own model investigates, Sherlog's code checks its answer -----------
+# The tools and the gate are in mcp_investigation.py; here they meet the recorded outages and the samples.
+
+@lru_cache(maxsize=2)
+def _sample_case(graph: str) -> inquiry.Case:
+    return inquiry.sample_case(graph, _sample_incident(graph))
+
+
+def _case(spec: inquiry.IncidentSpec) -> inquiry.Case:
+    if spec.recorded is not None:
+        return inquiry.recorded_case(spec.recorded, _replay_entry(spec.recorded)["record"])
+    if spec.sample is not None:
+        return _sample_case(spec.sample)
+    return inquiry.document_case(spec.document)
+
+
+def _look(tool: str) -> Callable[[inquiry.Look], dict]:
+    return lambda args: inquiry.look(_case(args.incident), tool, args.call_args())
+
+
+def _reveal_truth(args: inquiry.RevealArgs) -> dict:
+    entry = _replay_entry(args.recorded)
+    record, caught = entry["record"], entry["caught"]
+    verdict = next((e for e in record["events"] if e["type"] == "verdict"), {})
+    return {
+        "recorded": args.recorded, "root": record["root"], "fault": record["fault"],
+        "hard": bool(record.get("hard")), "decoy": record["truth"].get("decoy"),
+        "sherlog": {"model": record.get("model", bench.OPUS), "answer": verdict.get("answer"),
+                    "escalation": verdict.get("escalation"),
+                    "suspects": [{k: c[k] for k in ("service", "confidence", "verified")}
+                                 for c in verdict.get("causes", [])],
+                    "right": verdict.get("answer") == record["root"], "caught": caught},
+        "zscore_top3": record["truth"]["baseline"],
+    }
+
+
+INVESTIGATION_TOOLS = {
+    "top_anomalies": (inquiry.Look, _look("top_anomalies")),
+    "get_metric": (inquiry.MetricLook, _look("get_metric")),
+    "get_logs": (inquiry.ServiceLook, _look("get_logs")),
+    "get_dependencies": (inquiry.ServiceLook, _look("get_dependencies")),
+    "check_answer": (inquiry.CheckArgs, lambda args: inquiry.check(_case(args.incident), args.suspects)),
+    "reveal_truth": (inquiry.RevealArgs, _reveal_truth),
+}
+INVESTIGATE_PROMPT = mcp_server.Prompt(
+    *inquiry.PROMPT, inquiry.PROMPT_ARGUMENTS,
+    lambda arguments: inquiry.prompt_text(inquiry.outage_spec(arguments.get("outage", inquiry.DEFAULT_OUTAGE),
+                                                              len(_replays()))))
+
 MCP = mcp_server.Server("sherlog", _version(), MCP_INSTRUCTIONS, {
     "list_recorded_outages": _tool(
         _NoArgs, lambda _: {"outages": replays()}, "List the recorded outages",
@@ -701,13 +764,14 @@ MCP = mcp_server.Server("sherlog", _version(), MCP_INSTRUCTIONS, {
         "outages: how often each method named the true cause first, answered alone and answered wrong, its median "
         "cost, what the rollback replay caught, each method against the no-AI call-graph rule outage by outage, the "
         "no-AI baselines, and the caveats that bound these numbers."),
-})
+    **{name: _tool(args, run, *inquiry.DESCRIPTIONS[name]) for name, (args, run) in INVESTIGATION_TOOLS.items()},
+}, {"investigate_outage": INVESTIGATE_PROMPT})
 
 
 @app.post("/mcp")
 async def mcp_endpoint(request: Request) -> Response:
     """The MCP endpoint: the Model Context Protocol over Streamable HTTP, JSON-RPC 2.0 with one JSON answer per POST
-    and no session. Five free, read-only tools; see docs/mcp.md. GET and DELETE answer 405."""
+    and no session. Free, read-only tools and one prompt; see docs/mcp.md. GET and DELETE answer 405."""
     try:
         body = await _read_body(request)
     except HTTPException as exc:

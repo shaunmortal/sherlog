@@ -281,10 +281,11 @@ def sample() -> dict:
     return export(sim.simulate(*SAMPLE))
 
 
-def graph_sample() -> dict:
+def graph_sample(doc: dict | None = None) -> dict:
     """An upload from a system that is not the shop: the sample outage cut down to six of its services, renamed,
-    with the calls among them as its own call graph. Log lines naming a service left out are dropped."""
-    doc = sample()
+    with the calls among them as its own call graph. Log lines naming a service left out are dropped. `doc` is
+    another export of the shop to cut down the same way, such as the sample replayed with a service rolled back."""
+    doc = sample() if doc is None else doc
     words = {**{old: new for old, (new, _) in GRAPH_SAMPLE.items()},
              **{sim.RPC[old]: rpc for old, (_, rpc) in GRAPH_SAMPLE.items()}}
     shop_word = _mention(tuple(SHOP_NAMES))
