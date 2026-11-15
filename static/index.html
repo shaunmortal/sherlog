@@ -412,7 +412,8 @@
     <ol class="log" id="log" tabindex="0" aria-labelledby="h-log"><li class="empty">
       <button type="button" class="act" id="replayStart">Replay outage #41 <small>(free, about 11 s)</small></button>
       Every tool call the agent makes will appear here.</li></ol>
-    <h2 class="label side-head" id="h-verdict">Verdict</h2>
+    <!-- focusable, so the phone's jump link moves focus here before it hides itself, instead of dropping it to the page -->
+    <h2 class="label side-head" id="h-verdict" tabindex="-1">Verdict</h2>
     <div id="verdict"><p class="empty">The ranked suspects appear here once the agent finishes.</p></div>
   </section>
 </div>

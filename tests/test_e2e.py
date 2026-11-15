@@ -106,6 +106,18 @@ def test_the_first_screen_button_hands_keyboard_focus_to_the_flight_log(page, er
     assert errors == []
 
 
+def test_the_phone_jump_to_the_verdict_takes_keyboard_focus_there(browser):
+    # the pill hides itself once the verdict is in view; focus must land on the verdict, not drop to the page
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    page.goto(f"{URL}/console#replay/41")
+    sync_api.expect(page.locator("#status")).to_contain_text("Done.", timeout=REPLAY_TIMEOUT_MS)
+    page.locator("#jumpVerdict").press("Enter")
+    sync_api.expect(page.locator("#h-verdict")).to_be_focused()
+    sync_api.expect(page.locator("#jumpVerdict")).to_be_hidden()
+    context.close()
+
+
 def test_a_caught_replay_shows_the_rollback_disproving_its_answer(page, errors):
     caught = [r for r in page.request.get(f"{URL}/api/replays").json() if r.get("caught")]
     if not caught:
