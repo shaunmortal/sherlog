@@ -12,6 +12,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app
+import investigate
+import sim
 
 client = TestClient(app.app)
 SITE = "https://sherlog-jade.vercel.app"
@@ -255,3 +257,29 @@ def test_every_footer_links_the_api_reference_page(path):
 def test_swagger_ui_stays_at_docs_for_developers():
     res = client.get("/docs")
     assert res.status_code == 200 and "swagger-ui" in res.text and "/openapi.json" in res.text
+
+
+# --- the console's first paint matches what it shows once loaded, so nothing moves -------------------------------
+
+def test_the_console_starts_with_the_text_it_shows_once_loaded():
+    page = client.get("/console").text
+    assert f'id="metaSystem">Simulated shop · {len(sim.SERVICES)} services<' in page
+    assert f'id="metaModel">{investigate.MODELS["haiku"]} → {investigate.MODELS["opus"]}<' in page
+    meta = client.get("/api/meta").json()
+    ev = meta["evidence"]
+    assert (f'id="statNote">{ev["hard-agent"]["outages"]} hard-mode outages, each with a decoy anomaly at the same '
+            f'time, and {ev["agent"]["outages"]} normal ones.') in page
+    # the default picks, as the console describes them: the latency fault and the auto investigator
+    fault = meta["faults"][re.search(r"let pick = \{ service: '\w+', fault: '(\w+)'", page).group(1)]
+    assert f'id="faultDesc">{fault[0].upper()}{fault[1:]}.</p>' in page
+    auto = re.search(r"  auto: '([^']+)',", page).group(1)
+    assert f'id="modelDesc">{auto} Numbers: cause named first, median cost per outage on the benchmark.</p>' in page
+
+
+def test_the_console_grids_hold_a_blank_cell_for_every_choice_until_they_load():
+    page = client.get("/console").text
+    meta = client.get("/api/meta").json()
+    for grid, count in (("svcGrid", len(meta["services"])), ("faultGrid", len(meta["faults"])),
+                        ("modelGrid", len(meta["models"]) + 1), ("modeGrid", 2)):  # + 1: auto
+        cells = re.search(rf'id="{grid}"[^>]*>(.*?)</div>', page).group(1)
+        assert cells.count('class="cell wait"') == count, grid
