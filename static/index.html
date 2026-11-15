@@ -421,7 +421,7 @@
 <div class="evidence" id="evidence" role="tabpanel" aria-labelledby="tab-evidence" hidden>
   <h1>How well does the agent work?</h1>
   <p><span class="evN">132</span> outages, three for every service × fault type, on seeds that were never looked at while the agent was built. "Named the cause first" means the true cause was ranked first <i>and</i> accepted by the verifier. Every run, with each tool call and the model's reasoning, can be replayed under Replay.</p>
-  <p>The telemetry is simulated: caller logs name the failing service and faults are single and clean, so the absolute numbers are optimistic. The no-AI baseline runs on exactly the same data, so the comparison is fair.</p>
+  <p>The telemetry is simulated: caller logs name the failing service and faults are single and clean, so the absolute numbers are optimistic. The no-AI baselines run on exactly the same data, so the comparison is fair.</p>
   <h2 class="sub" id="h-methods">What each capability and model adds · <span class="evN">132</span> outages · [95% interval]</h2>
   <div class="table-wrap" id="evMethods" role="region" tabindex="0" aria-labelledby="h-methods"></div>
   <p id="evTest" style="margin-top:12px"></p>
@@ -1389,17 +1389,17 @@ function renderEvidence(ev) {
   const auto = ev.auto?.outages ? { ...ev.auto, label: `${ev.auto.label} (Opus needed in ${ev.auto.escalated_to_strong})` } : null;
   $('#evMethods').replaceChildren(table(head,
     [...noAIRows(agent), ...ladder.map((v) => methodRow(v === 'auto' ? auto : ev[v]))]));
-  $('#evTest').textContent = `Agent vs the no-AI ranking on the same outages: the agent alone was right in ${agent.only_agent_right}, ` +
+  $('#evTest').textContent = `Agent vs the z-score ranking on the same outages: the agent alone was right in ${agent.only_agent_right}, ` +
     `the ranking alone in ${agent.only_baseline_right} (exact McNemar test, ${pValue(agent.mcnemar_p)}).` +
     graphTest(agent, 'Agent') +
     (agent.answers_checked ? ` Blast-radius check: ${agent.answers_explain_all} of the agent's ${agent.answers_checked} answers explain ` +
-      `every abnormal service through the call graph, and the check flags ${agent.baseline_wrong_caught} of the no-AI ranking's ` +
+      `every abnormal service through the call graph, and the check flags ${agent.baseline_wrong_caught} of the z-score ranking's ` +
       `${agent.baseline_wrong} wrong answers.` : '');
   const robust = ['no-logs'].filter((v) => ev[v]?.outages).map((v) => [`${ev[v].label} · ${ev[v].outages} outages`, ...methodRow(ev[v]).slice(1)]);
   $('#evRobust').replaceChildren(robust.length ? table(head, robust) : el('p', {}, 'No robustness runs yet.'));
   renderHard(ev, head);
   $('#evFaults').replaceChildren(table(
-    ['Fault', 'Outages', 'No-AI cause first', 'Agent cause first'],
+    ['Fault', 'Outages', 'Z-score cause first', 'Agent cause first'],
     Object.entries(agent.by_fault).map(([f, g]) => [f, g.outages, pct(g.baseline_ac1), pct(g.agent_ac1)])));
 }
 
@@ -1410,7 +1410,7 @@ function renderHard(ev, head) {
   const methods = ['hard-one-shot', 'hard-haiku', 'hard-sonnet', 'hard-agent', 'hard-auto'].filter((v) => ev[v]?.outages)
     .map((v) => methodRow(v === 'hard-auto' ? { ...ev[v], label: `${ev[v].label} (Opus needed in ${ev[v].escalated_to_strong})` } : ev[v]));
   $('#evHard').replaceChildren(table(head, [...noAIRows(hard), ...methods]));
-  $('#evHardTest').textContent = `Opus agent vs the no-AI ranking: the agent alone was right in ${hard.only_agent_right}, the ranking alone in ` +
+  $('#evHardTest').textContent = `Opus agent vs the z-score ranking: the agent alone was right in ${hard.only_agent_right}, the ranking alone in ` +
     `${hard.only_baseline_right} (exact McNemar test, ${pValue(hard.mcnemar_p)}).` + graphTest(hard, 'Opus agent');
 }
 
