@@ -35,7 +35,9 @@ LOG_LINES_SHOWN = 12
 SERIES_POINTS_SHOWN = 12
 FAULT_TYPES = (*sim.FAULTS, "unknown")
 
-SYSTEM = f"""You are the on-call engineer for an online shop built from {len(sim.SERVICES)} microservices. \
+
+def _system(system: str, users: str) -> str:
+    return f"""You are the on-call engineer for {system}. \
 An alarm just fired; find the service that caused it.
 
 A broken service makes everything that calls it look unhealthy too, so tell the cause apart from its victims: \
@@ -49,10 +51,17 @@ verifier rejects any suspect whose cited calls do not. Confidence is your probab
 is the cause.
 
 In submit_ranking also write ticket_note, for engineers: 2-3 sentences naming the cause, the key evidence and a \
-next step. And customer_update: 2 plain-language sentences for shoppers about what is affected, with no internal \
+next step. And customer_update: 2 plain-language sentences for {users} about what is affected, with no internal \
 service names and no speculation."""
 
-_SERVICE = {"type": "string", "enum": list(sim.SERVICES)}
+
+# the shop's prompt, which every recorded run used
+SYSTEM = _system(f"an online shop built from {len(sim.SERVICES)} microservices", "shoppers")
+
+
+def system_prompt(inc: sim.Incident) -> str:
+    """The shop's prompt, or the same prompt about an upload's own system."""
+    return SYSTEM if inc.calls is None else _system(f"a system built from {len(inc.services)} services", "its users")
 
 
 def _tool(name: str, description: str, properties: dict) -> dict:
@@ -60,40 +69,58 @@ def _tool(name: str, description: str, properties: dict) -> dict:
     return {"name": name, "description": description, "strict": True, "input_schema": schema}
 
 
-_SUSPECT = {
-    "type": "object",
-    "properties": {
-        "service": _SERVICE,
-        "fault_type": {"type": "string", "enum": list(FAULT_TYPES)},
-        "reason": {"type": "string", "description": "One sentence: why this service."},
-        "confidence": {"type": "number", "description": "Probability 0 to 1 that this is the cause."},
-        "evidence": {
-            "type": "array", "items": {"type": "string"},
-            "description": "Call ids, like c3, whose results show this service abnormal.",
+def _suspect(service: dict) -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "service": service,
+            "fault_type": {"type": "string", "enum": list(FAULT_TYPES)},
+            "reason": {"type": "string", "description": "One sentence: why this service."},
+            "confidence": {"type": "number", "description": "Probability 0 to 1 that this is the cause."},
+            "evidence": {
+                "type": "array", "items": {"type": "string"},
+                "description": "Call ids, like c3, whose results show this service abnormal.",
+            },
         },
-    },
-    "required": ["service", "fault_type", "reason", "confidence", "evidence"],
-    "additionalProperties": False,
-}
+        "required": ["service", "fault_type", "reason", "confidence", "evidence"],
+        "additionalProperties": False,
+    }
 
-TOOLS = [
-    _tool("get_metric", "One metric of one service: normal baseline, current value, z-score, how long it has been "
-          "abnormal, and recent values.", {"service": _SERVICE, "metric": {"type": "string", "enum": list(sim.METRICS)}}),
-    _tool("get_logs", "Recent WARN and ERROR log lines written by one service, newest last.", {"service": _SERVICE}),
-    _tool("get_dependencies", "The services this service calls and is called by, with the current health of each.",
-          {"service": _SERVICE}),
-    _tool("submit_ranking", "Submit the final answer: up to 5 suspects, most likely first, with the ticket note and "
-          "customer update.", {
-              "causes": {"type": "array", "items": _SUSPECT},
-              "ticket_note": {"type": "string"},
-              "customer_update": {"type": "string"},
-          }),
-]
+
+def build_tools(services: tuple[str, ...]) -> list[dict]:
+    """The agent's tools, every service argument limited to these services."""
+    service = {"type": "string", "enum": list(services)}
+    metric = {"type": "string", "enum": list(sim.METRICS)}
+    return [
+        _tool("get_metric", "One metric of one service: normal baseline, current value, z-score, how long it has "
+              "been abnormal, and recent values.", {"service": service, "metric": metric}),
+        _tool("get_logs", "Recent WARN and ERROR log lines written by one service, newest last.", {"service": service}),
+        _tool("get_dependencies", "The services this service calls and is called by, with the current health of "
+              "each.", {"service": service}),
+        _tool("submit_ranking", "Submit the final answer: up to 5 suspects, most likely first, with the ticket note "
+              "and customer update.", {
+                  "causes": {"type": "array", "items": _suspect(service)},
+                  "ticket_note": {"type": "string"},
+                  "customer_update": {"type": "string"},
+              }),
+    ]
+
+
+TOOLS = build_tools(sim.SERVICES)
 
 
 def tools_without(*names: str) -> list[dict]:
     """The agent's tools minus some, for ablations."""
     return [t for t in TOOLS if t["name"] not in names]
+
+
+def tools_for(inc: sim.Incident, tools: list[dict]) -> list[dict]:
+    """The offered tools for this incident: as given for the shop; for an upload with its own call graph, the same
+    tools in the same order, rebuilt over its services."""
+    if inc.calls is None:
+        return tools
+    offered = {t["name"] for t in tools}
+    return [t for t in build_tools(inc.services) if t["name"] in offered]
 
 
 @dataclass(frozen=True)
@@ -115,7 +142,7 @@ def _at(inc: sim.Incident, tick: int) -> str:
 
 
 def _top_anomalies(inc: sim.Incident, args: dict) -> tuple[str, set[str]]:
-    rows = sorted(((inc.window_z(s, m), s, m) for s in sim.SERVICES for m in sim.METRICS), reverse=True)
+    rows = sorted(((inc.window_z(s, m), s, m) for s in inc.services for m in sim.METRICS), reverse=True)
     rows = rows[:TOP_ANOMALIES_SHOWN]
     lines = [
         f"{s:<10} {m:<11} z={z:+6.1f}   normal {inc.stats[(s, m)][0]:.4g} -> now {inc.series[s][m][inc.now]:.4g}"
@@ -164,10 +191,10 @@ def _get_dependencies(inc: sim.Incident, args: dict) -> tuple[str, set[str]]:
 
     text = (
         f"{health(s)}\n"
-        f"calls (downstream): {', '.join(map(health, sim.CALLS[s])) or 'nothing'}\n"
-        f"called by (upstream): {', '.join(map(health, sim.CALLERS[s])) or 'nobody (entry point)'}"
+        f"calls (downstream): {', '.join(map(health, inc.callees[s])) or 'nothing'}\n"
+        f"called by (upstream): {', '.join(map(health, inc.callers[s])) or 'nobody (entry point)'}"
     )
-    neighbours = (s, *sim.CALLS[s], *sim.CALLERS[s])
+    neighbours = (s, *inc.callees[s], *inc.callers[s])
     return text, {x for x in neighbours if inc.worst(x)[1] >= EVIDENCE_Z}
 
 
@@ -179,15 +206,15 @@ _HANDLERS = {
 }
 
 
-def _check_args(name: str, args) -> str | None:
+def _check_args(inc: sim.Incident, name: str, args) -> str | None:
     if name not in _HANDLERS:
         return f"unknown tool {name!r}"
     if not isinstance(args, dict):
         return "arguments must be an object"
     if name == "top_anomalies":
         return None
-    if args.get("service") not in sim.SERVICES:
-        return f"unknown service {args.get('service')!r}; known: {', '.join(sim.SERVICES)}"
+    if args.get("service") not in inc.services:
+        return f"unknown service {args.get('service')!r}; known: {', '.join(inc.services)}"
     if name == "get_metric" and args.get("metric") not in sim.METRICS:
         return f"unknown metric {args.get('metric')!r}; known: {', '.join(sim.METRICS)}"
     return None
@@ -195,7 +222,7 @@ def _check_args(name: str, args) -> str | None:
 
 def run_tool(inc: sim.Incident, name: str, args, call_id: str) -> Call:
     """Run one read-only tool. Bad input comes back as an error result, never an exception."""
-    problem = _check_args(name, args)
+    problem = _check_args(inc, name, args)
     if problem:
         return Call(call_id, name, args if isinstance(args, dict) else {}, f"[{call_id}] error: {problem}",
                     frozenset(), True)
@@ -268,12 +295,12 @@ def build_verdict(raw: dict, calls: dict[str, Call]) -> dict:
 
 # --- the agent loop ----------------------------------------------------------------------
 
-def _ask(client, messages: list, tools: list[dict], model: str) -> object:
+def _ask(client, messages: list, tools: list[dict], model: str, system: str) -> object:
     fallback = {"betas": [FALLBACK_BETA], "fallbacks": "default"} if model in FALLBACK_MODELS else {}
     return client.beta.messages.create(
         model=model,
         max_tokens=MAX_TOKENS,
-        system=SYSTEM,
+        system=system,
         tools=tools,
         messages=messages,
         thinking={"type": "adaptive", "display": "summarized"},
@@ -292,12 +319,13 @@ def _alert_text(inc: sim.Incident, first: Call) -> str:
         f"ALERT: a metric stayed {sim.ALARM_Z:g} standard deviations above normal for "
         f"{sim.ALARM_SUSTAIN_TICKS * sim.TICK_SECONDS}s. Times are relative to the alarm (t+0s); telemetry is "
         f"available up to {_at(inc, inc.now)}.\n"
-        f"Services: {', '.join(sim.SERVICES)}. Metrics: {', '.join(sim.METRICS)}.\n\n"
+        f"Services: {', '.join(inc.services)}. Metrics: {', '.join(sim.METRICS)}.\n\n"
         f"Strongest deviations right now:\n{first.text}"
     )
 
 
 def _agent_loop(inc: sim.Incident, client, tools: list[dict], model: str) -> Iterator[dict]:
+    tools, system = tools_for(inc, tools), system_prompt(inc)
     offered = {t["name"] for t in tools}
     first = run_tool(inc, "top_anomalies", {}, "c0")
     calls = {first.id: first}
@@ -306,7 +334,7 @@ def _agent_loop(inc: sim.Incident, client, tools: list[dict], model: str) -> Ite
     usage = {"input_tokens": 0, "output_tokens": 0, "model_calls": 0}
 
     for round_no in range(MAX_TOOL_ROUNDS + 2):
-        response = _ask(client, messages, tools, model)
+        response = _ask(client, messages, tools, model, system)
         usage = _add_usage(usage, response)
         if response.stop_reason == "refusal":
             yield {"type": "error", "message": "The model declined to continue this investigation."}
@@ -397,8 +425,8 @@ def telemetry_event(inc: sim.Incident) -> dict:
         "alarm": inc.alarm,
         "now": inc.now,
         "tick_seconds": sim.TICK_SECONDS,
-        "series": {s: {m: inc.series[s][m][:end] for m in sim.METRICS} for s in sim.SERVICES},
-        "z": {s: {m: round(inc.window_z(s, m), 1) for m in sim.METRICS} for s in sim.SERVICES},
+        "series": {s: {m: inc.series[s][m][:end] for m in sim.METRICS} for s in inc.services},
+        "z": {s: {m: round(inc.window_z(s, m), 1) for m in sim.METRICS} for s in inc.services},
     }
 
 
@@ -455,11 +483,11 @@ def handoff_reason(inc: sim.Incident, verdict: dict) -> str | None:
     return None
 
 
-def upstream(service: str) -> set[str]:
+def upstream(service: str, callers: dict[str, tuple[str, ...]] = sim.CALLERS) -> set[str]:
     """The service and everything that calls it, directly or through others: where its trouble can show."""
     reach, todo = {service}, [service]
     while todo:
-        for caller in sim.CALLERS[todo.pop()]:
+        for caller in callers[todo.pop()]:
             if caller not in reach:
                 reach.add(caller)
                 todo.append(caller)
@@ -486,7 +514,7 @@ def _sustained(inc: sim.Incident, service: str, metrics: tuple[str, ...] = sim.M
 def _explains(inc: sim.Incident, service: str, abnormal: list[str]) -> list[str]:
     """The abnormal services this one can account for: itself, and its callers only if its own latency or
     errors are abnormal (a busy CPU or a full heap that slows nobody down cannot make callers slow)."""
-    reach = upstream(service) if _sustained(inc, service, PROPAGATING) else {service}
+    reach = upstream(service, inc.callers) if _sustained(inc, service, PROPAGATING) else {service}
     return [s for s in abnormal if s in reach]
 
 
@@ -505,7 +533,7 @@ def blast_radius(inc: sim.Incident, service: str) -> dict:
     """Does the answer explain the whole outage? Every abnormal service should be it or one of its callers."""
     abnormal = [s for s in sim.zscore_ranking(inc) if _sustained(inc, s)]
     explained = _explains(inc, service, abnormal)
-    best = max(sim.SERVICES, key=lambda s: len(_explains(inc, s, abnormal)))
+    best = max(inc.services, key=lambda s: len(_explains(inc, s, abnormal)))
     return {
         "service": service,
         "abnormal": abnormal,
@@ -521,7 +549,9 @@ def rollback_check(inc: sim.Incident, service: str) -> dict:
     cause ends the outage; a victim has nothing of its own to roll back, and a decoy loses only its harmless
     anomaly, so the alarm stays. A check that only looks can be fooled by a decoy; this one cannot. The shop is
     simulated, so the replay is free; in production the equivalent is a canary rollback or a kill switch."""
-    after = sim.simulate(inc.root, inc.fault, inc.seed, hard=inc.decoy is not None, rolled_back=service)
+    if inc.root is None:
+        raise ValueError("the rollback replay needs a simulated outage; uploaded telemetry has no seed to replay")
+    after =sim.simulate(inc.root, inc.fault, inc.seed, hard=inc.decoy is not None, rolled_back=service)
     ranked, ticks = sim.zscore_ranking(inc), _window(inc)
     still = [s for s in ranked if _sustained(after, s, ticks=ticks)]
     alarm_after = after.alarm is not None

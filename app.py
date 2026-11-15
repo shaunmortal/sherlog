@@ -158,7 +158,7 @@ def _sse(events: Iterator[dict]) -> Iterator[str]:
 def _enrich(events: Iterator[dict], inc: sim.Incident) -> Iterator[dict]:
     """Add what the console shows but the agent never sees: the telemetry after the agent's cut-off (so the
     charts keep running while it investigates), and the blast-radius and rollback checks of its answer."""
-    rest = {s: {m: inc.series[s][m][inc.now + 1:] for m in sim.METRICS} for s in sim.SERVICES}
+    rest = {s: {m: inc.series[s][m][inc.now + 1:] for m in sim.METRICS} for s in inc.services}
     for event in events:
         if event["type"] == "telemetry":
             yield {**event, "rest": rest}
@@ -301,7 +301,7 @@ def replay(number: int) -> list[dict]:
     return list(_enrich(iter(record["events"]), incident))
 
 
-# --- bring your own outage: real telemetry in the shop's format, see docs/bring-your-own.md ------------------
+# --- bring your own outage: real telemetry, with its own call graph or the shop's, see docs/bring-your-own.md -
 
 MAX_BODY_MB = 2  # a full incident with every allowed log line fits well inside this
 
@@ -332,15 +332,16 @@ async def _read_capped(request: Request, schema: type[BaseModel]) -> BaseModel:
         raise RequestValidationError([{**e, "loc": ("body", *e["loc"])} for e in errors]) from None
 
 
-@lru_cache(maxsize=1)
-def _sample_incident() -> dict:
-    return byo.sample()
+@lru_cache(maxsize=2)
+def _sample_incident(graph: str) -> dict:
+    return byo.graph_sample() if graph == "custom" else byo.sample()
 
 
 @app.get("/api/sample-incident")
-def sample_incident() -> dict:
-    """One simulated outage in the bring-your-own format, culprit removed: download it, edit it, send it back."""
-    return _sample_incident()
+def sample_incident(graph: Literal["shop", "custom"] = "shop") -> dict:
+    """One simulated outage in the bring-your-own format, culprit removed: download it, edit it, send it back.
+    `graph=custom` gives six of its services renamed, with their own call graph in `calls`."""
+    return _sample_incident(graph)
 
 
 @app.post("/api/triage")
