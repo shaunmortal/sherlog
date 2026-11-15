@@ -283,7 +283,7 @@ def test_the_console_starts_with_the_text_it_shows_once_loaded():
     fault = meta["faults"][re.search(r"let pick = \{ service: '\w+', fault: '(\w+)'", page).group(1)]
     assert f'id="faultDesc">{fault[0].upper()}{fault[1:]}.</p>' in page
     auto = re.search(r"  auto: '([^']+)',", page).group(1)
-    assert f'id="modelDesc">{auto} Numbers: cause named first, median cost per outage on the benchmark.</p>' in page
+    assert f'id="modelDesc">{auto} Numbers: cause named first, median cost per outage on the simulated shop.</p>' in page
 
 
 def test_the_console_grids_hold_a_blank_cell_for_every_choice_until_they_load():

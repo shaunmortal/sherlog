@@ -350,7 +350,7 @@
       <p class="desc" id="faultDesc">Adds 400 ms to every request (slow network).</p>
       <p class="sub">3 · Who investigates</p>
       <div class="grid" id="modelGrid" role="radiogroup" aria-label="Model that investigates"><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span></div>
-      <p class="desc" id="modelDesc">Claude Haiku 5.5 investigates first; Claude Opus 5.5 starts over only if its citations fail the check, it is under 80% sure, or another service would explain more of the outage. Numbers: cause named first, median cost per outage on the benchmark.</p>
+      <p class="desc" id="modelDesc">Claude Haiku 5.5 investigates first; Claude Opus 5.5 starts over only if its citations fail the check, it is under 80% sure, or another service would explain more of the outage. Numbers: cause named first, median cost per outage on the simulated shop.</p>
       <p class="sub">4 · Difficulty</p>
       <div class="grid" id="modeGrid" role="radiogroup" aria-label="Difficulty"><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span><span class="cell wait" aria-hidden="true"><b>&nbsp;</b><small>&nbsp;</small></span></div>
       <div class="go-bar"><button type="button" class="act" id="go">Break it live</button></div>
@@ -1581,7 +1581,7 @@ function renderModels(ev) {
     pick = { ...pick, model: k };
     for (const grid of grids) press(grid, k);
     nameRun(state.running ? recorded : null);  // the header names the pick, unless a replay is playing
-    $('#modelDesc').textContent = `${MODEL_HINT[k]} Numbers: cause named first, median cost per outage on the benchmark.`;
+    $('#modelDesc').textContent = `${MODEL_HINT[k]} Numbers: cause named first, median cost per outage on the simulated shop.`;
   };
   for (const grid of grids) choiceGrid(grid, items, pick.model, choose);
   choose(pick.model);
