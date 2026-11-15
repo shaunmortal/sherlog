@@ -71,6 +71,14 @@ def resample(times: list[float], values: list[float], start: int) -> list[float]
     return out
 
 
+def _clamp(metric: str, value: float) -> float:
+    """Into Sherlog's limits for its own metric names (a service with no traffic reports 0 ms latency, under the
+    0.1 ms floor), as the Prometheus converter does; values keep 6 significant digits."""
+    lo, hi = sim.LIMITS.get(metric, (None, None))
+    value = value if lo is None else max(lo, value)
+    return value if hi is None else min(hi, value)
+
+
 def series_of(columns: dict[str, list[float]], times: list[float], start: int) -> dict[str, dict[str, list[float]]]:
     """service -> Sherlog metric -> 120 readings, from the benchmark's metric columns (1 s rows)."""
     out: dict[str, dict[str, list[float]]] = {}
@@ -82,7 +90,7 @@ def series_of(columns: dict[str, list[float]], times: list[float], start: int) -
         ticks = resample(times, values, start)
         if ticks is not None:
             scale = SCALE.get(metric, 1.0)
-            out.setdefault(service, {})[metric] = [float(f"{v * scale:.6g}") for v in ticks]  # 6 significant digits
+            out.setdefault(service, {})[metric] = [_clamp(metric, float(f"{v * scale:.6g}")) for v in ticks]
     for service, metrics in out.items():
         if "errors" in metrics and "workload" in metrics:
             failed, total = metrics.pop("errors"), metrics["workload"]

@@ -48,6 +48,8 @@ def test_metric_columns_map_onto_sherlog_names_and_units():
     assert list(series["cart"]) == ["latency_ms", "error_rate", "cpu", "workload"]  # p50 dropped, p90 in ms
     assert series["cart"]["latency_ms"][0] == 20.0 and series["cart"]["error_rate"][0] == 0.2
     assert list(series["db"]) == ["mem", "diskio"] and list(series["web"]) == ["errors"]  # no workload: kept raw
+    idle = adapter.series_of({"pay_latency-90": _col(lambda t: 0.0)}, SECONDS, START)
+    assert idle["pay"]["latency_ms"][0] == sim.LIMITS["latency_ms"][0]  # no traffic: clamped to the floor
     proxy = adapter.series_of({"PassthroughCluster_workload": _col(lambda t: 1.0)}, SECONDS, START)
     assert list(proxy) == ["passthroughcluster"]  # a valid upload name; the scorer lower-cases names anyway
 
