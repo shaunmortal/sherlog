@@ -287,3 +287,18 @@ def test_scraped_metrics_become_a_document_through_the_unchanged_converter(tmp_p
     assert doc["calls"] == GRAPH and doc["logs"] == []
     inc = plan_.incident(doc)
     assert inc.alarm == 99 + sim.ALARM_SUSTAIN_TICKS - 1 and inv.graph_ranking(inc)[0] == "store"  # slow from tick 99
+
+
+PROM = run.OUT / "prom" / "outage.json"
+
+
+@pytest.mark.skipif(not PROM.exists(), reason="no Prometheus outage recorded")
+def test_the_recorded_prometheus_outage_passes_the_server_and_reproduces_its_checks():
+    record, client = json.loads(PROM.read_text()), TestClient(app.app)
+    for name, path in (("prom", record["doc"]), ("collector", record["collector_doc"])):
+        text = (PROM.parent / path).read_text()
+        res = client.post("/api/triage", content=text, headers={"content-type": "application/json"})
+        assert res.status_code == 200, (name, res.text)
+        inc = plan_.incident(json.loads(text))
+        assert (inc.alarm, inv.graph_ranking(inc)[0]) == (record[name]["alarm"], record[name]["graph"])
+    assert hashlib.sha256((PROM.parent / record["doc"]).read_bytes()).hexdigest() == record["doc_sha256"]

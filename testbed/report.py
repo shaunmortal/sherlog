@@ -126,8 +126,9 @@ def alarm_facts(records: list[dict]) -> str:
     silent = [r["id"] for r in records if r["alarm"] is None]
     delays = [r["alarm"] - r["truth"]["onset"] for r in records if r["alarm"] is not None and not r["alarm_before_onset"]]
     delay = f", median {statistics.median(delays) * 5:g} s after the fault began" if delays else ""
+    named = lambda ids: f" ({', '.join(ids)})" if ids else ""  # noqa: E731
     return (f"Alarm fired after the fault began in {len(delays)} of {len(records)} outages{delay}; before it "
-            f"(a false alarm) in {len(early)} {early or ''}; never in {len(silent)} {silent or ''}.")
+            f"(a false alarm) in {len(early)}{named(early)}; never in {len(silent)}{named(silent)}.")
 
 
 def wrong_answers(records: list[dict]) -> str:
@@ -150,7 +151,11 @@ def report(records: list[dict], out: Path = OUT) -> str:
     normal = [r for r in records if not r["hard"]]
     hard = [r for r in records if r["hard"]]
     groups = {f"Normal ({len(normal)})": normal, f"Hard ({len(hard)})": hard, f"All ({len(records)})": records}
-    spent = sum(e["charged_usd"] for e in bench.load(out / "spend.jsonl"))
+    ledger = bench.load(out / "spend.jsonl")
+    ids = {r["id"] for r in records}
+    spent = sum(e["charged_usd"] for e in ledger)
+    here = sum(e["charged_usd"] for e in ledger if e["outage"] in ids)
+    live = {e["outage"] for e in ledger} & ids
     sections = [f"{len(records)} real outages ({len(normal)} normal, {len(hard)} hard)", "",
                 alarm_facts(records), "", "Cause first, with 95% Wilson intervals:", "", accuracy_table(groups)]
     for name, group in (("Normal", normal), ("Hard", hard)):
@@ -158,7 +163,9 @@ def report(records: list[dict], out: Path = OUT) -> str:
             sections += ["", f"{name}: the agent's verdicts", "", agent_table(group),
                          "", f"{name}: real rollbacks", "", rollback_table(group), "", rollback_facts(group)]
     sections += ["", "Wrong answers (the call-graph rule always answers; the agent only when confident):", "",
-                 wrong_answers(records), "", f"Live spend recorded in spend.jsonl: ${spent:.2f}"]
+                 wrong_answers(records), "",
+                 f"Live spend recorded in spend.jsonl: ${spent:.2f} in all; ${here:.2f} on the {len(live)} outages "
+                 f"above with live runs, ${here / max(len(live), 1):.3f} per outage (both routes)"]
     return "\n".join(sections)
 
 
