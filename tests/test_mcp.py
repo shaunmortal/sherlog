@@ -12,7 +12,8 @@ import byo
 import mcp_server
 
 client = TestClient(app.app)
-TOOLS = {"list_recorded_outages", "get_recorded_verdict", "triage_incident", "sample_incident", "benchmark_summary"}
+TOOLS = {"list_recorded_outages", "get_recorded_verdict", "triage_incident", "sample_incident", "benchmark_summary",
+         "top_anomalies", "get_metric", "get_logs", "get_dependencies", "check_answer", "reveal_truth"}
 MODERN = "2026-07-28"
 META = {"io.modelcontextprotocol/protocolVersion": MODERN, "io.modelcontextprotocol/clientCapabilities": {},
         "io.modelcontextprotocol/clientInfo": {"name": "test", "version": "1"}}
@@ -32,7 +33,7 @@ def _rpc(method, params=None, rid=1, headers=None):
 def _modern(method, params=None, rid=1, headers=None):
     """A 2026-07-28 request: _meta in the body, mirrored in the headers, as a modern client sends it."""
     mirrored = {"mcp-protocol-version": MODERN, "mcp-method": method,
-                **({"mcp-name": params["name"]} if method == "tools/call" else {})}
+                **({"mcp-name": params["name"]} if method in ("tools/call", "prompts/get") else {})}
     return _rpc(method, {**(params or {}), "_meta": META}, rid, {**mirrored, **(headers or {})})
 
 
@@ -68,7 +69,7 @@ def test_initialize_agrees_the_clients_version_or_offers_the_newest_handshake_on
     assert res.status_code == 200 and res.headers["content-type"] == "application/json"
     assert "mcp-session-id" not in res.headers  # stateless: every request stands on its own
     assert res.json() == {"jsonrpc": "2.0", "id": "init", "result": {
-        "protocolVersion": agreed, "capabilities": {"tools": {"listChanged": False}},
+        "protocolVersion": agreed, "capabilities": {"tools": {"listChanged": False}, "prompts": {"listChanged": False}},
         "serverInfo": {"name": "sherlog", "version": app._version()}, "instructions": app.MCP_INSTRUCTIONS}}
 
 
@@ -94,7 +95,7 @@ def test_ping_answers_an_empty_result():
     assert _rpc("ping", rid="p") == (200, {"jsonrpc": "2.0", "id": "p", "result": {}})
 
 
-def test_tools_list_names_five_read_only_tools_each_with_a_closed_object_schema():
+def test_tools_list_names_every_tool_read_only_each_with_a_closed_object_schema():
     status, answer = _rpc("tools/list")
     tools = answer["result"]["tools"]
     assert status == 200 and {t["name"] for t in tools} == TOOLS and len(tools) == len(TOOLS)
@@ -312,7 +313,7 @@ def test_a_browser_origin_must_be_this_server_or_this_machine(origin, allowed):
 def test_server_discover_names_every_version_and_the_tools_capability():
     status, answer = _modern("server/discover")
     assert status == 200 and answer["result"] == {
-        "supportedVersions": [*mcp_server.MODERN, *mcp_server.LEGACY], "capabilities": {"tools": {}},
+        "supportedVersions": [*mcp_server.MODERN, *mcp_server.LEGACY], "capabilities": {"tools": {}, "prompts": {}},
         "instructions": app.MCP_INSTRUCTIONS, "ttlMs": mcp_server.LIST_TTL_MS, "cacheScope": "public",
         "resultType": "complete", "_meta": {mcp_server.SERVER_INFO_KEY: {"name": "sherlog", "version": app._version()}}}
 

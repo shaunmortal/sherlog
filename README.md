@@ -372,13 +372,13 @@ The alarm, both rankings, the call-graph rule, the blast-radius check and the ag
 
 ## Use it from Claude (MCP)
 
-Sherlog is also an MCP server, free and read-only, with no key: it can list and open the recorded investigations, triage an uploaded outage with the no-AI checks, hand out the sample uploads and report the benchmark.
+Sherlog is also an MCP server, free and read-only, with no key. Bring your own Claude: it investigates an outage with the agent's own read-only tools, and Sherlog's code checks its answer as it checks the agent's: every cited call re-run, the 80% rule, the blast radius and the rollback replay.
 
 ```bash
 claude mcp add --transport http sherlog https://sherlog-jade.vercel.app/mcp
 ```
 
-Tools: `list_recorded_outages`, `get_recorded_verdict`, `triage_incident`, `sample_incident`, `benchmark_summary`. [`docs/mcp.md`](docs/mcp.md) has the details and an example call; [`/llms.txt`](https://sherlog-jade.vercel.app/llms.txt) is a map of the project for AI tools.
+Then type `/mcp__sherlog__investigate_outage 41` in Claude Code. Investigation tools: `top_anomalies`, `get_metric`, `get_logs`, `get_dependencies`, then `check_answer` (ship, or hand to a human) and `reveal_truth` to score the run. The others list and open the recorded investigations (`list_recorded_outages`, `get_recorded_verdict`), triage telemetry with the no-AI checks (`triage_incident`, `sample_incident`) and report the benchmark (`benchmark_summary`). [`docs/mcp.md`](docs/mcp.md) has a walkthrough of outage #41; [`/llms.txt`](https://sherlog-jade.vercel.app/llms.txt) is a map of the project for AI tools.
 
 ## Reproduce
 
