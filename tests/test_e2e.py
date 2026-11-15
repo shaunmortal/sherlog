@@ -188,6 +188,7 @@ def test_triaging_an_upload_with_its_own_call_graph_draws_its_services_until_a_r
     # an upload on the shop's own 11 names is still an upload
     page.locator("#tab-data").click()
     page.locator("#sampleUse").click()
+    sync_api.expect(page.locator("#status")).to_contain_text("Loaded the sample")  # over the network, wait for it
     page.locator("#triageBtn").click()
     sync_api.expect(page.locator("#status")).to_contain_text("Triage done.")
     sync_api.expect(page.locator("#metaSystem")).to_have_text("Your upload · 11 services")
