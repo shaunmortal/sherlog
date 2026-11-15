@@ -56,7 +56,7 @@ def test_the_story_pages_one_h1_is_its_visible_headline_and_results_lead_with_th
     sync_api.expect(heading).to_have_text("An AI on-call investigator that has to prove its answer.")
     sync_api.expect(heading).to_be_in_viewport()
     # it fades in on load (about a second), not when scrolled to
-    page.wait_for_function("getComputedStyle(document.querySelector('h1')).opacity === '1'", timeout=3_000)
+    sync_api.expect(heading).to_have_css("opacity", "1", timeout=3_000)  # no string eval: the page's CSP forbids it
     real = page.request.get(f"{URL}/api/meta").json()["real_benchmark"]
     rows = page.locator("#realBars .bar-row")
     sync_api.expect(rows).to_have_count(len(real["methods"]))
