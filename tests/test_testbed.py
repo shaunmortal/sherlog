@@ -1,6 +1,11 @@
 """The real-system testbed's pure parts: the fault plan, telemetry -> document, the rollback decision and the
-spend cap. No server is started; the experiment itself is `python -m testbed.run` (docs/real-system.md)."""
+spend cap, plus a check of the recorded documents. No server is started; the experiment itself is
+`python -m testbed.run` (docs/real-system.md)."""
+import hashlib
 import json
+import os
+import signal
+import subprocess
 import sys
 from pathlib import Path
 
@@ -177,6 +182,24 @@ def test_without_a_latency_or_error_alarm_a_lingering_cpu_alarm_rejects_the_roll
     assert plan_.rollback_decision(doc, _after(cpu={"catalog": 90.0}))["proves"] is False
 
 
+# --- the recorded experiment -----------------------------------------------------------------
+
+RECORDS = [json.loads(line) for line in (run.OUT / "outages.jsonl").read_text().splitlines()
+           if line.strip()] if (run.OUT / "outages.jsonl").exists() else []
+
+
+@pytest.mark.skipif(not RECORDS, reason="no real-system outages recorded")
+def test_every_recorded_document_passes_the_server_and_reproduces_its_triage():
+    client = TestClient(app.app)
+    for record in RECORDS:
+        text = (run.OUT / record["doc"]).read_text()
+        res = client.post("/api/triage", content=text, headers={"content-type": "application/json"})
+        assert res.status_code == 200, (record["id"], res.text)
+        assert res.json() == record["triage"], record["id"]
+        assert hashlib.sha256(text.encode()).hexdigest() == record["doc_sha256"]
+        assert record["truth"]["service"] not in record["id"] and "truth" not in json.loads(text)
+
+
 # --- the spend cap ---------------------------------------------------------------------------
 
 def test_the_budget_never_lets_a_run_break_the_cap_and_keeps_room_for_auto():
@@ -198,3 +221,24 @@ def test_a_run_costs_both_models_when_auto_hands_off_and_nothing_known_when_it_f
     assert run.run_cost({"route": [haiku, opus], "first_usage": usage, "usage": usage}) == 4.10
     assert run.run_cost({"model": opus, "usage": usage}) == 4.00
     assert run.run_cost({"causes": [], "escalation": "investigation failed"}) is None
+
+
+# --- teardown --------------------------------------------------------------------------------
+
+def test_stopping_a_bed_whose_service_already_exited_does_not_raise(tmp_path):
+    p = subprocess.Popen([sys.executable, "-c", "pass"], start_new_session=True)
+    os.waitid(os.P_PID, p.pid, os.WEXITED | os.WNOWAIT)  # exited, not reaped: macOS refuses killpg with EPERM
+    bed = run.Bed(0, tmp_path)
+    bed.procs = {"gateway": p}
+    bed.stop()
+    assert p.returncode == 0 and bed.procs == {}
+    run.signal_group(p, signal.SIGTERM)  # reaped: its pid may be someone else's now, so it is not signalled
+
+
+def test_stopping_a_bed_ends_its_running_process_groups(tmp_path):
+    p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True)
+    bed = run.Bed(0, tmp_path)
+    bed.procs = {"gateway": p}
+    bed.stop()
+    assert p.returncode == -signal.SIGTERM
+

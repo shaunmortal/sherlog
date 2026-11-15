@@ -36,7 +36,7 @@ ERROR_FAULT_SHARE = 0.3       # errors: this share of requests raise a real exce
 CPU_FAULT_THREADS = 3         # cpu: busy-loop threads inside the service, fighting its request threads for the GIL
 LEAK_MB_PER_TICK = 6          # memory: the leak grows this much every 5 s ...
 LEAK_STEP_S = 0.5
-LEAK_CAP_MB = 300             # ... up to here, so a long outage cannot swap the laptop
+LEAK_CAP_MB = 200             # ... up to here, so a long outage cannot swap the laptop (8 GB, swap nearly full)
 WARMUP_STEPS = 8              # the memory decoy loads its cache in this many 1 s steps, then holds it
 PAGE = 16384                  # the leak and the cache are read a byte per page every second, as a cache that is
 TOUCH_EVERY_S = 1.0           # still used would be, so the OS keeps them resident instead of compressing them
@@ -47,11 +47,12 @@ IDLE_CONNECTION_S = 60
 MB = 2**20
 # a bad deploy: real exceptions from real bugs
 BUGS = (lambda: {}["request_id"], lambda: [][0], lambda: int("n/a"))
-# the CPU decoy: a batch job in a child process, so it burns a core of its own and slows no request down
+# the CPU decoy: a batch job in a child process, so it burns a core of its own and slows no request down; it
+# ends itself if its service dies without stopping it
 BATCH_JOB = """import os, time
 os.nice(5)
-duty = {duty}
-while True:
+duty, parent = {duty}, os.getppid()
+while os.getppid() == parent:
     t = time.perf_counter()
     while time.perf_counter() - t < 0.1 * duty:
         pass

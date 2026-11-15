@@ -69,6 +69,19 @@ class Clock:
         time.sleep(max(0.0, self.start + self.ticks * self.seconds - time.monotonic()))
 
 
+def signal_group(p: subprocess.Popen, sig: int) -> None:
+    """Signal the process group `p` leads, a decoy's batch job included: `p` was started with
+    start_new_session, so the group's id is its pid. A process that has exited is left alone, since once reaped
+    its pid may belong to someone else; macOS refuses (EPERM) to signal a group whose leader exited but is not
+    yet reaped, so that case is reaped here instead."""
+    if p.poll() is not None:
+        return
+    try:
+        os.killpg(p.pid, sig)
+    except (ProcessLookupError, PermissionError):
+        p.poll()
+
+
 class Bed:
     """One copy of the system on its own ports: eight service processes and a load generator."""
 
@@ -99,19 +112,14 @@ class Bed:
         self.last, self.cpu, self.at = {}, {}, None
 
     def stop(self) -> None:
-        for p in self.procs.values():
-            try:
-                os.killpg(p.pid, signal.SIGTERM)  # the group: a decoy's batch job dies with its service
-            except ProcessLookupError:
-                pass
-        for p in self.procs.values():
+        procs = list(self.procs.values())  # a copy: the signal handler may stop a bed while its thread does too
+        for p in procs:
+            signal_group(p, signal.SIGTERM)
+        for p in procs:
             try:
                 p.wait(STOP_TIMEOUT_S)
             except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(p.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+                signal_group(p, signal.SIGKILL)
                 p.wait()
         self.procs = {}
 
@@ -379,7 +387,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--normal", type=int, default=20, help="normal outages")
     parser.add_argument("--hard", type=int, default=10, help="hard outages: with a decoy")
-    parser.add_argument("--beds", type=int, default=3, help="copies of the system running at once (ports apart)")
+    parser.add_argument("--beds", type=int, default=2, help="copies of the system running at once (ports apart)")
     parser.add_argument("--live", action="store_true", help="run the agent too (needs ANTHROPIC_API_KEY)")
     parser.add_argument("--cap", type=float, default=CAP_USD, help="total live spend allowed, US$")
     parser.add_argument("--out", type=Path, default=OUT)
