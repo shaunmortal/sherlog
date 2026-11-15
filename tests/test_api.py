@@ -108,9 +108,18 @@ def test_status_page_explains_itself_without_javascript(api):
 def test_meta_carries_what_the_console_draws_from(api):
     meta = api.get("/api/meta").json()
     assert {"services", "calls", "faults", "metrics", "live", "model", "models", "benchmark", "evidence",
-            "baseline_ticks", "std_floor", "healthy"} <= set(meta)
+            "real_benchmark", "baseline_ticks", "std_floor", "healthy"} <= set(meta)
     assert meta["services"] == list(sim.SERVICES) and set(meta["healthy"]) == set(sim.SERVICES)
     assert set(meta["models"]) == set(investigate.MODELS) and meta["evidence"]["agent"]["outages"] > 0
+    assert meta["real_benchmark"]["cases"] == 252 and list(meta["real_benchmark"]["methods"])[0] == "auto"
+
+
+def test_the_story_pages_stakes_line_is_the_real_outages_z_score_ranking(api):
+    # the most abnormal service is the z-score ranking's first pick, so it is wrong as often as that ranking misses
+    real = json.loads(app.REAL_RESULTS.read_text())
+    cases, wrong = real["split"]["test"], 1 - real["methods"]["zscore"]["all"]["AC@1"]
+    line = f"In {cases} real outages, the most abnormal service was not the cause {round(wrong * 100)}% of the time"
+    assert line in api.get("/").text
 
 
 def test_health_without_a_key_says_replays_only_and_names_the_deployed_commit(api, offline, monkeypatch):

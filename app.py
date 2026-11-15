@@ -188,6 +188,32 @@ def _load_evidence(mtimes: tuple) -> dict:
     return bench.evidence_cached()
 
 
+REAL_RESULTS = STATIC.parent / "runs" / "real-benchmark" / "results.json"
+REAL_METHODS = ("auto", "graph", "mmnsigma", "nsigma", "baro")  # the README's real-benchmark table, in its order
+REAL_PAIRED = ("graph", "mmnsigma", "nsigma")  # the auto route against each, case by case
+REAL_AGENT = ("cases", "answered", "handed_to_human", "wrong_when_answered", "handed_to_opus", "cost_usd_total",
+              "cost_usd_median")
+
+
+@lru_cache(maxsize=1)
+def _real_benchmark() -> dict:
+    """The test set of the public benchmark of real outages, from runs/real-benchmark/results.json, which
+    scripts/benchmark/report.py recomputes from the run records with no API calls (docs/real-benchmark.md)."""
+    res = json.loads(REAL_RESULTS.read_text())
+    scores = ("AC@1", "AC@1_ci95", "AC@3", "Avg@5")
+    return {
+        "source": "runs/real-benchmark/results.json, recomputed by `python scripts/benchmark/report.py` with no API "
+                  "calls; the method and every table: docs/real-benchmark.md. Data: RCAEval benchmark, MIT licence.",
+        "cases": res["split"]["test"],
+        "systems": "three real microservice systems (12, 15 and 68 services), each fault injected on purpose",
+        "methods": {k: {"label": res["methods"][k]["label"], **{s: res["methods"][k]["all"][s] for s in scores}}
+                    for k in REAL_METHODS},
+        "auto_vs": {k: res["paired"]["auto"][k] for k in REAL_PAIRED},
+        "most_abnormal_first": res["methods"]["zscore"]["all"]["AC@1"],  # the z-score ranking's first pick
+        "agent": {k: res["methods"]["auto"]["sherlog"][k] for k in REAL_AGENT},
+    }
+
+
 @lru_cache(maxsize=1)
 def _healthy_series() -> dict:
     """A fault-free shop, looped by the console while nothing is broken."""
@@ -270,7 +296,8 @@ def health() -> dict:
 
 @app.get("/api/meta")
 def meta() -> dict:
-    """The shop's services, call graph, faults and metrics, the models, the benchmark tables and a healthy loop."""
+    """The shop's services, call graph, faults and metrics, the models, the benchmark tables (the shop's and the real
+    outages') and a healthy loop."""
     return {
         "services": sim.SERVICES,
         "calls": sim.CALLS,
@@ -281,6 +308,7 @@ def meta() -> dict:
         "models": investigate.MODELS,
         "benchmark": bench.summarize(bench.load(bench.runs_path("agent"))),
         "evidence": _evidence(),
+        "real_benchmark": _real_benchmark(),
         "baseline_ticks": sim.BASELINE_TICKS,
         "std_floor": sim.STD_FLOOR,
         "healthy": _healthy_series(),
@@ -407,11 +435,11 @@ async def investigate_upload(request: Request) -> StreamingResponse:
 # live run, and none is limited beyond the body-size cap the upload routes have.
 
 MCP_INSTRUCTIONS = (
-    "Sherlog is an AI on-call investigator that has to prove its answer, benchmarked on a simulated 11-service shop. "
-    "These tools are free and read-only: none calls Claude or needs a key. benchmark_summary gives the headline "
-    "numbers and their caveats; list_recorded_outages and get_recorded_verdict show recorded investigations with the "
-    "checks of each answer; sample_incident and triage_incident run the no-AI checks on telemetry in the "
-    "sherlog-incident/1 format. Live investigations are not offered here: they run in the console.")
+    "Sherlog is an AI on-call investigator that has to prove its answer, benchmarked on 252 real outages of a "
+    "public benchmark and on a simulated 11-service shop. These tools are free and read-only: none calls Claude or "
+    "needs a key. benchmark_summary gives the headline numbers and their caveats; list_recorded_outages and "
+    "get_recorded_verdict show recorded investigations with the checks of each answer; sample_incident and "
+    "triage_incident run the no-AI checks on telemetry in the sherlog-incident/1 format. Live investigations are not offered here: they run in the console.")
 HEADLINE_METHODS = ("one-shot", "haiku", "sonnet", "agent", "auto")  # the README's results table, in its order
 
 
@@ -491,17 +519,25 @@ def _benchmark_summary(_: BaseModel) -> dict:
     normal, hard = _benchmark(ev, "", bench.SEED_BASE), _benchmark(ev, "hard-", bench.HARD_SEED_BASE)
     vs_rule = [b["methods"]["agent"]["vs_call_graph_rule"] for b in (normal, hard)]
     return {
-        "source": "runs/evidence.json: every recorded run, scored by `python bench.py --report` with no API calls. "
-                  "cause_first: the true cause ranked first with its citations verified.",
+        "real_outages": {**_real_benchmark(), "note": "AC@k: the root-cause service is among a method's first k, "
+                         "scored by the benchmark's own evaluator; Avg@5: the mean of AC@1 to AC@5. The published "
+                         "baselines were re-run on the same cases with the benchmark's own runner."},
+        "source": "normal and hard: the controlled benchmark on the simulated shop, in runs/evidence.json, scored by "
+                  "`python bench.py --report` with no API calls. cause_first: the true cause ranked first with its "
+                  "citations verified.",
         "normal": normal,
         "hard": {**hard, "note": "adds a decoy: a service with a harmless anomaly that starts with the fault"},
         "caveats": [
-            "The telemetry is simulated: a shop this project wrote. The no-AI rules run on the same data, so the "
-            "comparisons are fair, but the absolute numbers are optimistic.",
+            "Real outages: one benchmark suite of injected faults (one root cause each, at a known time) and one "
+            "live run per case. The cases are public, so they may be in the models' training data; "
+            "docs/real-benchmark.md checks for a learned prior and finds no sign of one, though that cannot rule one "
+            "out.",
+            "The controlled benchmark's telemetry is simulated: a shop this project wrote. The no-AI rules run on the "
+            "same data, so the comparisons are fair, but the absolute numbers are optimistic.",
             "In the simulator, rolling back the true cause is exactly what clears the fault, so the rollback numbers "
             "measure the gate, not accuracy in the field. Uploaded telemetry gets no rollback test.",
-            f"The Opus agent's edge over the no-AI call-graph rule is small: only the agent was right in "
-            f"{vs_rule[0]['only_method_right']} normal and {vs_rule[1]['only_method_right']} hard outages, only the "
+            f"On the controlled benchmark, the Opus agent's edge over the no-AI call-graph rule is small: only the "
+            f"agent was right in {vs_rule[0]['only_method_right']} normal and {vs_rule[1]['only_method_right']} hard outages, only the "
             f"rule in {vs_rule[0]['only_rule_right']} and {vs_rule[1]['only_rule_right']} (exact McNemar "
             f"p = {vs_rule[0]['mcnemar_p']:.2g} and {vs_rule[1]['mcnemar_p']:.2g}).",
             f"The benchmarks are small: one hard-mode outage moves a score by {100 / hard['outages']:.1f} points.",
@@ -541,10 +577,12 @@ MCP = mcp_server.Server("sherlog", _version(), MCP_INSTRUCTIONS, {
         "points at cache, the real cause."),
     "benchmark_summary": _tool(
         _NoArgs, _benchmark_summary, "Summarize the benchmark",
-        "The headline numbers from runs/evidence.json for 132 normal and 44 hard-mode simulated outages: how often "
-        "each method named the true cause first, answered alone and answered wrong, its median cost, what the rollback "
-        "replay caught, each method against the no-AI call-graph rule outage by outage, the no-AI baselines, and "
-        "the caveats that bound these numbers."),
+        "The headline numbers. First, 252 real outages of a public benchmark (three real microservice systems): how "
+        "often Sherlog and the best published baselines, re-run on the same cases, ranked the root cause first, "
+        "case-by-case tests and the cost. Then, from runs/evidence.json, 132 normal and 44 hard-mode simulated "
+        "outages: how often each method named the true cause first, answered alone and answered wrong, its median "
+        "cost, what the rollback replay caught, each method against the no-AI call-graph rule outage by outage, the "
+        "no-AI baselines, and the caveats that bound these numbers."),
 })
 
 

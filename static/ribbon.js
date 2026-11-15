@@ -1,20 +1,21 @@
 // Behind the story page: a blue ribbon drawn down the page as you scroll, the way a pen would.
-// Each section gets one gesture (in from an edge, a lasso round a box or an arc across a heading, out the other
-// edge); between them it runs off screen, so it is one ribbon that grows as you scroll and pulls back as you go up.
+// A few boxes get one gesture each (in from an edge, a lasso round the box, back out the same edge); between them it
+// runs off screen, so it is one ribbon that grows as you scroll and pulls back as you go up. It never crosses a
+// heading: each lasso stays below the heading above it, and a lasso without room for that is left out.
 // It bends away from the pointer; over it, a clear liquid surface ripples wherever the pointer moves.
 import * as THREE from 'three';
 
-// One gesture per section: in from one edge, one round lasso around a box, out the other edge.
-// fx/fy place the lasso's centre on the box; `sweep` draws a single arc across it instead. Boxes hidden on this
-// layout (zero width) are skipped. Between gestures the route runs off screen, so it stays one continuous ribbon.
+// One gesture per box: in from an edge, one round lasso, back out the same edge; the last one ends in its lasso,
+// behind its box, so no loose end sticks out. fx/fy place the lasso's centre on the box; `below` is the heading block
+// it must stay under. Boxes hidden on this layout (zero width) are skipped, as the statement's empty column is in one
+// column. Between gestures the route runs off screen.
 const LOOPS = [
-  { sel: '.statement .split > :first-child', fx: 0.32, fy: 0.55 },  // the empty column under the heading
-  { sel: '#how h2', sweep: true },                                    // the sticky stage below leaves no room for a loop
-  { sel: '#bigstats > :first-child', fx: 0.45, fy: 0.05 },           // the 100% card
+  { sel: '.statement .split > :first-child', fx: 0.32, fy: 0.55, below: '#statementTitle' },  // the empty column
+  { sel: '#realStats > :first-child', fx: 0.45, fy: 0.05, below: '#results .head2' },          // the real outages' card
 ];
-// One column (the page's CSS stacks everything at 860 px and below): no free room for a lasso beside the copy,
-// so just one arc across each heading.
-const LOOPS_NARROW = [{ sel: '#how h2', sweep: true }, { sel: '#results h2', sweep: true }];
+const CLEAR = 1.1;         // a lasso reaches about this many radii above its centre (its top, plus the curve's swing)
+const HEADING_GAP = 32;    // px kept free under a heading, its descenders included
+const MIN_RADIUS = 24;     // px: a lasso squeezed smaller than this is left out
 const RADIAL = 16, SEGMENTS_PER_SCREEN = 320, MAX_SEGMENTS = 6000;
 const HEAD_AT = 0.6;       // heading down the page, the head stays this far down the viewport
 const LOOP_SCROLL = 0.12;  // least px of scroll per px of ribbon: a lasso is one quick sweep
@@ -41,23 +42,21 @@ function loopPoints(cx, cy, r, side) {
 }
 
 function routePoints(w, h) {
-  const narrow = w <= 860, r = loopRadius(w, h), edge = EDGE * w, rise = RISE * h;
-  const pageY = (y) => -(y + window.scrollY), points = [];
-  for (const { sel, fx, fy, sweep } of narrow ? LOOPS_NARROW : LOOPS) {
+  const edge = EDGE * w, pageY = (y) => -(y + window.scrollY), gestures = [];
+  for (const { sel, fx, fy, below } of LOOPS) {
     const b = document.querySelector(sel)?.getBoundingClientRect();
     if (!b?.width) continue;
-    if (sweep) {  // in from the side the route is on, across the heading, out the other side
-      const s = points.length && points[points.length - 1].x < 0 ? -1 : 1;
-      points.push(new THREE.Vector3(s * edge, pageY(b.top - (narrow ? 0.2 : 0.4) * h), 0),
-        new THREE.Vector3(0, pageY(b.top + 0.5 * b.height), 0),
-        new THREE.Vector3(-s * edge, pageY(b.bottom + (narrow ? 0 : 0.2) * h), 0));
-      continue;
-    }
-    const cx = b.left + fx * b.width - w / 2, cy = pageY(b.top + fy * b.height), side = cx < 0 ? -1 : 1;
-    points.push(new THREE.Vector3(side * edge, cy + rise, 0), new THREE.Vector3(cx - side * 0.2 * r, cy + 0.7 * rise, 0),
-      ...loopPoints(cx, cy, r, side),
-      new THREE.Vector3(cx - side * 1.25 * r, cy - r, DEPTH), new THREE.Vector3(-side * edge, cy - 1.15 * r, DEPTH));
+    const centre = b.top + fy * b.height;
+    const ceiling = (document.querySelector(below)?.getBoundingClientRect().bottom ?? -Infinity) + HEADING_GAP;
+    const r = Math.min(loopRadius(w, h), (centre - ceiling) / CLEAR);
+    if (r < MIN_RADIUS) continue;
+    const rise = Math.min(RISE * h, centre - ceiling);  // the way in starts no higher than the heading's foot
+    const cx = b.left + fx * b.width - w / 2, cy = pageY(centre), side = cx < 0 ? -1 : 1;
+    gestures.push([[new THREE.Vector3(side * edge, cy + rise, 0), new THREE.Vector3(cx - side * 0.2 * r, cy + 0.7 * rise, 0),
+      ...loopPoints(cx, cy, r, side)],
+    [new THREE.Vector3(cx, cy - 1.15 * r, DEPTH), new THREE.Vector3(side * edge, cy - 1.25 * r, DEPTH)]]);
   }
+  const points = gestures.flatMap(([lasso, out], i) => (i < gestures.length - 1 ? [...lasso, ...out] : lasso));
   return points.length > 1 ? points : null;
 }
 

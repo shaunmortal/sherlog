@@ -42,6 +42,7 @@
   .ink { position: absolute; top: 0; left: 0; pointer-events: none; transition: transform .5s var(--ease-drawer), width .5s var(--ease-drawer); }
   .views .ink { top: auto; bottom: 0; height: 2px; background: var(--text); }
   .views .theme { padding: 0 18px; font-size: 15px; letter-spacing: 0; }
+  .meta-link { display: inline-flex; align-items: center; gap: .5ch; min-height: 24px; margin-left: 10px; color: var(--accent-text); text-underline-offset: 3px; }
 
   /* ---- three columns ---- */
   .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr) 380px; min-height: calc(100vh - 49px); }
@@ -132,6 +133,10 @@
   .head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 16px 22px 12px; }
   .head .label { margin: 0; }
   .head .hint { margin: 0; }
+  /* the guess prompt and Skip to verdict share a row under the telemetry's controls, where a replay starts; the
+     button keeps its place while hidden, so showing it moves nothing */
+  .guess-row { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+  #skipBtn.off { visibility: hidden; }
 
   /* ---- middle: service map ---- */
   .map-wrap { padding: 0 22px 14px; border-bottom: 1px solid var(--line); }
@@ -226,6 +231,9 @@
   pre { margin: 6px 0 0; padding: 10px; border-radius: 10px; background: var(--sunk); border: 1px solid var(--line); font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
   #verdict { padding: 16px 22px 28px; }
+  /* the verdict just landed: its banner is ringed for a moment (with reduced motion it just appears and goes) */
+  #verdict .banner { transition: box-shadow .6s var(--ease-quad); }
+  #verdict.landed .banner { box-shadow: 0 0 0 3px var(--accent); }
   .empty { margin: 0; color: var(--muted); font-size: 14px; }
   .score { padding: 14px 16px; margin-bottom: 14px; border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow); }
   .score h3 { margin: 0 0 2px; font: 600 17px var(--sans); }
@@ -282,6 +290,11 @@
   .ev-table td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); }
   .ev-table th:not(:first-child), .ev-table td:not(:first-child) { text-align: right; white-space: nowrap; }
   .ev-table tbody tr:last-child td { font-weight: 600; }
+  #evReal tbody tr:first-child td { font-weight: 600; } #evReal tbody tr:last-child td { font-weight: 400; }  /* Sherlog leads */
+  .evidence h2.part { margin: 40px 0 10px; font: 600 22px/1.25 var(--sans); letter-spacing: -.01em; color: var(--text); }
+  .evidence h2.part:focus { outline: none; }  /* focused only so the header's link lands here */
+  .evidence .source { font: 13px/1.6 var(--mono); }
+  .evidence .source a { color: var(--text); text-underline-offset: 3px; }
 
   .foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0 24px; padding: 10px 22px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
   .foot a { display: inline-flex; align-items: center; min-height: 44px; }  /* a whole touch target, as in the story page's footer */
@@ -296,7 +309,7 @@
     SHERLOG
   </a>
   <div class="meta">
-    <div><span>SYSTEM</span><b id="metaSystem" style="font-weight:400">Simulated shop</b></div>
+    <div><span>SYSTEM</span><b id="metaSystem" style="font-weight:400">Simulated shop</b><a class="meta-link" id="realLink" href="#evidence">also tested on 252 real outages <span aria-hidden="true">→</span></a></div>
     <div><span>MODEL</span><b id="metaModel" style="font-weight:400">Claude</b></div>
     <div><span>SOURCES</span>metrics · logs · call graph</div>
     <div><span>MODE</span><b id="metaMode" style="font-weight:400">…</b></div>
@@ -343,7 +356,7 @@
     </div>
     <div class="pad" id="dataPanel" role="tabpanel" aria-labelledby="tab-data" hidden>
       <h2 class="label">Your data</h2>
-      <p class="hint" style="margin:0">Bring 10 minutes of telemetry from your own system, with its call graph (2 to 40 services) or mapped onto the shop's 11, and the same alarm, rankings and checks run on it.</p>
+      <p class="hint" style="margin:0">Bring 10 minutes of telemetry from your own system, with its call graph (2 to 80 services) or mapped onto the shop's 11, and the same alarm, rankings and checks run on it.</p>
       <p class="hint" style="margin:6px 0 0"><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format, and how to export your telemetry</a></p>
       <p class="sub">1 · Telemetry</p>
       <div class="grid">
@@ -383,11 +396,15 @@
         <button type="button" class="pause" id="pauseBtn" aria-pressed="false">PAUSE</button>
       </div>
       <div class="mtabs" id="metricTabs" role="group" aria-label="Metric shown"></div>
+      <div class="guess-row">
+        <p class="hint" id="guessHint">Guess first: click the service you suspect on its chart or on the map.</p>
+        <button type="button" class="pause off" id="skipBtn">SKIP TO VERDICT</button>
+      </div>
     </div>
     <div id="telemetry"><p class="empty" style="padding:0 22px 16px">Loading the shop's metrics…</p></div>
     <a class="jump" id="jumpVerdict" href="#h-verdict" hidden>See the verdict <span aria-hidden="true">&nbsp;↓</span></a>
 
-    <div class="head" id="mapHead"><h2 class="label">Who did it?</h2><p class="hint" id="guessHint">Click the service you suspect, here or on its telemetry row, before the agent answers.</p></div>
+    <div class="head" id="mapHead"><h2 class="label">Who did it?</h2></div>
     <div class="map-wrap">
       <svg id="map" viewBox="0 0 800 340" role="group" aria-label="Service map"></svg>
       <div class="legend"><span><i></i>normal</span><span><i class="warn"></i>degraded</span><span><i class="bad"></i>failing</span><span>arrows: caller → callee</span></div>
@@ -421,6 +438,12 @@
 
 <div class="evidence" id="evidence" role="tabpanel" aria-labelledby="tab-evidence" hidden>
   <h1>How well does the agent work?</h1>
+  <h2 class="part" id="h-real" tabindex="-1">On <span class="realN">252</span> real outages · a public benchmark</h2>
+  <p>Three real microservice systems (12, 15 and 68 services), each broken on purpose and scored by the benchmark's own evaluator. The best published methods were re-run on the same cases with the benchmark's own runner. Ranked first: the root-cause service is the method's first suspect.</p>
+  <div class="table-wrap" id="evReal" role="region" tabindex="0" aria-labelledby="h-real"></div>
+  <p id="evRealTest" style="margin-top:12px"></p>
+  <p class="source">Data: RCAEval benchmark, MIT licence. <a href="https://github.com/shaunmortal/sherlog/blob/main/docs/real-benchmark.md">The method and every table</a></p>
+  <h2 class="part" id="h-controlled">The controlled benchmark · a simulated shop</h2>
   <p><span class="evN">132</span> outages, three for every service × fault type, on seeds that were never looked at while the agent was built. "Cause first" means the true cause was ranked first <i>and</i> its citations were verified. Every run, with each tool call and the model's reasoning, can be replayed under Replay.</p>
   <p>The telemetry is simulated: caller logs name the failing service and faults are single and clean, so the absolute numbers are optimistic. The no-AI baselines run on exactly the same data, so the comparison is fair.</p>
   <h2 class="sub" id="h-methods">What each capability and model adds · <span class="evN">132</span> outages · [95% interval]</h2>
@@ -495,6 +518,7 @@ let seenPills = new Set();         // map tags already shown, so a redraw doesn'
 let still = false;                 // the viewer paused the motion
 let playing = false;               // a playback is running (shown as LIVE unless paused)
 let busyFocus = null;              // the button that had keyboard focus when a run disabled it
+let fastForward = false;           // Skip to verdict: the rest of the recording plays in order, with no waits
 // the flight log and verdict as the page first shows them, for when the console holds no outage again
 const BLANK = { log: $('#log').firstElementChild.cloneNode(true), verdict: $('#verdict').firstElementChild.cloneNode(true) };
 
@@ -976,10 +1000,10 @@ async function play(from, to, ms, draw) {
   const id = ++playId;
   setLive(MOTION);
   for (let t = from; t <= to; t++) {
-    while (still && id === playId) await sleep(STILL_POLL_MS);
+    while (still && !fastForward && id === playId) await sleep(STILL_POLL_MS);
     if (id !== playId) return false;
     draw(t);
-    if (ms) await sleep(ms);
+    if (ms) await sleep(fastForward ? 0 : ms);
   }
   if (id === playId) setLive(false);
   return id === playId;
@@ -1083,6 +1107,34 @@ function renderVerdict(v) {
   if (rollback) announce(rollback.textContent);
   enter($('#verdict').querySelectorAll(':scope > :not(.suspects):not(.notes), .suspects > li, .notes > *'), { duration: 600, stagger: 50, easing: 'quint', y: 8 });
   offerJump();
+  landVerdict();
+}
+
+const LANDED_MS = 2000;  // how long a fresh verdict stays ringed
+let landedTimer = 0;
+
+/** The verdict just landed: bring it into view and ring it for a moment. On a phone the jump pill offers it instead,
+    unless the viewer asked to skip to it. */
+function landVerdict() {
+  const head = $('#h-verdict'), top = head.getBoundingClientRect().top;
+  if ((!PHONE.matches || fastForward) && (top < 0 || top > innerHeight * 0.4)) {
+    head.scrollIntoView({ behavior: MOTION ? 'smooth' : 'auto', block: 'start' });
+  }
+  $('#verdict').classList.add('landed');
+  clearTimeout(landedTimer);  // a verdict right after another keeps its full moment
+  landedTimer = setTimeout(() => $('#verdict').classList.remove('landed'), LANDED_MS);
+}
+
+/** Skip to verdict: play the rest of the recorded events in order, without the waits between them. */
+function skipToVerdict() {
+  fastForward = true;
+  hideSkip();
+}
+
+/** Hide Skip to verdict; keyboard focus on it waits at the verdict instead of dropping to the page. */
+function hideSkip() {
+  if (document.activeElement === $('#skipBtn')) $('#h-verdict').focus({ preventScroll: true });
+  $('#skipBtn').classList.add('off');
 }
 
 /** The answer's own result of the rollback replay, next to its citation badge. */
@@ -1192,6 +1244,7 @@ async function handle(ev) {
 
 function begin(message, investigator) {
   state = { ...freshState(), running: true, investigator };
+  fastForward = false;
   seenPills = new Set();
   setAgent(watching());
   view = { ...view, picked: false };
@@ -1208,6 +1261,7 @@ function begin(message, investigator) {
 
 function end(message = 'Done. Break something else?', tone = 'ok') {
   state = { ...state, running: false };
+  hideSkip();
   setAgent(watching());
   setBusy(false);
   setStatus(message, tone);
@@ -1281,9 +1335,11 @@ async function runReplay(id) {
     const ran = model ?? events.find((ev) => ev.type === 'verdict')?.model ?? META.model;
     state = { ...state, investigator: shortModel(ran) };
     onScreen({ label, model: ran });
+    $('#skipBtn').classList.remove('off');
     for (const ev of events) {
       await handle(ev);
-      await sleep(REPLAY_DELAY_MS[ev.type] ?? 0);
+      if (ev.type === 'verdict') hideSkip();
+      await sleep(fastForward ? 0 : REPLAY_DELAY_MS[ev.type] ?? 0);
     }
     end('Done. Replay another, or break something live.');
   } catch (err) {
@@ -1480,6 +1536,23 @@ function renderEvidence(ev) {
     Object.entries(agent.by_fault).map(([f, g]) => [f, g.outages, pct(g.baseline_ac1), pct(g.agent_ac1)])));
 }
 
+/** The public benchmark of real outages, first: Sherlog against its own no-AI rule and the published methods. */
+function renderReal(r) {
+  if (!r) return;
+  for (const n of document.querySelectorAll('.realN')) n.textContent = r.cases;
+  // rounded half to even, as Python prints them, so the interval reads as docs/real-benchmark.md has it (88.5 -> 88)
+  const even = (x) => { const v = x * 100, n = Math.round(v); return v - Math.floor(v) === 0.5 && n % 2 ? n - 1 : n; };
+  const withRealCI = (m) => `${pct(m['AC@1'])} [${m['AC@1_ci95'].map(even).join('–')}]`;
+  $('#evReal').replaceChildren(table(['Method', 'Ranked first', 'In top 3', 'Avg@5'],
+    Object.values(r.methods).map((m) => [m.label, withRealCI(m), pct(m['AC@3']), m['Avg@5'].toFixed(2)])));
+  const pair = (k) => `${r.auto_vs[k].only_first_right} and ${r.auto_vs[k].only_second_right} (p = ${r.auto_vs[k].mcnemar_p.toExponential(1)})`;
+  $('#evRealTest').textContent = `Case by case, the agent was right where n-sigma was wrong in ${r.auto_vs.nsigma.only_first_right} outages, ` +
+    `and n-sigma right where the agent was wrong in ${r.auto_vs.nsigma.only_second_right} (exact McNemar test, ` +
+    `p = ${r.auto_vs.nsigma.mcnemar_p.toExponential(1)}); against multi-source n-sigma, ${pair('mmnsigma')}; against Sherlog's own ` +
+    `call-graph rule, with no AI, ${pair('graph')}. It answered ${r.agent.answered} of ${r.cases} on its own and handed the rest to a ` +
+    `person, for a median ${usd(r.agent.cost_usd_median)} an outage ($${r.agent.cost_usd_total.toFixed(2)} for all ${r.cases}).`;
+}
+
 function renderHard(ev, head) {
   const hard = ev['hard-agent'];
   if (!hard?.outages) { $('#evHard').replaceChildren(el('p', {}, 'No hard-mode runs yet.')); return; }
@@ -1553,6 +1626,8 @@ async function init() {
   arrowKeys($('[role="tablist"]'), [...document.querySelectorAll('[role="tab"]')], { ArrowRight: 1, ArrowLeft: -1 });
   $('#pauseBtn').hidden = !MOTION;  // with reduced motion nothing moves, so there is nothing to pause
   $('#pauseBtn').addEventListener('click', toggleStill);
+  $('#skipBtn').addEventListener('click', skipToVerdict);
+  $('#realLink').addEventListener('click', (e) => { e.preventDefault(); showView('evidence'); $('#h-real').focus(); });
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && hover) { hover = null; paint(); } });  // Esc hides the chart readout
   try {
     META = await getJSON('/api/meta');
@@ -1568,6 +1643,7 @@ async function init() {
     (m) => { pick = { ...pick, hard: m === 'hard' }; press($('#modeGrid'), m); });
   renderStats(META.evidence);
   renderEvidence(META.evidence);
+  renderReal(META.real_benchmark);
   renderModels(META.evidence);
   useGraph(shopGraph());  // the map, the telemetry rows and the header's count of services
   revealOnScroll(document.querySelectorAll('#mapHead, .map-wrap, .how, #evidence > *'));  // once the telemetry has pushed them down

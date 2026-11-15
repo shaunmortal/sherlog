@@ -42,7 +42,24 @@ def page(browser, errors):
 
 def test_story_page_loads_without_console_errors(page, errors):
     page.goto(f"{URL}/", wait_until="networkidle")
-    sync_api.expect(page.locator("#heroTitle")).to_be_visible()
+    sync_api.expect(page.locator("h1")).to_be_visible()
+    assert errors == []
+
+
+def test_the_story_pages_one_h1_is_its_visible_headline_and_results_lead_with_the_real_outages(page, errors):
+    page.goto(f"{URL}/", wait_until="networkidle")
+    heading = page.locator("h1")
+    sync_api.expect(heading).to_have_count(1)
+    sync_api.expect(heading).to_have_text("An AI on-call investigator that has to prove its answer.")
+    sync_api.expect(heading).to_be_in_viewport()
+    # it fades in on load (about a second), not when scrolled to
+    page.wait_for_function("getComputedStyle(document.querySelector('h1')).opacity === '1'", timeout=3_000)
+    real = page.request.get(f"{URL}/api/meta").json()["real_benchmark"]
+    rows = page.locator("#realBars .bar-row")
+    sync_api.expect(rows).to_have_count(len(real["methods"]))
+    sync_api.expect(rows.first).to_contain_text(f"{round(real['methods']['auto']['AC@1'] * 100)}%")
+    # the real outages come before the controlled benchmark
+    assert page.evaluate("$('#realBars').compareDocumentPosition($('#bars')) & Node.DOCUMENT_POSITION_FOLLOWING")
     assert errors == []
 
 
@@ -182,4 +199,41 @@ def test_a_keyboard_triage_keeps_focus_on_its_button(page, errors):
     page.locator("#triageBtn").press("Enter")
     sync_api.expect(page.locator("#status")).to_contain_text("Triage done.")
     sync_api.expect(page.locator("#triageBtn")).to_be_focused()
+    assert errors == []
+
+
+def test_the_header_link_opens_the_real_outages_first_in_the_evidence_view(page, errors):
+    page.goto(f"{URL}/console", wait_until="networkidle")  # the link listens once the console has its data
+    page.get_by_role("link", name="also tested on 252 real outages").click()
+    sync_api.expect(page.get_by_role("tab", name="EVIDENCE")).to_have_attribute("aria-selected", "true")
+    sync_api.expect(page.locator("#h-real")).to_be_focused()
+    sync_api.expect(page.locator("#evReal tbody tr").first).to_contain_text("92% [88–95]")
+    assert errors == []
+
+
+def test_skip_to_verdict_plays_the_rest_of_the_recording_without_the_waits(page, errors):
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto(f"{URL}/console", wait_until="networkidle")
+    page.get_by_role("button", name="Replay outage #41").click()
+    skip = page.get_by_role("button", name="SKIP TO VERDICT")
+    sync_api.expect(skip).to_be_visible()
+    sync_api.expect(page.locator("#guessHint")).to_be_in_viewport()  # the prompt sits at the top of the charts
+    skip.click()
+    # a full replay takes about 11 s; the skipped one ends at once, with every recorded event and the same verdict
+    sync_api.expect(page.locator("#status")).to_contain_text("Done.", timeout=5_000)
+    sync_api.expect(page.locator("#h-verdict")).to_be_focused()
+    sync_api.expect(page.locator("#log .log-item.tool")).to_have_count(5)
+    sync_api.expect(page.locator("#verdict")).to_contain_text("Root cause: cache")
+    sync_api.expect(page.locator("#verdict")).to_contain_text("The culprit was cache")
+    sync_api.expect(skip).to_be_hidden()
+    assert errors == []
+
+
+def test_a_verdict_comes_into_view_and_is_ringed_when_it_lands(page, errors):
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto(f"{URL}/console#replay/41")
+    sync_api.expect(page.locator("#verdict .banner")).to_be_visible(timeout=REPLAY_TIMEOUT_MS)
+    sync_api.expect(page.locator("#verdict")).to_have_class("landed")
+    sync_api.expect(page.locator("#h-verdict")).to_be_in_viewport()
+    sync_api.expect(page.locator("#verdict")).not_to_have_class("landed")  # only for a moment
     assert errors == []

@@ -181,8 +181,8 @@ reading for 15 s or 30 s fired the alarm at tick 68, during healthy traffic. Hol
 - that the first 5 minutes were healthy
 
 Nothing scores the answer, because nobody knows the culprit. Uploads get no rollback test: it replays an outage
-from the simulator's seed, which real telemetry does not have. The benchmark's numbers come from the simulated
-shop, not from uploads.
+from the simulator's seed, which real telemetry does not have. The benchmark numbers come from the simulated shop
+and from the public benchmark of real outages, not from uploads.
 
 With its own `calls`, the agent's prompt calls your system "a system built from N services" instead of the
 shop, and its tools accept only your services. The prompt for the shop is unchanged.

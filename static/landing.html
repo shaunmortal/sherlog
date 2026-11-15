@@ -300,6 +300,12 @@
   @media (max-width: 620px) { .bar-row { grid-template-columns: minmax(0, 1fr) 64px; } .bar-track { grid-column: 1 / -1; grid-row: 2; } }
   .note { margin: 28px 0 0; max-width: 80ch; font-size: 15px; line-height: 1.6; color: var(--muted); }
   .note a { color: var(--text); text-decoration: underline 2px var(--accent); text-underline-offset: 4px; }
+  .source { margin: 14px 0 0; font: 13px/1.6 var(--mono); color: var(--muted); }
+  .source a { color: var(--text); text-decoration: underline 1px var(--accent); text-underline-offset: 4px; }
+  /* the controlled benchmark, under the real outages */
+  .controlled { margin-top: 14vh; }
+  .controlled h3 { margin: 0 0 20px; max-width: 22ch; font: 400 clamp(34px, 4.4vw, 68px)/1 var(--sans); letter-spacing: -.04em; }
+  .controlled > .sub { max-width: 62ch; margin-bottom: 40px; }
   /* hard mode's rollback what-if: two numbers under their own heading */
   .rb-proof { margin-top: 14vh; }
   .rb-proof h3 { margin: 0 0 20px; max-width: 18ch; font: 400 clamp(34px, 4.4vw, 68px)/1 var(--sans); letter-spacing: -.04em; }
@@ -356,9 +362,10 @@
   <section class="hero" aria-labelledby="heroIntro">
     <div class="wrap">
       <div class="hero-head">
-        <p class="hero-intro" id="heroIntro">An AI on-call investigator that has to prove its answer.</p>
+        <h1 class="hero-intro" id="heroIntro">An AI on-call investigator that has to prove its answer.</h1>
         <div class="hero-act">
-          <p class="hero-lede">When one service breaks, everything that calls it breaks too: Sherlog sends a Claude agent to find the one that broke, and plain code checks every tool call it cites.</p>
+          <!-- the stakes: 1 - the z-score ranking's AC@1 in runs/real-benchmark/results.json (55 of 252 test cases) -->
+          <p class="hero-lede">When one service breaks, everything that calls it breaks too. In 252 real outages, the most abnormal service was not the cause 22% of the time: Sherlog sends a Claude agent to find the one that was, and plain code checks every tool call it cites.</p>
           <div class="ctas">
             <a class="pbtn dark" href="/console#replay/41"><span class="roll" data-text="Watch outage #41, free"><span>Watch outage #41, free</span></span><span class="dot"></span></a>
             <a class="pbtn light" href="/console"><span class="dot"></span><span class="roll" data-text="Break something"><span>Break something</span></span></a>
@@ -378,7 +385,7 @@
 
   <section class="statement">
     <div class="wrap">
-      <h1 class="display" id="heroTitle"><span class="line indent"><span>Find the cause,</span></span><span class="line"><span>not the victims.</span></span></h1>
+      <h2 class="display" id="statementTitle"><span class="line indent"><span>Find the cause,</span></span><span class="line"><span>not the victims.</span></span></h2>
       <div class="split">
         <div></div>
         <div>
@@ -439,12 +446,20 @@
     <div class="wrap">
       <p class="eyebrow"><span class="dot"></span><span class="num">03</span> Results</p>
       <div class="head2">
-        <h2>Tested on <span class="evN">132</span> outages it had never seen.</h2>
-        <p class="sub">Three outages for every service and fault type, on seeds kept apart while the agent was built. "Cause first": the true cause ranked first, with its citations checked.</p>
+        <h2>Tested on <span class="realN">252</span> real outages.</h2>
+        <p class="sub">Three real microservice systems (12, 15 and 68 services), each broken on purpose in a public benchmark and scored by its own evaluator. The best published methods were re-run on the same cases.</p>
       </div>
-      <div class="bigstats" id="bigstats"></div>
-      <div class="bars" id="bars"></div>
-      <p class="note" id="resultsNote"></p>
+      <div class="bigstats" id="realStats"></div>
+      <div class="bars" id="realBars"></div>
+      <p class="note" id="realNote"></p>
+      <p class="source">Data: RCAEval benchmark, MIT licence. <a href="https://github.com/shaunmortal/sherlog/blob/main/docs/real-benchmark.md">The method and every number <span aria-hidden="true">↗</span></a></p>
+      <div class="controlled">
+        <h3>And on <span class="evN">132</span> simulated outages it had never seen.</h3>
+        <p class="sub">A controlled benchmark: a shop of 11 services, three outages for every service and fault type, on seeds kept apart while the agent was built. "Cause first": the true cause ranked first, with its citations checked.</p>
+        <div class="bigstats" id="bigstats"></div>
+        <div class="bars" id="bars"></div>
+        <p class="note" id="resultsNote"></p>
+      </div>
     </div>
   </section>
 
@@ -492,7 +507,7 @@
   </div>
   <div class="wrap">
     <span>Built from scratch for IceHacks 2026 · Claude Haiku, Sonnet and Opus 5.5 · MIT</span>
-    <span>The telemetry is simulated, so the numbers are optimistic.</span>
+    <span>Tested on 252 real outages of a public benchmark and 176 simulated ones.</span>
   </div>
 </footer>
 
@@ -878,6 +893,45 @@ function buildStory() {
 
 // ---- 03 / 04: the numbers -----------------------------------------------------------------
 
+// the real outages, as the README's table orders them: [key in META.real_benchmark.methods, label, detail, tone]
+const REAL_ROWS = [
+  ['auto', 'Sherlog · auto', 'Claude Haiku first, Claude Opus when needed', 'accent'],
+  ['graph', "Sherlog's call-graph rule", 'no AI, the same inputs', 'muted'],
+  ['mmnsigma', 'Multi-source n-sigma', 'published · metrics, logs and traces', 'muted'],
+  ['nsigma', 'n-sigma', 'published · metrics', 'muted'],
+  ['baro', 'BARO', 'published · metrics', 'muted'],
+];
+const sci = (p) => p.toExponential(1);  // 9.26e-6 -> "9.3e-6", as the README writes it
+
+/** Count-up stat boxes: [value, format, text] each, real values in place before any count-up. */
+function statBoxes(container, stats) {
+  const boxes = stats.map(([value, format, text]) => el('div', {}, el('b', {}, format(value)), el('span', {}, text)));
+  container.replaceChildren(...boxes);
+  revealOnScroll([container], () => {
+    enter(boxes, { duration: 1000, stagger: 80, easing: 'glide', y: 30 });
+    boxes.forEach((box, i) => countUp(box.firstChild, stats[i][0], stats[i][1]));
+  }, { none: true });
+}
+
+function buildReal() {
+  const r = META.real_benchmark;
+  if (!r) return;
+  const m = r.methods, vs = r.auto_vs.nsigma, rule = r.auto_vs.graph;
+  for (const n of document.querySelectorAll('.realN')) n.textContent = r.cases;
+  statBoxes($('#realStats'), [
+    [m.auto['AC@1'], pct, `ranked the root cause first on ${r.cases} real outages · the best published methods: ` +
+      `${pct(Math.min(m.nsigma['AC@1'], m.mmnsigma['AC@1'])).slice(0, -1)}–${pct(Math.max(m.nsigma['AC@1'], m.mmnsigma['AC@1']))}`],
+    [vs.only_first_right, (v) => `${Math.round(v)} vs ${vs.only_second_right}`,
+      `outages only Sherlog got right, vs only n-sigma, case by case · exact McNemar p = ${sci(vs.mcnemar_p)}`],
+    [r.agent.cost_usd_median, usd, `median cost per outage · Claude Opus took over in ${r.agent.handed_to_opus} of ${r.cases}`],
+  ]);
+  barRows($('#realBars'), REAL_ROWS.map(([key, label, detail, tone]) => [label, detail, m[key]['AC@1'], tone]));
+  $('#realNote').textContent = "Ranked first: the root-cause service is the method's first suspect, as the benchmark's evaluator scores it. " +
+    "The published methods were re-run on the same cases with the benchmark's own runner. Without the AI, Sherlog's call-graph rule " +
+    `ranks the cause first in ${pct(m.graph['AC@1'])}; the agent is right where the rule is wrong in ${rule.only_first_right} outages, ` +
+    `and the reverse in ${rule.only_second_right} (exact McNemar test, p = ${sci(rule.mcnemar_p)}).`;
+}
+
 function barRows(container, rows) {
   // a list for screen readers: each row names its value in words, the bar itself is only the picture of it
   container.setAttribute('role', 'list');
@@ -908,12 +962,7 @@ function buildResults() {
     'graph_ac1' in a ? [a.graph_ac1, pct, 'the no-AI call-graph rule, same outages'] : [a.baseline_ac1, pct, 'the classic no-AI ranking, same outages'],
     [ev.auto?.median_cost_usd ?? a.median_cost_usd, usd, ev.auto ? `per outage on auto: Haiku first, Opus in ${ev.auto.escalated_to_strong} of ${ev.auto.outages}` : 'median cost per outage'],
   ];
-  const boxes = stats.map(([value, format, text]) => el('div', {}, el('b', {}, format(value)), el('span', {}, text)));  // real values before any count-up
-  $('#bigstats').replaceChildren(...boxes);
-  revealOnScroll([$('#bigstats')], () => {
-    enter(boxes, { duration: 1000, stagger: 80, easing: 'glide', y: 30 });
-    boxes.forEach((box, i) => countUp(box.firstChild, stats[i][0], stats[i][1]));
-  }, { none: true });
+  statBoxes($('#bigstats'), stats);
   const rows = [
     ['No AI · z-score ranking', 'the standard baseline', a.baseline_ac1, 'muted'],
     ['No AI · robust z-score', 'median and MAD', a.robust_ac1, 'muted'],
@@ -1014,9 +1063,9 @@ function revealHeadings() {
   const titles = [...document.querySelectorAll('.band h2, .cta h2')];
   const words = new Map(titles.map((h) => [h, splitWords(h)]));
   revealOnScroll(titles, (h) => maskIn(words.get(h)), { none: true });
-  revealOnScroll(document.querySelectorAll('.eyebrow, .head2 .sub, .step, .note, .rb-proof > h3, .rb-proof > .sub, .cta p, .cta .ctas, .marquee'), null, { easing: 'glide', blur: 6 });
+  revealOnScroll(document.querySelectorAll('.eyebrow, .head2 .sub, .step, .note, .source, .controlled > h3, .controlled > .sub, .rb-proof > h3, .rb-proof > .sub, .cta p, .cta .ctas, .marquee'), null, { easing: 'glide', blur: 6 });
   revealOnScroll([$('.statement .split')], null, { easing: 'glide', y: 30 });
-  revealOnScroll([$('#heroTitle')], () => maskIn($('#heroTitle').querySelectorAll('.line > span'), { stagger: 120, duration: 1300 }), { none: true });
+  revealOnScroll([$('#statementTitle')], () => maskIn($('#statementTitle').querySelectorAll('.line > span'), { stagger: 120, duration: 1300 }), { none: true });
 }
 
 async function init() {
@@ -1043,6 +1092,7 @@ async function init() {
   heroLoop();
   buildCards();
   buildStory();
+  buildReal();
   buildResults();
   buildHard();
   buildRollbackStats();

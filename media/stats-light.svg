@@ -1,25 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="256" viewBox="0 0 1280 256" font-family="system-ui, sans-serif" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="510" viewBox="0 0 1280 510" font-family="system-ui, sans-serif" role="img" aria-labelledby="t d">
 <title id="t">Sherlog in numbers</title>
-<desc id="d">Hard mode, with a decoy: the Opus agent named the cause first in 43 of 44 outages, with 0 wrong answers. Auto route: a median $0.0015 per outage, all 132 normal outages right. Rollback replay, hard mode: 7 of 7 wrong answers caught, 0 of 83 right ones rejected. 183 recorded investigations replay free in the console, with no API key.</desc>
-<rect width="1280" height="256" rx="28" fill="#f0f1fa"/>
-<rect x="20.5" y="20.5" width="300.0" height="215" rx="18" fill="#ffffff" stroke="#d9dbe7"/>
-<text x="48.0" y="62" font-size="14" font-weight="600" letter-spacing="1.4" fill="#5c5f6e">HARD MODE · DECOY</text>
-<text x="45.0" y="138" font-size="68" letter-spacing="-2.6" fill="#0b0c10">43<tspan font-size="40" letter-spacing="-.5" fill="#5c5f6e">/44</tspan></text>
-<text x="48.0" y="180" font-size="19" font-weight="600" fill="#0b0c10">Cause named first</text>
-<text x="48.0" y="207" font-size="16" fill="#5c5f6e">Opus agent, 0 wrong answers</text>
-<rect x="333.5" y="20.5" width="300.0" height="215" rx="18" fill="#ffffff" stroke="#d9dbe7"/>
-<text x="361.0" y="62" font-size="14" font-weight="600" letter-spacing="1.4" fill="#5c5f6e">AUTO ROUTE</text>
-<text x="358.0" y="138" font-size="68" letter-spacing="-2.6" fill="#0b0c10">$0.0015</text>
-<text x="361.0" y="180" font-size="19" font-weight="600" fill="#0b0c10">Median cost per outage</text>
-<text x="361.0" y="207" font-size="16" fill="#5c5f6e">all 132 normal outages right</text>
-<rect x="646.5" y="20.5" width="300.0" height="215" rx="18" fill="#ffffff" stroke="#d9dbe7"/>
-<text x="674.0" y="62" font-size="14" font-weight="600" letter-spacing="1.4" fill="#5c5f6e">ROLLBACK · HARD MODE</text>
-<text x="671.0" y="138" font-size="68" letter-spacing="-2.6" fill="#0b0c10">7<tspan font-size="40" letter-spacing="-.5" fill="#5c5f6e">/7</tspan></text>
-<text x="674.0" y="180" font-size="19" font-weight="600" fill="#0b0c10">Wrong answers caught</text>
-<text x="674.0" y="207" font-size="16" fill="#5c5f6e">0 of 83 right ones rejected</text>
-<rect x="959.5" y="20.5" width="300.0" height="215" rx="18" fill="#ffffff" stroke="#d9dbe7"/>
-<text x="987.0" y="62" font-size="14" font-weight="600" letter-spacing="1.4" fill="#5c5f6e">NO API KEY</text>
-<text x="984.0" y="138" font-size="68" letter-spacing="-2.6" fill="#0b0c10">183</text>
-<text x="987.0" y="180" font-size="19" font-weight="600" fill="#0b0c10">Recorded replays</text>
-<text x="987.0" y="207" font-size="16" fill="#5c5f6e">free in the console</text>
+<desc id="d">Sherlog in numbers. On 252 real outages of a public benchmark, Sherlog ranked the root cause first in 92%, against 80% to 81% for the best published methods re-run on the same cases; case by case against n-sigma, 40 to 9, p = 9.3e-6. Ranked first: Sherlog auto route 92%, Sherlog call-graph rule with no AI 83%, multi-source n-sigma 81%, n-sigma 80%, BARO 29%. On the same inputs without the AI, 83%. Median cost $0.0024 per real outage, $8.01 for all 252. Controlled benchmark, hard mode with a decoy: the Opus agent gave 0 wrong answers and named the cause first in 43 of 44.</desc>
+<rect width="1280" height="510" rx="28" fill="#f0f1fa"/>
+<rect x="20.5" y="20.5" width="1239.0" height="261.0" rx="18" fill="#ffffff" stroke="#d9dbe7"/>
+<text x="52.0" y="64.0" font-size="14" font-weight="600" letter-spacing="1.4" fill="#5c5f6e">252 REAL OUTAGES · A PUBLIC BENCHMARK</text>
+<text x="48.0" y="166.0" font-size="112" letter-spacing="-4.5" fill="#0b0c10">92%</text>
+<text x="52.0" y="206.0" font-size="22" font-weight="600" fill="#0b0c10">root cause ranked first</text>
+<text x="52.0" y="236.0" font-size="18" fill="#5c5f6e">best published methods, same cases: 80–81%</text>
+<text x="52.0" y="262.0" font-size="18" fill="#5c5f6e">vs n-sigma, case by case: 40 to 9, p = 9.3e-6</text>
+<text x="520.0" y="78.0" font-size="17" font-weight="600" fill="#0b0c10">Sherlog, auto route</text>
+<rect x="820" y="66" width="330" height="12" rx="6" fill="#e4e6ef"/>
+<rect x="820" y="66" width="305.1" height="12" rx="6" fill="#1a2ffb"/>
+<text x="1214.0" y="79.0" font-size="20" font-weight="600" text-anchor="end" fill="#1a2ffb">92%</text>
+<text x="520.0" y="118.0" font-size="17" fill="#0b0c10">Sherlog call-graph rule, no AI</text>
+<rect x="820" y="106" width="330" height="12" rx="6" fill="#e4e6ef"/>
+<rect x="820" y="106" width="273.7" height="12" rx="6" fill="#767a8a"/>
+<text x="1214.0" y="119.0" font-size="20" text-anchor="end" fill="#0b0c10">83%</text>
+<text x="520.0" y="158.0" font-size="17" fill="#0b0c10">Multi-source n-sigma, published</text>
+<rect x="820" y="146" width="330" height="12" rx="6" fill="#e4e6ef"/>
+<rect x="820" y="146" width="267.1" height="12" rx="6" fill="#767a8a"/>
+<text x="1214.0" y="159.0" font-size="20" text-anchor="end" fill="#0b0c10">81%</text>
+<text x="520.0" y="198.0" font-size="17" fill="#0b0c10">n-sigma, published</text>
+<rect x="820" y="186" width="330" height="12" rx="6" fill="#e4e6ef"/>
+<rect x="820" y="186" width="264.5" height="12" rx="6" fill="#767a8a"/>
+<text x="1214.0" y="199.0" font-size="20" text-anchor="end" fill="#0b0c10">80%</text>
+<text x="520.0" y="238.0" font-size="17" fill="#0b0c10">BARO, published</text>
+<rect x="820" y="226" width="330" height="12" rx="6" fill="#e4e6ef"/>
+<rect x="820" y="226" width="95.6" height="12" rx="6" fill="#767a8a"/>
+<text x="1214.0" y="239.0" font-size="20" text-anchor="end" fill="#0b0c10">29%</text>
+<rect x="20.5" y="294.5" width="404.3" height="195.0" rx="18" fill="#ffffff" stroke="#d9dbe7"/>
+<text x="48.0" y="334.0" font-size="14" font-weight="600" letter-spacing="1.4" fill="#5c5f6e">SAME INPUTS, WITHOUT THE AI</text>
+<text x="45.0" y="402.0" font-size="60" letter-spacing="-2.4" fill="#0b0c10">92% vs 83%</text>
+<text x="48.0" y="440.0" font-size="19" font-weight="600" fill="#0b0c10">Sherlog vs its own no-AI rule</text>
+<text x="48.0" y="467.0" font-size="16" fill="#5c5f6e">26 cases to 2, p = 3.0e-6</text>
+<rect x="437.8" y="294.5" width="404.3" height="195.0" rx="18" fill="#ffffff" stroke="#d9dbe7"/>
+<text x="465.3" y="334.0" font-size="14" font-weight="600" letter-spacing="1.4" fill="#5c5f6e">COST</text>
+<text x="462.3" y="402.0" font-size="60" letter-spacing="-2.4" fill="#0b0c10">$0.0024</text>
+<text x="465.3" y="440.0" font-size="19" font-weight="600" fill="#0b0c10">Median per real outage</text>
+<text x="465.3" y="467.0" font-size="16" fill="#5c5f6e">$8.01 for all 252</text>
+<rect x="855.2" y="294.5" width="404.3" height="195.0" rx="18" fill="#ffffff" stroke="#d9dbe7"/>
+<text x="882.7" y="334.0" font-size="14" font-weight="600" letter-spacing="1.4" fill="#5c5f6e">CONTROLLED BENCHMARK · DECOY</text>
+<text x="879.7" y="402.0" font-size="60" letter-spacing="-2.4" fill="#0b0c10">0</text>
+<text x="882.7" y="440.0" font-size="19" font-weight="600" fill="#0b0c10">Wrong answers, hard mode</text>
+<text x="882.7" y="467.0" font-size="16" fill="#5c5f6e">Opus agent: 43 of 44 named first</text>
 </svg>
