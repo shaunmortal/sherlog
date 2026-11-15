@@ -1,4 +1,4 @@
-# never upload secrets or local tooling
+# never upload secrets or local tooling (docs/ and README.md stay: the server renders them at /guide)
 .env
 .env.*
 !.env.example
@@ -13,7 +13,6 @@ tests
 requirements-dev.txt
 SUBMISSION.md
 .claude
-docs
 scripts
 testbed
 runs/real

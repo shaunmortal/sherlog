@@ -1,7 +1,9 @@
 """What a deployed site serves besides its pages and API: security headers and a content security policy that lets
-every page's own scripts and styles run, robots.txt, the sitemap, security.txt, the 404 page and the API reference."""
+every page's own scripts and styles run, CDN files pinned with their hashes, robots.txt, the sitemap, security.txt,
+the 404 page, the API reference and Swagger UI."""
 import base64
 import hashlib
+import json
 import math
 import re
 import xml.etree.ElementTree as ET
@@ -13,13 +15,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app
+import guide
 import investigate
 import sim
 
 client = TestClient(app.app)
 SITE = "https://sherlog-jade.vercel.app"
 BROWSER = {"accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
-PAGES = ["/", "/console", "/status", "/reference", "/docs"]
+PAGES = ["/", "/console", "/status", "/reference", "/docs", "/guide", "/guide/real-system"]
+CDN = "https://cdn.jsdelivr.net/"
+PINNED = re.compile(r"^https://cdn\.jsdelivr\.net/npm/[\w.-]+@\d+\.\d+\.\d+/")  # a package at an exact version
 HEADERS = {
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
@@ -42,6 +47,7 @@ class _Page(HTMLParser):
         super().__init__()
         self.inline = {"script": [], "style": []}  # the text of each inline <script> (import map too) and <style>
         self.loads = {"script": [], "style": []}   # where each <script src> and stylesheet comes from
+        self.tags = []                             # the attributes of each <script src> and stylesheet
         self.attributes = []                       # style="" and on...="" attributes, which a hash cannot allow
         self._open = None
 
@@ -50,8 +56,10 @@ class _Page(HTMLParser):
         self.attributes += [name for name in attrs if name == "style" or name.startswith("on")]
         if tag == "script" and "src" in attrs:
             self.loads["script"].append(attrs["src"])
+            self.tags.append(attrs)
         elif tag == "link" and attrs.get("rel") == "stylesheet":
             self.loads["style"].append(attrs["href"])
+            self.tags.append(attrs)
         elif tag in ("script", "style"):
             self._open = tag
             self.inline[tag].append("")
@@ -120,24 +128,62 @@ def test_the_404_page_s_inline_code_is_allowed_too():
     assert all(_sha256(text) in policy["script-src"] for text in page.inline["script"])
 
 
-@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference"])
+@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/docs", "/guide", "/guide/real-system"])
 def test_pages_use_no_inline_style_or_handler_attributes(path):
     # a hash can allow a <style> or <script> block but not style="..." or onclick="...", which would need
     # 'unsafe-inline'; the console sets its dynamic styles through the DOM instead
     assert _parse(client.get(path).text).attributes == []
 
 
+def _allows(sources: list[str], url: str) -> bool:
+    """Whether a policy's source list allows this URL: 'self' for this server, a whole origin, or a folder on it."""
+    parts = urlsplit(url)
+    if not parts.netloc:
+        return "'self'" in sources
+    return any(url.startswith(src) if src.endswith("/") else src == f"{parts.scheme}://{parts.netloc}"
+               for src in sources if src.startswith("https://"))
+
+
 @pytest.mark.parametrize("path", PAGES)
-def test_every_script_and_stylesheet_a_page_loads_comes_from_an_allowed_origin(path):
+def test_every_script_and_stylesheet_a_page_loads_comes_from_an_allowed_source(path):
     res = client.get(path)
     page, policy = _parse(res.text), _policy(res)
     importmap = re.findall(r'"(https://[^"]+)"', "".join(page.inline["script"]))
-    for kind, directive, urls in (("script", "script-src", page.loads["script"] + importmap),
-                                  ("style", "style-src", page.loads["style"])):
+    for directive, urls in (("script-src", page.loads["script"] + importmap), ("style-src", page.loads["style"])):
         for url in urls:
-            parts = urlsplit(url)
-            origin = f"{parts.scheme}://{parts.netloc}" if parts.netloc else "'self'"
-            assert origin in policy[directive], f"{path}: {url} is not allowed by {directive}"
+            assert _allows(policy[directive], url), f"{path}: {url} is not allowed by {directive}"
+
+
+def test_the_policy_allows_only_pinned_folders_of_the_cdn():
+    policy = _policy(client.get("/"))
+    for directive in ("script-src", "style-src"):
+        cdn = [src for src in policy[directive] if src.startswith(CDN.rstrip("/"))]
+        assert cdn and all(PINNED.match(src) and src.endswith("/") for src in cdn), (directive, cdn)
+    assert not _allows(policy["script-src"], f"{CDN}npm/three@0.161.0/build/three.module.min.js")
+    assert not _allows(policy["script-src"], f"{CDN}npm/some-other-package@1.0.0/index.js")
+
+
+@pytest.mark.parametrize("path", ["/", "/docs"])
+def test_every_cdn_file_is_pinned_to_an_exact_version_with_its_hash(path):
+    page = _parse(client.get(path).text)
+    tags = [t for t in page.tags if (t.get("src") or t.get("href", "")).startswith(CDN)]
+    for t in tags:
+        assert PINNED.match(t.get("src") or t["href"]), t
+        assert re.fullmatch(r"sha384-[A-Za-z0-9+/]{64}", t.get("integrity", "")) and t.get("crossorigin") == "anonymous", t
+    importmap = [json.loads(text) for text in page.inline["script"] if '"imports"' in text]
+    assert tags or importmap, path
+    for entry in importmap:
+        for url in entry["imports"].values():
+            assert PINNED.match(url), url
+        assert all(re.fullmatch(r"sha384-[A-Za-z0-9+/]{64}", h) for h in entry["integrity"].values())
+
+
+def test_the_import_map_has_a_hash_for_every_three_js_module_the_3d_shop_loads():
+    entry = json.loads(next(text for text in _parse(client.get("/").text).inline["script"] if '"imports"' in text))
+    imports = re.findall(r"from '([^']+)'", (app.STATIC / "hero3d.js").read_text())
+    resolved = {entry["imports"][name] if name in entry["imports"] else
+                entry["imports"]["three/addons/"] + name.removeprefix("three/addons/") for name in imports}
+    assert resolved == set(entry["integrity"])
 
 
 def test_fonts_come_from_the_font_host_only():
@@ -173,7 +219,8 @@ def test_the_sitemap_lists_every_page_and_llms_txt():
     root = ET.fromstring(client.get("/sitemap.xml").content)
     ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
     listed = [loc.text for loc in root.findall("s:url/s:loc", ns)]
-    assert listed == [f"{SITE}{path}" for path in ("/", "/console", "/status", "/reference", "/llms.txt")]
+    docs = ("/guide", *(f"/guide/{doc.slug}" for doc in guide.DOCS))
+    assert listed == [f"{SITE}{path}" for path in ("/", "/console", "/status", "/reference", *docs, "/llms.txt")]
     for url in listed:  # each one is really served
         assert client.get(url.removeprefix(SITE)).status_code == 200
 
@@ -248,16 +295,24 @@ def test_the_api_reference_answers_head():
     assert head.status_code == 200 and head.content == b""
 
 
-@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference"])
-def test_every_footer_links_the_api_reference_page(path):
-    page = client.get(path).text
+@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/guide", "/guide/mcp", "/no-such-page"])
+def test_every_footer_links_the_api_reference_and_the_docs(path):
+    page = client.get(path, headers=BROWSER).text
     footer = page[page.index("<footer"):page.index("</footer>")]
     assert re.search(r'href="/reference"[^>]*>API</a>', footer) and 'href="/docs"' not in footer
+    assert '<a href="/guide">Docs</a>' in footer
 
 
 def test_swagger_ui_stays_at_docs_for_developers():
     res = client.get("/docs")
     assert res.status_code == 200 and "swagger-ui" in res.text and "/openapi.json" in res.text
+
+
+def test_swagger_ui_sits_in_our_own_accessible_page():
+    page = client.get("/docs").text
+    assert '<html lang="en">' in page and 'href="/static/swagger.css"' in page
+    assert "deepLinking: false" in page  # its links would sit inside each route's toggle button
+    assert client.get("/static/swagger.css").status_code == 200
 
 
 # --- the console's first paint matches what it shows once loaded, so nothing moves -------------------------------

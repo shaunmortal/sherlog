@@ -15,7 +15,20 @@ Everything here is free and needs no key, except live investigations (POST /api/
 - [Story page](https://sherlog-jade.vercel.app/): what Sherlog does, told with a recorded outage, a guessing game and the benchmark
 - [Console](https://sherlog-jade.vercel.app/console): break a service live, replay a recorded outage for free ([#41](https://sherlog-jade.vercel.app/console#replay/41) is the walk-through), read the evidence, upload your own telemetry
 - [Status](https://sherlog-jade.vercel.app/status): live mode, recorded outages, today's live runs and the deployed version
+- [Docs](https://sherlog-jade.vercel.app/guide): the docs below, rendered on the site, each at `/guide/{page}`
 - [API reference](https://sherlog-jade.vercel.app/reference): every route, generated from the code; the schema itself is at [/openapi.json](https://sherlog-jade.vercel.app/openapi.json), and [Swagger UI](https://sherlog-jade.vercel.app/docs) tries each route
+
+## Docs
+
+Each page is the repository's markdown (docs/*.md, and the README's "How it works"), rendered on the site:
+
+- [How it works](https://sherlog-jade.vercel.app/guide/how-it-works): the alarm, the agent and its read-only tools, the citation verifier, the 80% rule, the blast radius and the rollback replay
+- [Real outages](https://sherlog-jade.vercel.app/guide/real-benchmark): the public benchmark of 252 held-out real outages: the protocol, every table and the limitations
+- [A real running system](https://sherlog-jade.vercel.app/guide/real-system): 30 outages on eight real services, with real faults and real rollbacks
+- [MCP connector](https://sherlog-jade.vercel.app/guide/mcp): how to connect, each tool with an example call and answer
+- [Bring your own outage](https://sherlog-jade.vercel.app/guide/bring-your-own): the upload format, its checks and limits, and a converter for metric range-query exports
+- [Open-weights models](https://sherlog-jade.vercel.app/guide/open-model): two open-weights models behind the same gate
+- [Reproducibility](https://sherlog-jade.vercel.app/guide/reproducibility): every recorded run re-run from its seed, and a mutation check
 
 ## MCP connector
 

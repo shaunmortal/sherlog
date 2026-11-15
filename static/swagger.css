@@ -1,0 +1,28 @@
+/* Swagger UI at /docs, made to pass WCAG 2.2 AA: text at 4.5:1 or more, targets of at least 24px. */
+body { margin: 0; background: #fff; color: #1d1f28; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; max-width: 1460px; margin: 0 auto; padding: 12px; font: 500 14px sans-serif; }
+.bar a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; color: #1d1f28; text-underline-offset: 3px; }
+.bar .brand { margin-right: auto; letter-spacing: .08em; text-decoration: none; }
+.bar nav { display: flex; flex-wrap: wrap; gap: 4px; }
+a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid #1a2ffb; outline-offset: 2px; }
+
+/* the API's version and spec badges and the schema link */
+.swagger-ui .info .title small { background: #4c5060; }
+.swagger-ui .info .title small.version-stamp { background: #2f6b00; }
+.swagger-ui .info a, .swagger-ui .info .url { color: #1a4fbf; }
+/* each method's badge in Swagger's own hue, dark enough for its white text */
+.swagger-ui .opblock.opblock-get .opblock-summary-method { background: #1a63c2; }
+.swagger-ui .opblock.opblock-post .opblock-summary-method { background: #0d7d48; }
+.swagger-ui .opblock.opblock-put .opblock-summary-method { background: #a85b00; }
+.swagger-ui .opblock.opblock-delete .opblock-summary-method { background: #c8231a; }
+.swagger-ui .opblock.opblock-patch .opblock-summary-method { background: #0f7a6c; }
+.swagger-ui .opblock.opblock-head .opblock-summary-method { background: #6b3fa0; }
+.swagger-ui .opblock.opblock-options .opblock-summary-method { background: #1d5f8a; }
+.swagger-ui .json-schema-2020-12-expand-deep-button { color: #4c5060; }
+/* Try it out: the cancel button's red and the execute button's blue, darker */
+.swagger-ui .btn.cancel { border-color: #c8231a; color: #c8231a; }
+.swagger-ui .btn.execute { border-color: #1a63c2; background: #1a63c2; }
+/* grey notes (a parameter's place, an undocumented answer, no links) and the download button of an answer */
+.swagger-ui .parameter__in, .swagger-ui .parameter__extension, .swagger-ui :is(.response-col_status, .response-col_links) .response-undocumented { color: #5c5f6e; }
+.swagger-ui .download-contents { background: #4c5060; }
