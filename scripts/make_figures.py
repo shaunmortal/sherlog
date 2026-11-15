@@ -72,7 +72,7 @@ def main() -> None:
     normal, hard = rows(ev, ""), rows(ev, "hard-")
     head = [
         f'<text x="{PAD}" y="44" font-size="20" font-weight="600" fill="{INK}">Named the true cause first</text>',
-        f'<text x="{PAD}" y="68" font-size="13" fill="{MUTED}">Ranked first and accepted by the verifier · whiskers: 95% Wilson intervals</text>',
+        f'<text x="{PAD}" y="68" font-size="13" fill="{MUTED}">Ranked first; for Claude, with its citations verified too · whiskers: 95% Wilson intervals</text>',
         # legend: two identities, also named on every row
         f'<rect x="{WIDTH - PAD - 150}" y="34" width="12" height="12" rx="3" fill="{NO_AI}"/>',
         f'<text x="{WIDTH - PAD - 132}" y="44.5" font-size="13" fill="{INK}">No AI</text>',
