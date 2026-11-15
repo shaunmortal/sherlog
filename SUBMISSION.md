@@ -127,18 +127,19 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
   100 on the same three pages.
 - **Reliability:** a status page and `/api/health`, a 120 s timeout on every model call, a clear reason
   for every failure, and per-visitor and daily limits on live runs. Every page and the health check answer
-  `HEAD` for uptime monitors, a workflow is scheduled every 30 minutes to check the live health endpoint, `/docs`
-  describes every route, `requirements.txt` pins the exact versions the tests pass with, and all three pages
+  `HEAD` for uptime monitors, a workflow is scheduled every 30 minutes to check the live health endpoint, `/reference`
+  lists every route (Swagger UI stays at `/docs`), every response carries a strict content security policy, `requirements.txt` pins the exact versions the tests pass with, and all three pages
   carry a link preview image.
 - **Real outages:** a converter from the public benchmark's cases to Sherlog's upload format, a dev/test split
   frozen before any live call, the published baselines re-run with the benchmark's own runner, scoring by its own
   evaluator, Wilson intervals and exact McNemar tests, and checks of n-sigma's window and of a learned prior.
-- **Tests:** 1,601 pytest tests in CI, 1,285 of which re-run every recorded run from its seed and compare its tool
+- **Tests:** 1,678 pytest tests in CI, 1,285 of which re-run every recorded run from its seed and compare its tool
   results exactly (the agent loop and the auto route against a scripted fake model, the
   call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format,
   uploads with their own call graph, the MCP connector, and a guard that the shop's prompt and tool schemas never
   change),
-  plus 16 browser end-to-end checks.
+  plus 49 browser end-to-end checks that run in CI against the app started on the runner (security policy,
+  404 page, layout shift, axe-core on five pages in both themes).
 - **AI tools used:** Claude Code as a pair programmer; Claude Haiku, Sonnet and Opus 5.5 inside the product.
   Claude Code wrote and tested code under our direction, several features at once in separate agent
   worktrees joined by the `merge:` commits. The verifier, the blast-radius check, the call-graph rule and the
@@ -241,7 +242,7 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-c
 4. Console, Your data, **Use** the shop sample, **Triage (no AI)**: the alarm, the z-score and robust z-score
    rankings and the blast-radius check. Then **Use** a custom-graph sample and **Triage** again: an upload
    with its own call graph of six services replaces the shop on the charts and the map.
-5. In a clone: `pytest -q` (1,601 passed, 1 skipped), `python bench.py --report`, which recomputes every
+5. In a clone: `pytest -q` (1,678 passed, 1 skipped), `python bench.py --report`, which recomputes every
    controlled-benchmark table from the recorded runs with no API calls, and `python scripts/benchmark/report.py`,
    which recomputes every real-outage number.
 
