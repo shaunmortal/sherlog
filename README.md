@@ -43,7 +43,7 @@ Sherlog was built during IceHacks 2026, on Nov 14 and 15 (IST), with Claude Code
 | Track | Why it fits, and where to check |
 |---|---|
 | **Best&nbsp;AI&nbsp;Hack** | A Claude agent investigates with read-only tools and must cite the tool calls behind each suspect. Plain code checks every citation, and a replay with the answer rolled back tests it. **On 252 real outages of a public benchmark it ranked the root cause first in 92%, against 80–81% for the best published methods re-run on the same cases (against n-sigma, case by case, 40 to 9, p = 9.3e-6) and 83% for the same inputs without the AI**, for a median $0.0024 an outage. In the controlled benchmark's hard mode, the Opus agent named the cause first in 43 of 44 and never answered wrong.<br>**Check it:** [Real outages](#real-outages-a-public-benchmark) · [What's new](#whats-new-here) · [How it works](#how-it-works) · [a caught wrong answer](https://sherlog-jade.vercel.app/console#replay/177) |
-| **Best&nbsp;Deployed&nbsp;App** | Live, with a status page and a health endpoint. All 183 recorded investigations replay with no API key; live runs are rate-limited and fail with a clear reason; 1,813 tests and 73 browser checks run in CI on every push, 1,285 of the tests re-running every recorded run from its seed; every response carries a strict content security policy and the usual security headers; every real-outage number recomputes from the committed run records with no key; an MCP connector at `/mcp` lets Claude use it as a tool; an uptime check of the live health endpoint is scheduled every 30 minutes.<br>**Check it:** [Live site](https://sherlog-jade.vercel.app) · [`/status`](https://sherlog-jade.vercel.app/status) · [`/api/health`](https://sherlog-jade.vercel.app/api/health) · [CI](https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml) · [uptime check](.github/workflows/uptime.yml) · [Reliability](#reliability) |
+| **Best&nbsp;Deployed&nbsp;App** | Live, with a status page and a health endpoint. All 183 recorded investigations replay with no API key; live runs are rate-limited and fail with a clear reason; 1,814 tests and 73 browser checks run in CI on every push, 1,285 of the tests re-running every recorded run from its seed; every response carries a strict content security policy and the usual security headers; every real-outage number recomputes from the committed run records with no key; an MCP connector at `/mcp` lets Claude use it as a tool; an uptime check of the live health endpoint is scheduled every 30 minutes.<br>**Check it:** [Live site](https://sherlog-jade.vercel.app) · [`/status`](https://sherlog-jade.vercel.app/status) · [`/api/health`](https://sherlog-jade.vercel.app/api/health) · [CI](https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml) · [uptime check](.github/workflows/uptime.yml) · [Reliability](#reliability) |
 | **Best&nbsp;Design&nbsp;&amp;&nbsp;UX** | A scroll story you can play: guess which service broke, then watch the agent investigate, check and roll back; the story page's results and the console's evidence lead with the real outages. Built to WCAG 2.2 AA, with 0 axe-core violations on the story page, the console and the status page, in both themes, at desktop and phone sizes; full keyboard use, screen-reader announcements and pausable motion.<br>**Check it:** [Story page](https://sherlog-jade.vercel.app) · [Console](https://sherlog-jade.vercel.app/console) · [Accessibility](#accessibility) |
 
 ## Real outages: a public benchmark
@@ -66,6 +66,7 @@ AC@k: the root-cause service is among the method's first k suspects. Avg@5: the 
 - **92% vs 83% on the same inputs without the AI.** Sherlog's call-graph rule reads the same telemetry and call graph with no AI; the agent was right where the rule was wrong in 26 outages, and the reverse in 2 (p = 3.0e-6).
 - **A median $0.0024 an outage**, $8.01 for all 252: Claude Haiku's answer stood in 189 cases, and Claude Opus took over in 63.
 - **It answers when it is sure.** It answered 214 of the 252 on its own, 208 of them right, and handed the other 38 to a person.
+- **A second suite, code-level faults.** On the benchmark's 81 held-out cases where a faulty code change is deployed, it named the cause first in 53 of the 54 on the 12- and 15-service systems, with no wrong answer there; 79% overall, against 73% for n-sigma ([the RE3 section](docs/real-benchmark.md#a-second-suite-code-level-faults-re3)).
 
 The protocol (blind cases, the frozen split, the deviations from the benchmark's own) and every table, by system and by fault: [docs/real-benchmark.md](docs/real-benchmark.md). `python scripts/benchmark/report.py` recomputes every number in [`runs/real-benchmark/results.json`](runs/real-benchmark/results.json) from the committed run records, with no key.
 
@@ -87,7 +88,7 @@ Sherlog also ran on a real system of 8 services, each its own OS process calling
 | 3:10–3:25 | [`/console#replay/177`](https://sherlog-jade.vercel.app/console#replay/177) (C1 in the Replay tab) | A confident wrong answer the rollback stopped. In hard mode the Haiku agent names `cart`, the decoy, 85% sure, with its citations verified, so it goes out; rolling `cart` back leaves `frontend` abnormal and the alarm on, so the rollback does not prove it. |
 | 3:25–3:40 | [Your data](https://sherlog-jade.vercel.app/console#data) → **Use** the shop sample → **Triage (no AI)**, then **Use** a custom-graph sample → **Triage** | No key needed. The alarm, the z-score ranking (`cart` first), the robust z-score (`cache` first) and the blast-radius check, which says `cache` would explain more of the outage than `cart`. The custom-graph sample brings its own call graph of six services, which replace the shop on the charts and the map. |
 | 3:40–4:00 | [`docs/real-benchmark.md`](docs/real-benchmark.md), then in a clone `python scripts/benchmark/report.py` | The real outages: the protocol and every table. The script recomputes every number in [`runs/real-benchmark/results.json`](runs/real-benchmark/results.json) from the committed run records, with no key, in about 1 s, and stops if one differs from the benchmark's own evaluator. |
-| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 1,813 passed and 1 skipped (the browser checks, which need a running server), in about 35 s. `python bench.py --report`: every controlled-benchmark table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
+| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 1,814 passed and 1 skipped (the browser checks, which need a running server), in about 35 s. `python bench.py --report`: every controlled-benchmark table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
 
 ```bash
 uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q
@@ -341,7 +342,7 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 - **Link previews.** All three pages carry a share preview image, [`static/og.jpg`](static/og.jpg).
 - **Clear errors, never a hang.** Every live failure ends the stream with a reason the console shows: a missing or invalid key, a model the key cannot use, the API's rate limit, a timeout, no connection, an API error. The verdict then goes to a human. Each model call gives up after 120 s, with 1 retry.
 - **Limits.** Live runs are limited to 6 an hour per visitor and 200 a day. Over the limit you get a 429, and with live mode off a 503, each saying what to try instead. A bad upload gets a 422 that names the field; a body over 2 MB gets a 413.
-- **Tests.** 1,813 pytest tests run in CI on every push and pull request:
+- **Tests.** 1,814 pytest tests run in CI on every push and pull request:
   - 117 in [`test_core.py`](test_core.py): the simulator, the agent loop against a scripted fake model, the verifier, the blast radius, the rollback, the auto route and the call-graph rule
   - 33 in [`tests/test_api.py`](tests/test_api.py): every route and every failure path of a live run, `HEAD` answers, the API reference, the preview image and tags, replay numbering, the caught replays and the story page's real-outage line
   - 26 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
@@ -350,7 +351,7 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
   - 1,285 in [`tests/test_reproducibility.py`](tests/test_reproducibility.py): every recorded run re-simulated from its seed, its tool results compared exactly, its verdict re-checked by today's verifier, and every replay's checks pinned ([how](docs/reproducibility.md))
   - 30 in [`tests/test_topology.py`](tests/test_topology.py): uploads with their own call graph, from the checks on `calls` through triage, the tools, the agent and the routes to the converter, and a guard that the shop's prompt and tool schemas are byte for byte the ones the recorded runs used
   - 20 in [`tests/test_metrics.py`](tests/test_metrics.py): uploads that bring their own metric names, a service reporting only some of them
-  - 8 in [`tests/test_benchmark_adapter.py`](tests/test_benchmark_adapter.py): the converter of the public benchmark's cases, on synthetic rows
+  - 9 in [`tests/test_benchmark_adapter.py`](tests/test_benchmark_adapter.py): the converter of the public benchmark's cases, on synthetic rows
   - 48 in [`tests/test_guide.py`](tests/test_guide.py): the docs pages' renderer (escaping, links, tables, code, heading ids), their routes, and that every internal link and anchor resolves
   - 55 in [`tests/test_site.py`](tests/test_site.py): the security headers and the policy's hashes, robots.txt, the sitemap, security.txt, the 404 page, the API reference, and the console's first paint matching what it shows once loaded
   - 22 in [`tests/test_testbed.py`](tests/test_testbed.py): the real multi-process testbed's fault schedule, telemetry conversion, rollback decision, teardown and Prometheus path
@@ -407,7 +408,7 @@ Requires Python 3.12 or newer (CI runs 3.12) and uv.
 uv venv --python 3.13 && uv pip install -r requirements.txt
 cp .env.example .env                                  # then put your Anthropic API key in .env
 uv run --env-file .env uvicorn app:app --reload       # http://localhost:8000 (story), /console, /status
-uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 1,813 tests
+uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 1,814 tests
 ```
 
 Without an API key everything except live runs works: replays, the Evidence view, triage.
@@ -462,6 +463,7 @@ The real outages' live runs, data download and baseline runs are in [docs/real-b
 - **Uploads have a fixed shape, not a fixed system.** An upload brings its own call graph of 2 to 80 services, or uses the shop's 11. Either way: one 10-minute window at 5 s of the 4 metrics or of up to 10 of its own, and no traces. Nothing scores an uploaded answer, because nobody knows the culprit; on uploads with their own graph there is one live run, not a benchmark.
 - **The rate limiter is in memory,** so it is per server instance.
 - **The real outages are one benchmark suite, with one live run per case.** Its faults are injected, one root cause each at a known time; each case had one live run, so run-to-run variance was not measured; parts of the call graph were written by hand from each system's published architecture; and the 68-service system is the hardest (82% ranked first, 26 of 84 cases handed to a person).
+- **Code-level faults on the 68-service system are a weak spot.** In the second suite it named the cause first in 11 of that system's 27 cases (41%, against 78% for n-sigma) and handed 19 of them to a person; all 3 of its wrong answers in that suite were there. Across the whole suite, 79% against n-sigma's 73% is not a significant difference (p = 0.49).
 - **The real cases are public, so they may be in the models' training data.** When the agent's first suspect is wrong, it is a service broken in another case of the same system no more often than for methods that cannot have memorised anything (6 of 19, against 20 of 50 for n-sigma): no sign of a learned prior, though that does not rule one out.
 
 ---
@@ -486,6 +488,10 @@ A dated log from what the repository shows: local file timestamps and `git log -
 | Nov 15, 08:56–10:35 | Uploads with their own call graph; tests that re-run every recorded run from its seed; the README's banner, numbers and clips; the MCP connector and `llms.txt`. |
 | Nov 15, 10:47–12:31 | The public benchmark of real outages: the converter, the dev/test split frozen at 11:09 before any live call, the dev and test runs, the published baselines re-run with the benchmark's own runner, and the checks of n-sigma's window and of a learned prior. |
 | Nov 15, 12:40–13:45 | The real-outage result leads the README, the story page and the console's evidence; **Skip to verdict**, and a verdict that comes into view when it lands. |
+| Nov 15, 13:49–14:17 | Security headers and a content security policy, crawler files, a 404 page and the API reference; a console whose layout holds still while it loads; browser checks in CI (security policy, layout shift, axe-core); Sherlog on 30 real outages of a real multi-process system, with real rollbacks. |
+| Nov 15, 14:40–15:43 | The 2:48 demo video; Sherlog as an MCP investigator, where your own model investigates and Sherlog's code checks the answer, with a real model investigating outage 41 through the live server; the console's stats lead with the real outages; the uptime check covers the pages, MCP and the headers. |
+| Nov 15, 15:53–16:48 | The docs on the site at `/guide`; an accessible Swagger page; CDN files pinned with integrity hashes and a narrower policy; a second real-outage suite of code-level faults, its dev/test split frozen at 15:53 before any live call. |
+| Nov 15, 21:15 | The last 10 code-level cases run under a second spend cap, so that suite covers all 81 held-out cases. |
 
 ## Built with
 

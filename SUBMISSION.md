@@ -32,7 +32,7 @@ checked by plain code, and we turned it into something anyone can play.
 - **Use it from your own Claude:** an MCP server where your model investigates and Sherlog's code checks its answer
   and says ship or hand to a human. Free, no key.
 - **Shipped:** a live site with free replays and keyless live runs, a status page, an API reference, a strict content
-  security policy, an 8-page docs section on the site, 1,813 tests and 73 browser checks in CI, and WCAG 2.2 AA on
+  security policy, an 8-page docs section on the site, 1,814 tests and 73 browser checks in CI, and WCAG 2.2 AA on
   every page.
 
 **On 252 real outages of a public benchmark**, three real microservice systems (12, 15 and 68 services) each broken
@@ -89,7 +89,9 @@ Haiku's answer does not stand) ranked the root cause first in 92%, in the top 3 
 re-run on the same cases: multi-source n-sigma 81%, n-sigma 80%, BARO 29%. Without the AI, Sherlog's call-graph rule
 gets 83% on the same inputs; the agent was right where the rule was wrong in 26 outages, and the reverse in 2
 (p = 3.0e-6). It answered 214 of the 252 on its own, 208 of them right, and handed the other 38 to a person; Opus
-took over from Haiku in 63. The dev/test split was frozen before the first live call.
+took over from Haiku in 63. The dev/test split was frozen before the first live call. On the benchmark's second
+suite, 81 held-out code-level faults, it named the cause first in 53 of 54 on the 12- and 15-service systems with
+no wrong answer there, and 79% overall against 73% for n-sigma.
 
 **Results on the controlled benchmark** (a simulated shop, which adds a decoy mode and the rollback replay). On 132
 outages the agent named the true cause first in every one (100%, 95%
@@ -153,7 +155,7 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
 - **Real outages:** a converter from the public benchmark's cases to Sherlog's upload format, a dev/test split
   frozen before any live call, the published baselines re-run with the benchmark's own runner, scoring by its own
   evaluator, Wilson intervals and exact McNemar tests, and checks of n-sigma's window and of a learned prior.
-- **Tests:** 1,813 pytest tests in CI, 1,285 of which re-run every recorded run from its seed and compare its tool
+- **Tests:** 1,814 pytest tests in CI, 1,285 of which re-run every recorded run from its seed and compare its tool
   results exactly (the agent loop and the auto route against a scripted fake model, the
   call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format,
   uploads with their own call graph, the MCP connector, and a guard that the shop's prompt and tool schemas never
@@ -179,6 +181,13 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
     connector and `llms.txt`.
   - Nov 15, 10:47-12:31: the public benchmark of real outages, the split frozen at 11:09 before any live call.
   - Nov 15, 12:40-13:45: the real-outage result leads the README, the story page and the console's evidence.
+  - Nov 15, 13:49-14:17: security headers and policy, a 404 page, the API reference, browser checks in CI;
+    Sherlog on 30 real outages of a real multi-process system, with real rollbacks.
+  - Nov 15, 14:40-15:43: the 2:48 demo video; the MCP investigator, with a real model investigating outage 41
+    through the live server; the console's stats lead with the real outages.
+  - Nov 15, 15:53-16:48: the docs on the site at `/guide`; pinned CDN files with integrity hashes; a second
+    real-outage suite of code-level faults, its split frozen at 15:53 before any live call.
+  - Nov 15, 21:15: the last 10 code-level cases, run under a second spend cap, so that suite covers all 81.
 
 ## Challenges we ran into
 
@@ -235,7 +244,8 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
 
 ## What's next for Sherlog
 
-- Real outages with code-level faults, the public benchmark's next suite.
+- Code-level faults on large systems: on the 68-service system Sherlog named the cause first in 11 of 27
+  (n-sigma 78%), because the faulty service's own latency and errors barely move there.
 - More real-world confusion: two faults at once, flapping faults, retry storms.
 - Plug into real systems: alerts in directly instead of an exported window, and a summary out to the
   team's chat.
@@ -262,6 +272,6 @@ model-context-protocol, fireworks-ai, glm-5.3, gpt-oss-120b, javascript, canvas,
 4. Console, Your data, **Use** the shop sample, **Triage (no AI)**: the alarm, the z-score and robust z-score
    rankings and the blast-radius check. Then **Use** a custom-graph sample and **Triage** again: an upload
    with its own call graph of six services replaces the shop on the charts and the map.
-5. In a clone: `pytest -q` (1,813 passed, 1 skipped), `python bench.py --report`, which recomputes every
+5. In a clone: `pytest -q` (1,814 passed, 1 skipped), `python bench.py --report`, which recomputes every
    controlled-benchmark table from the recorded runs with no API calls, and `python scripts/benchmark/report.py`,
    which recomputes every real-outage number.
