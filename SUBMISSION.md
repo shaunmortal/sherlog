@@ -7,8 +7,8 @@ Tracks to select: **Best AI Hack** (main), **Best Deployed / Shipped App**, **Be
 
 ## Tagline (≤ 200 chars)
 
-Break a service, guess the culprit, and watch an AI on-call agent find the root cause and prove it: code checks
-every tool call it cites, and a rollback replay shows the outage stop.
+An AI on-call agent that must prove its answer: on 252 real outages it ranked the root cause first in 92%, against
+80-81% for the best published methods. Break a service and watch it work.
 
 ## Inspiration
 
@@ -20,7 +20,17 @@ checked by plain code, and we turned it into something anyone can play.
 
 ## What it does
 
-Sherlog runs a simulated online shop of 11 microservices. You pick a service and a fault (network
+**On 252 real outages of a public benchmark**, three real microservice systems (12, 15 and 68 services) each broken
+on purpose by a known fault, Sherlog ranked the root cause first in **92%** (95% CI 88-95%), against 80% and 81% for
+the best published methods (n-sigma and its multi-source version) re-run on the same cases with the benchmark's own
+runner, and 83% for Sherlog's own call-graph rule on the same inputs without the AI. Case by case, it was right where
+n-sigma was wrong in 40 outages, and the reverse in 9 (exact McNemar test, p = 9.3e-6), for a median $0.0024 an
+outage. Every number is recomputed from the committed run records with no key by `scripts/benchmark/report.py`, and
+scored by the benchmark's own evaluator; the protocol is in `docs/real-benchmark.md`.
+
+Data: RCAEval benchmark, MIT licence, <https://huggingface.co/datasets/phamquiluan/RCAEval>
+
+To play with, Sherlog runs a simulated online shop of 11 microservices. You pick a service and a fault (network
 latency, a bad deploy that throws errors, CPU starvation, a memory leak), choose who investigates and
 how hard it is, and break it.
 
@@ -43,10 +53,9 @@ how hard it is, and break it.
 - It drafts a ticket note for engineers and a plain-language update for customers.
 - The scoreboard reveals the culprit (and the decoy): you vs the agent vs the no-AI z-score ranking.
 - **Bring your own outage, from any system:** upload 10 minutes of real telemetry with your own call
-  graph (2 to 40 services under their own names), or mapped onto the shop's 11. Triage runs the alarm, the
+  graph (2 to 80 services under their own names), or mapped onto the shop's 11. Triage runs the alarm, the
   z-score and robust z-score rankings and the blast-radius check on your services with no AI and no key; the
-  agent can investigate it too, with its tools and prompt set to your services. The benchmark numbers come
-  from the simulated shop, and uploads get no rollback test.
+  agent can investigate it too, with its tools and prompt set to your services. Uploads get no rollback test.
 - A **status page** and a health endpoint show whether live mode is on, and the 183 recorded
   investigations replay for free whenever it is not: the Opus agent's 176 and the 7 wrong answers the
   rollback caught.
@@ -55,7 +64,15 @@ how hard it is, and break it.
 tool calls that show it, or a clear hand-over. Teams deciding whether to trust an AI on-call agent, who can
 reuse the verify-then-rollback gate and the benchmark protocol. People practising triage, through the guess game.
 
-**Results.** On 132 benchmark outages the agent named the true cause first in every one (100%, 95%
+**Results on real outages.** On 252 held-out real outages, the auto route (Claude Haiku first, Claude Opus when
+Haiku's answer does not stand) ranked the root cause first in 92%, in the top 3 in 96%. The published baselines,
+re-run on the same cases: multi-source n-sigma 81%, n-sigma 80%, BARO 29%. Without the AI, Sherlog's call-graph rule
+gets 83% on the same inputs; the agent was right where the rule was wrong in 26 outages, and the reverse in 2
+(p = 3.0e-6). It answered 214 of the 252 on its own, 208 of them right, and handed the other 38 to a person; Opus
+took over from Haiku in 63. The dev/test split was frozen before the first live call.
+
+**Results on the controlled benchmark** (a simulated shop, which adds a decoy mode and the rollback replay). On 132
+outages the agent named the true cause first in every one (100%, 95%
 interval 97-100%), against 83% and 78% for two standard no-AI rankings (McNemar p < 0.001 against the
 z-score ranking). A stronger no-AI control comes close: a call-graph rule, which names the abnormal service
 that explains the most of the others, gets 131 of 132 (99%), and the agent's one extra outage is not a
@@ -105,19 +122,23 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
   183 recorded investigations (no API cost), the 7 wrong answers the rollback caught among them.
 - **Accessibility:** built to WCAG 2.2 AA: skip links, radio groups and tabs with arrow keys, guessing
   by keyboard, a live region that announces each step, AA contrast in light and dark, a pause control and
-  reduced motion. axe-core 4.10.2 finds 0 violations on all three pages in both themes at desktop and phone
-  widths, and Lighthouse scores accessibility 100 on all three.
+  reduced motion, and **Skip to verdict** during a replay. axe-core 4.10.2 finds 0 violations on the story page,
+  the console and the status page, in both themes, at desktop and phone widths, and Lighthouse scores accessibility
+  100 on the same three pages.
 - **Reliability:** a status page and `/api/health`, a 120 s timeout on every model call, a clear reason
   for every failure, and per-visitor and daily limits on live runs. Every page and the health check answer
-  `HEAD` for uptime monitors, a scheduled workflow checks the live health endpoint every 30 minutes, `/docs`
+  `HEAD` for uptime monitors, a workflow is scheduled every 30 minutes to check the live health endpoint, `/docs`
   describes every route, `requirements.txt` pins the exact versions the tests pass with, and all three pages
   carry a link preview image.
-- **Tests:** 1,200 pytest tests in CI, 933 of which re-run every recorded run from its seed and compare its tool
+- **Real outages:** a converter from the public benchmark's cases to Sherlog's upload format, a dev/test split
+  frozen before any live call, the published baselines re-run with the benchmark's own runner, scoring by its own
+  evaluator, Wilson intervals and exact McNemar tests, and checks of n-sigma's window and of a learned prior.
+- **Tests:** 1,233 pytest tests in CI, 933 of which re-run every recorded run from its seed and compare its tool
   results exactly (the agent loop and the auto route against a scripted fake model, the
   call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format,
   uploads with their own call graph, the MCP connector, and a guard that the shop's prompt and tool schemas never
   change),
-  plus 12 browser end-to-end checks.
+  plus 16 browser end-to-end checks.
 - **AI tools used:** Claude Code as a pair programmer; Claude Haiku, Sonnet and Opus 5.5 inside the product.
   Claude Code wrote and tested code under our direction, several features at once in separate agent
   worktrees joined by the `merge:` commits. The verifier, the blast-radius check, the call-graph rule and the
@@ -133,6 +154,10 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
   - Nov 15, 03:16-04:58: docs led by what is new; fixes to triage, upload errors, focus and touch targets.
   - Nov 15, 05:54-06:19: the call-graph rule, caught-answer replays, `HEAD`, `/docs`, pinned dependencies,
     the link preview and uptime check; the console's first screen leads with replay #41 and hard mode.
+  - Nov 15, 08:56-10:35: uploads with their own call graph, tests that re-run every recorded run, the MCP
+    connector and `llms.txt`.
+  - Nov 15, 10:47-12:31: the public benchmark of real outages, the split frozen at 11:09 before any live call.
+  - Nov 15, 12:40-13:45: the real-outage result leads the README, the story page and the console's evidence.
 
 ## Challenges we ran into
 
@@ -163,6 +188,8 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
 
 ## Accomplishments that we're proud of
 
+- 92% of 252 real outages ranked first, ahead of the best published methods on the same cases (80-81%), for a
+  median $0.0024 an outage, with every number recomputable from the committed runs.
 - An agent that shows its work: every claim links to a tool call you can open, and plain code checks each citation.
 - A check a decoy cannot fool in the simulator: over the recorded runs, the rollback replay caught every
   wrong hard-mode answer and rejected no right one, and those 7 wrong answers replay in the console.
@@ -187,7 +214,7 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
 
 ## What's next for Sherlog
 
-- Evaluate on a public benchmark of real outages.
+- Real outages with code-level faults, the public benchmark's next suite.
 - More real-world confusion: two faults at once, flapping faults, retry storms.
 - Plug into real systems: alerts in directly instead of an exported window, and a summary out to the
   team's chat.
@@ -206,7 +233,7 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-c
 
 **Evaluate it in 5 minutes** (no key needed):
 
-1. The video (2:39).
+1. The video (2:39), then the real outages: https://github.com/shaunmortal/sherlog/blob/main/docs/real-benchmark.md
 2. https://sherlog-jade.vercel.app/console#replay/41 : the z-score ranking blames cart; the agent names cache,
    citing the tool calls that show it, and rolling cache back clears all four broken services.
 3. https://sherlog-jade.vercel.app/console#replay/177 (C1): a confident wrong answer the rollback stopped.
@@ -214,8 +241,9 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-c
 4. Console, Your data, **Use** the shop sample, **Triage (no AI)**: the alarm, the z-score and robust z-score
    rankings and the blast-radius check. Then **Use** a custom-graph sample and **Triage** again: an upload
    with its own call graph of six services replaces the shop on the charts and the map.
-5. In a clone: `pytest -q` (1,200 passed, 1 skipped) and `python bench.py --report`, which recomputes every
-   table from the recorded runs with no API calls.
+5. In a clone: `pytest -q` (1,233 passed, 1 skipped), `python bench.py --report`, which recomputes every
+   controlled-benchmark table from the recorded runs with no API calls, and `python scripts/benchmark/report.py`,
+   which recomputes every real-outage number.
 
 ---
 

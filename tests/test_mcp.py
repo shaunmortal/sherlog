@@ -201,6 +201,38 @@ def test_benchmark_summary_reports_runs_evidence_with_its_caveats():
     assert any("simulated" in c for c in answer["caveats"]) and any("call-graph rule" in c for c in answer["caveats"])
 
 
+def _real_results():
+    return json.loads(app.REAL_RESULTS.read_text())
+
+
+def test_benchmark_summary_leads_with_the_real_outages_from_their_results_file():
+    answer, results = _ok("benchmark_summary"), _real_results()
+    real = answer["real_outages"]
+    assert next(iter(answer)) == "real_outages" and real["cases"] == results["split"]["test"]
+    assert list(real["methods"]) == list(app.REAL_METHODS)
+    for key, method in real["methods"].items():
+        assert method["AC@1"] == results["methods"][key]["all"]["AC@1"]
+        assert method["label"] == results["methods"][key]["label"]
+    assert real["auto_vs"]["nsigma"] == results["paired"]["auto"]["nsigma"]
+    assert real["agent"]["cost_usd_median"] == results["methods"]["auto"]["sherlog"]["cost_usd_median"]
+
+
+DATA_LINE = "Data: RCAEval benchmark, MIT licence, <https://huggingface.co/datasets/phamquiluan/RCAEval>"
+
+
+@pytest.mark.parametrize("doc", ["README.md", "SUBMISSION.md", "static/llms.txt"])
+def test_the_docs_quote_the_real_benchmark_as_its_results_file_has_it(doc):
+    results, text = _real_results(), (app.STATIC.parent / doc).read_text()
+    first = lambda key: f"{round(results['methods'][key]['all']['AC@1'] * 100)}%"  # noqa: E731
+    paired = results["paired"]["auto"]["nsigma"]
+    p_value = f"{paired['mcnemar_p']:.1e}".replace("e-0", "e-")
+    quoted = [f"{results['split']['test']} ", *map(first, app.REAL_METHODS), f"{paired['only_first_right']} ",
+              f" {paired['only_second_right']} ", f"p = {p_value}",
+              f"${results['methods']['auto']['sherlog']['cost_usd_median']:.4f}"]
+    assert [q for q in quoted if q not in text] == []
+    assert text.count(DATA_LINE) == 1  # the one place the data source is named
+
+
 @pytest.mark.parametrize("name", ["list_recorded_outages", "benchmark_summary"])
 def test_tools_without_arguments_refuse_unknown_ones(name):
     assert _refused(name, {"extra": 1}) == "Bad input. extra: Extra inputs are not permitted"

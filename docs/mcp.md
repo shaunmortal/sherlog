@@ -52,7 +52,7 @@ curl -s https://sherlog-jade.vercel.app/mcp -H 'content-type: application/json' 
 | `get_recorded_verdict` | `number` (1 to 183) | One investigation: the agent's tool calls with the text each returned, its verdict (suspects, confidence, cited call ids and whether plain code verified each citation, the answer or the hand-over, a ticket note and a customer update), the blast-radius check, the rollback replay, and the truth, including what the no-AI z-score ranking said. |
 | `triage_incident` | `incident`: a [sherlog-incident/1 document](bring-your-own.md#the-format) | The no-AI checks, as `POST /api/triage` runs them: the alarm tick, the z-score and robust z-score rankings, and the blast-radius check of the z-score ranking's top suspect. The same checks and error messages (with each path under `incident`) and the same 2 MB cap. |
 | `sample_incident` | `graph`: `shop` (default) or `custom` | A sample document, culprit removed, as `GET /api/sample-incident` gives it: the shop's 11 services (about 42 KB of JSON) or six renamed services with their own call graph (about 27 KB). |
-| `benchmark_summary` | none | The headline numbers from [`runs/evidence.json`](../runs/evidence.json) for the 132 normal and 44 hard-mode outages: for each method, how often it named the cause first, answered alone and answered wrong, its median cost, what the rollback caught, and how it compares with the no-AI call-graph rule outage by outage; the no-AI baselines; and the caveats. |
+| `benchmark_summary` | none | The headline numbers. First the 252 real outages of a public benchmark, from [`runs/real-benchmark/results.json`](../runs/real-benchmark/results.json): each method's AC@1 (with its interval), AC@3 and Avg@5, the auto route against the published baselines and its own no-AI rule case by case, and its cost. Then, from [`runs/evidence.json`](../runs/evidence.json), the 132 normal and 44 hard-mode simulated outages: for each method, how often it named the cause first, answered alone and answered wrong, its median cost, what the rollback caught, and how it compares with the no-AI call-graph rule outage by outage; the no-AI baselines; and the caveats. |
 
 Each tool's `inputSchema` is generated from the same models the server validates with, so it lists every field and
 limit. Every answer comes twice, as the spec suggests: as JSON text in `content` and as `structuredContent`. A bad
@@ -97,10 +97,17 @@ back cleared all four broken services. For a wrong answer the rollback caught, t
 
 ### Example: `benchmark_summary`
 
-Answer (trimmed to hard mode's Opus agent and no-AI baselines):
+Answer (trimmed to the real outages' auto route and hard mode's Opus agent and no-AI baselines):
 
 ```json
 {
+  "real_outages": {
+    "cases": 252,
+    "methods": {"auto": {"label": "Sherlog agent, auto route (Claude Haiku 5.5, Claude Opus 5.5 when needed)",
+                         "AC@1": 0.9246, "AC@1_ci95": [0.885, 0.951], "AC@3": 0.9563, "Avg@5": 0.9508}},
+    "auto_vs": {"nsigma": {"n": 252, "only_first_right": 40, "only_second_right": 9, "mcnemar_p": 9.26e-06}},
+    "agent": {"cases": 252, "answered": 214, "cost_usd_median": 0.00242}
+  },
   "hard": {
     "outages": 44, "seeds": "2000-2043",
     "no_ai": {"zscore_cause_first": 0.659, "robust_zscore_cause_first": 0.568,
@@ -109,7 +116,8 @@ Answer (trimmed to hard mode's Opus agent and no-AI baselines):
                           "wrong_answers": 0, "median_cost_usd": 0.056, "rollback_caught_wrong": 0,
                           "vs_call_graph_rule": {"only_method_right": 3, "only_rule_right": 0, "mcnemar_p": 0.25}}}
   },
-  "caveats": ["The telemetry is simulated: a shop this project wrote. ...", "..."]
+  "caveats": ["Real outages: one benchmark suite of injected faults ...",
+              "The controlled benchmark's telemetry is simulated: a shop this project wrote. ...", "..."]
 }
 ```
 
@@ -144,5 +152,5 @@ against a local server: it lists the five tools and calls them. `tests/test_mcp.
 - `triage_incident` takes the whole document as an argument. A model writing out 11 services' 10 minutes of
   numbers is slow and costly (the shop sample is about 42 KB of JSON), so for real exports, `POST` the file to
   `/api/triage` instead; the tool suits small incidents and documents a script builds.
-- The recorded outages and the benchmark come from the simulated shop, and only simulated outages get the
-  rollback replay; `benchmark_summary` says so in its caveats.
+- The recorded outages and the controlled benchmark come from the simulated shop, and only simulated outages get
+  the rollback replay; `benchmark_summary` says so in its caveats.
