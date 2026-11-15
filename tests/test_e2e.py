@@ -57,9 +57,40 @@ def test_clicking_a_guess_card_reveals_the_cause(page, errors):
 def test_console_plays_a_recorded_outage_to_its_verdict(page, errors):
     page.goto(f"{URL}/console")
     page.get_by_role("tab", name="REPLAY").click()
+    page.locator("#allReplays > summary").click()  # every outage sits in a list that opens below the picks
     page.locator("#replayGrid button").first.click()
     sync_api.expect(page.locator("#status")).to_contain_text("Done.", timeout=REPLAY_TIMEOUT_MS)
     sync_api.expect(page.locator("#verdict")).to_contain_text("The culprit was")
+    assert errors == []
+
+
+def test_the_first_screen_button_replays_outage_41_with_precise_labels(page, errors):
+    page.goto(f"{URL}/console", wait_until="networkidle")  # the button listens once the console has its data
+    page.get_by_role("button", name="Replay outage #41").click()
+    sync_api.expect(page.locator("#metaMode")).to_have_text("replay")
+    sync_api.expect(page.locator("#status")).to_contain_text("Done.", timeout=REPLAY_TIMEOUT_MS)
+    verdict = page.locator("#verdict")
+    # the citation check is passed by victims too, so only the rollback is called proof
+    sync_api.expect(verdict).to_contain_text("citations verified")
+    sync_api.expect(verdict.locator(".suspects li").first).to_contain_text("rollback clears it")
+    sync_api.expect(verdict).to_contain_text("victim of cache")
+    page.get_by_role("tab", name="LIVE").click()
+    sync_api.expect(page.locator("#metaMode")).not_to_have_text("replay")
+    assert errors == []
+
+
+def test_a_caught_replay_shows_the_rollback_disproving_its_answer(page, errors):
+    caught = [r for r in page.request.get(f"{URL}/api/replays").json() if r.get("caught")]
+    if not caught:
+        pytest.skip("this server lists no caught replays")
+    page.goto(f"{URL}/console#replay", wait_until="networkidle")
+    page.locator("#startHere button", has_text="caught").click()
+    sync_api.expect(page.locator("#metaModel")).to_have_text(caught[0]["model"])
+    sync_api.expect(page.locator("#status")).to_contain_text("Done.", timeout=REPLAY_TIMEOUT_MS)
+    verdict = page.locator("#verdict")
+    sync_api.expect(verdict).to_contain_text("does not stop the alarm")
+    sync_api.expect(verdict.locator(".suspects li").first).to_contain_text("rollback does not clear it")
+    sync_api.expect(verdict.locator("tr", has_text="Sherlog agent")).to_contain_text("wrong")
     assert errors == []
 
 
