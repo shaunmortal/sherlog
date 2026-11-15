@@ -905,7 +905,8 @@ function buildResults() {
   for (const n of document.querySelectorAll('.evN')) n.textContent = a.outages;
   const stats = [
     [a.agent_ac1, pct, `named the cause first · Opus agent · ${a.outages} outages`],
-    [a.baseline_ac1, pct, 'the classic no-AI ranking, same outages'],
+    // against the strongest no-AI rule, not only the z-score ranking, which a quiet victim fools
+    'graph_ac1' in a ? [a.graph_ac1, pct, 'the no-AI call-graph rule, same outages'] : [a.baseline_ac1, pct, 'the classic no-AI ranking, same outages'],
     [ev.auto?.median_cost_usd ?? a.median_cost_usd, usd, ev.auto ? `per outage on auto: Haiku first, Opus in ${ev.auto.escalated_to_strong} of ${ev.auto.outages}` : 'median cost per outage'],
   ];
   const boxes = stats.map(([value, format, text]) => el('div', {}, el('b', {}, format(value)), el('span', {}, text)));  // real values before any count-up
