@@ -104,6 +104,15 @@ def test_a_422_with_many_problems_keeps_its_detail_short_and_every_error_listed(
     assert body["detail"].endswith(f"; and {lines - app.SHOWN_PROBLEMS} more.")
 
 
+def test_a_422_never_echoes_a_huge_key_back():
+    # an unknown key of 100,000 characters must not come back twice in full (detail and errors[].loc)
+    huge = "x" * 100_000
+    body = _post("/api/triage", _sample_with(lambda d: d["series"].update({huge: d["series"]["cart"]})))
+    assert body.status_code == 422
+    assert len(body.content) < 2_000
+    assert all(len(str(part)) <= app.SHOWN_KEY_CHARS for e in body.json()["errors"] for part in e["loc"])
+
+
 def test_bodies_over_the_cap_are_refused_with_413_declared_or_streamed():
     too_big = b" " * (app.MAX_BODY_MB * 1_000_000 + 1)
     assert client.post("/api/triage", content=too_big).status_code == 413

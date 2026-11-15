@@ -42,6 +42,8 @@ SHORT_SHA = 7
 # a 422's detail names only the first few problems: one wrong field in every log line of an upload is thousands
 # of errors, too many for the console's alert line to read out; `errors` still lists every one for a script
 SHOWN_PROBLEMS = 3
+SHOWN_KEY_CHARS = 80  # a 422 echoes at most this much of any one key in an error location
+SHOWN_MSG_CHARS = 500  # and of any one message (long enough for the list of allowed names)
 
 
 def _git_version() -> str:
@@ -191,11 +193,19 @@ def _healthy_series() -> dict:
     return sim.simulate(None, None, seed=HEALTHY_SEED).series
 
 
+def _clip(part, limit: int):
+    """A key or message as a 422 shows it: a huge key in an upload must not come back in full."""
+    if not isinstance(part, str) or len(part) <= limit:
+        return part
+    return part[:limit - 1] + "…"
+
+
 @app.exception_handler(RequestValidationError)
 def bad_input(request: Request, exc: RequestValidationError) -> JSONResponse:
     """422 with one sentence the console can show, plus each error's location for an uploader's script.
     The path skips the leading body/path/query, so a nested field reads series.cart.cpu_pct.3, not just 3."""
-    errors = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
+    errors = [{"loc": [_clip(part, SHOWN_KEY_CHARS) for part in e["loc"]], "msg": _clip(e["msg"], SHOWN_MSG_CHARS)}
+              for e in exc.errors()]
     problems = "; ".join(f"{'.'.join(map(str, e['loc'][1:])) or e['loc'][0]}: {e['msg']}"
                          for e in errors[:SHOWN_PROBLEMS])
     more = f"; and {len(errors) - SHOWN_PROBLEMS} more." if len(errors) > SHOWN_PROBLEMS else ""
