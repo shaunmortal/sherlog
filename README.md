@@ -1,14 +1,13 @@
-# Sherlog
+<h1 align="center">
+  <a href="https://sherlog-jade.vercel.app">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="media/banner-dark.svg">
+      <img src="media/banner-light.svg" alt="Sherlog: an AI on-call investigator that has to prove its answer. Built for IceHacks 2026, in the Best AI Hack, Best Deployed App and Best Design &amp; UX tracks." width="900">
+    </picture>
+  </a>
+</h1>
 
-**When one service breaks, everything that calls it breaks too. Sherlog is an AI on-call investigator that finds the one that broke, and has to prove it**: plain code checks every tool call it cites, and a replay with its answer rolled back shows whether the outage really stops.
-
-<p align="center"><a href="https://sherlog-jade.vercel.app"><img src="media/hero.jpg" alt="The Sherlog story page: the headline 'An AI on-call investigator that has to prove its answer' above a dark panel with the shop's eleven services in 3D, replaying outage #41. Cache, cart and frontend glow red and red rings spread as the slowdown reaches checkout. Click to open the live site." width="900"></a></p>
-
-<p align="center">
-  <a href="https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml"><img src="https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml/badge.svg" alt="Tests: the latest run of the test workflow"></a>
-  <img src="https://img.shields.io/badge/axe--core-0_violations-1a2ffb" alt="axe-core: 0 violations">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2b2e3a" alt="License: MIT"></a>
-</p>
+<p align="center"><b>When one service breaks, everything that calls it breaks too. Sherlog is an AI on-call investigator that finds the one that broke, and has to prove it</b>: plain code checks every tool call it cites, and a replay with its answer rolled back shows whether the outage really stops.</p>
 
 <p align="center">
   <a href="https://sherlog-jade.vercel.app"><img src="https://img.shields.io/badge/Story_page-sherlog--jade.vercel.app-1a2ffb?style=for-the-badge&amp;labelColor=0c0d12" alt="The story page at sherlog-jade.vercel.app" height="36"></a>&nbsp;&nbsp;
@@ -16,11 +15,38 @@
   <a href="https://sherlog-jade.vercel.app/status"><img src="https://img.shields.io/badge/Status-health_and_version-0c0d12?style=for-the-badge&amp;labelColor=2b2e3a" alt="The status page" height="36"></a>
 </p>
 
-Demo video: VIDEO_URL (2:39)
+<p align="center">
+  <a href="https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml"><img src="https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml/badge.svg" alt="Tests: the latest run of the test workflow"></a>
+  <img src="https://img.shields.io/badge/axe--core-0_violations-1a2ffb" alt="axe-core: 0 violations">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2b2e3a" alt="License: MIT"></a>
+</p>
 
-Built during IceHacks 2026.
+<p align="center"><a href="VIDEO_URL"><img src="media/video-thumb.jpg" alt="Play the demo video, 2:39. Its frame shows the shop's call graph after outage #41: the answer, cache, explains all four red services, with cart, checkout and frontend ticked." width="720"></a></p>
+<p align="center">Demo video: <a href="VIDEO_URL">VIDEO_URL</a> (2:39)</p>
 
-**Contents:** [Who it is for](#who-it-is-for) · [Evaluate it in 5 minutes](#evaluate-it-in-5-minutes) · [What's new](#whats-new-here) · [Try it in 30 seconds](#try-it-in-30-seconds) · [How it works](#how-it-works) · [Results](#results) · [Accessibility](#accessibility) · [Reliability](#reliability) · [Bring your own outage](#bring-your-own-outage) · [Reproduce](#reproduce) · [Layout](#repository-layout) · [Limitations](#limitations) · [How it was built](#how-it-was-built)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="media/stats-dark.svg">
+    <img src="media/stats-light.svg" alt="Sherlog in numbers. Hard mode, with a decoy: the Opus agent named the cause first in 43 of 44 outages, with 0 wrong answers. Auto route: a median $0.0015 per outage, all 132 normal outages right. Rollback replay: 7 of 7 wrong answers caught, 0 of 83 right ones rejected. 183 recorded investigations replay free in the console, with no API key." width="900">
+  </picture>
+</p>
+<p align="center"><sub>Every number is in <a href="runs/evidence.json"><code>runs/evidence.json</code></a>, from the recorded runs. The shop is simulated, so the absolute numbers are optimistic: see <a href="#limitations">Limitations</a>.</sub></p>
+
+<p align="center"><a href="https://sherlog-jade.vercel.app"><img src="media/hero.jpg" alt="The Sherlog story page: the headline 'An AI on-call investigator that has to prove its answer' above a dark panel with the shop's eleven services in 3D, replaying outage #41. Cache, cart and frontend glow red and red rings spread as the slowdown reaches checkout. Click to open the live site." width="900"></a></p>
+
+**Contents:** [Built for IceHacks](#built-for-icehacks-2026) · [Who it is for](#who-it-is-for) · [Evaluate it in 5 minutes](#evaluate-it-in-5-minutes) · [What's new](#whats-new-here) · [Try it in 30 seconds](#try-it-in-30-seconds) · [How it works](#how-it-works) · [Results](#results) · [Accessibility](#accessibility) · [Reliability](#reliability) · [Bring your own outage](#bring-your-own-outage) · [Reproduce](#reproduce) · [Layout](#repository-layout) · [Limitations](#limitations) · [How it was built](#how-it-was-built)
+
+---
+
+## Built for IceHacks 2026
+
+Sherlog was built during IceHacks 2026, on Nov 14 and 15 (IST), with Claude Code as an AI pair programmer and Claude Haiku, Sonnet and Opus 5.5 inside the product. [How it was built](#how-it-was-built) has the dated log, from the first test run to the last review fix. It is entered in three tracks:
+
+| Track | Why Sherlog fits | Check it |
+|---|---|---|
+| **Best&nbsp;AI&nbsp;Hack** | A Claude agent investigates with read-only tools and must cite the tool calls behind each suspect. Plain code checks every citation, and a replay with the answer rolled back tests it. Benchmarked on 176 held-out outages against three no-AI rules: in hard mode the Opus agent named the cause first in 43 of 44 and never answered wrong. | [What's new](#whats-new-here) · [How it works](#how-it-works) · [Results](#results) · [a caught wrong answer](https://sherlog-jade.vercel.app/console#replay/177) |
+| **Best&nbsp;Deployed&nbsp;App** | Live, with a status page and a health endpoint. All 183 recorded investigations replay with no API key; live runs are rate-limited and fail with a clear reason; 204 tests run in CI on every push; a scheduled check calls the live health endpoint every 30 minutes. | [Live site](https://sherlog-jade.vercel.app) · [`/status`](https://sherlog-jade.vercel.app/status) · [`/api/health`](https://sherlog-jade.vercel.app/api/health) · [CI](https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml) · [uptime check](.github/workflows/uptime.yml) · [Reliability](#reliability) |
+| **Best&nbsp;Design&nbsp;&amp;&nbsp;UX** | A scroll story you can play: guess which service broke, then watch the agent investigate, check and roll back. Built to WCAG 2.2 AA, with 0 axe-core violations on all three pages in both themes, at desktop and phone sizes; full keyboard use, screen-reader announcements and pausable motion. | [Story page](https://sherlog-jade.vercel.app) · [Console](https://sherlog-jade.vercel.app/console) · [Accessibility](#accessibility) |
 
 ---
 
