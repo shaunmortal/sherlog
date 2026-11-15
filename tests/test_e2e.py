@@ -54,6 +54,22 @@ def test_clicking_a_guess_card_reveals_the_cause(page, errors):
     assert errors == []
 
 
+PAST_REVEAL_FALLBACK_MS = 6_000  # the story page shows unscrolled sections 4 s after load, for automated screenshots
+
+
+@pytest.mark.parametrize("automated", [False, True])
+def test_sections_wait_for_a_person_to_scroll_but_not_for_a_screenshot(browser, automated):
+    context = browser.new_context()
+    if not automated:  # a person's browser does not report automation
+        context.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => false })")
+    page = context.new_page()
+    page.goto(f"{URL}/", wait_until="networkidle")
+    page.wait_for_timeout(PAST_REVEAL_FALLBACK_MS)
+    waiting = page.locator(".pre").count()  # sections below the fold that have not revealed yet
+    context.close()
+    assert (waiting == 0) == automated
+
+
 def test_console_plays_a_recorded_outage_to_its_verdict(page, errors):
     page.goto(f"{URL}/console")
     page.get_by_role("tab", name="REPLAY").click()

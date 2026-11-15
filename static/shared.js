@@ -106,7 +106,9 @@ function maskIn(nodes, { delay = 0, stagger = 45, duration = 1100 } = {}) {
     { duration, delay: delay + i * stagger, easing: curve, fill: 'backwards' }));
 }
 
-// a full-page screenshot or a printout never scrolls, so whatever is still waiting by then is shown anyway
+// a full-page screenshot or a printout never scrolls, so whatever is still waiting by then is shown anyway. The
+// screenshot's timer runs only in a browser that reports automation, so a person still sees each section arrive
+// however long they watch the top of the page first
 const REVEAL_FALLBACK_MS = 4000;
 
 function whenLoaded(fn) {
@@ -114,7 +116,8 @@ function whenLoaded(fn) {
   else addEventListener('load', fn, { once: true });
 }
 
-/** The first time each node scrolls into view (or 4 s after load, or before printing): reveal it and call `onShow(node)`. */
+/** The first time each node scrolls into view (or 4 s after load in an automated browser, or before printing): reveal it
+    and call `onShow(node)`. */
 function revealOnScroll(nodes, onShow = null, options = {}) {
   if (!MOTION || !('IntersectionObserver' in window)) { for (const node of nodes) onShow?.(node); return; }
   const show = (node, i = 0) => {
@@ -129,7 +132,7 @@ function revealOnScroll(nodes, onShow = null, options = {}) {
   const waiting = [...nodes];
   for (const node of waiting) { node.classList.add('pre'); io.observe(node); }
   const showRest = () => { for (const node of waiting) if (node.classList.contains('pre')) show(node); };
-  whenLoaded(() => setTimeout(showRest, REVEAL_FALLBACK_MS));
+  if (navigator.webdriver) whenLoaded(() => setTimeout(showRest, REVEAL_FALLBACK_MS));
   addEventListener('beforeprint', () => { showRest(); settleAnimations(); });
 }
 
