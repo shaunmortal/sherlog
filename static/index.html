@@ -475,7 +475,7 @@ let state = freshState();
 let pick = { service: 'payment', fault: 'latency', model: 'auto', hard: false };
 const MODEL_NAME = { auto: 'Auto', opus: 'Claude Opus 5.5', sonnet: 'Claude Sonnet 5.5', haiku: 'Claude Haiku 5.5' };
 const MODEL_HINT = {
-  auto: 'Claude Haiku 5.5 investigates first; only if its answer is not verified and confident does Claude Opus 5.5 start over.',
+  auto: 'Claude Haiku 5.5 investigates first; Claude Opus 5.5 starts over only if its citations fail the check, it is under 80% sure, or another service would explain more of the outage.',
   opus: 'Claude Opus 5.5 investigates: the most careful model.',
   sonnet: 'Claude Sonnet 5.5 investigates: fast, at about a third of the cost.',
   haiku: 'Claude Haiku 5.5 investigates: the fastest and cheapest model.',
@@ -1122,8 +1122,9 @@ async function handle(ev) {
     case 'truth': renderTruth(ev); break;
     case 'error': logItem('error', [ev.message]); setStatus(ev.message, 'bad'); break;
     case 'handoff':
-      logItem('alarm', [`${ev.from} could not give a verified, confident answer (${ev.reason}). ${ev.to} takes over with a fresh investigation.`]);
-      announce(`${ev.from} could not give a verified answer. ${ev.to} takes over.`);
+      // the reason may be a failed check, low confidence, or another service that explains more of the outage
+      logItem('alarm', [`${ev.from}'s answer does not stand (${ev.reason}). ${ev.to} takes over with a fresh investigation.`]);
+      announce(`${ev.from}'s answer does not stand. ${ev.to} takes over.`);
       setAgent(`${shortModel(ev.to)} investigating`, true);
       break;
   }

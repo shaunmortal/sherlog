@@ -216,6 +216,18 @@ def test_auto_route_hands_over_to_the_strong_model_only_when_the_cheap_one_canno
     assert "fallbacks" not in unsure_then_sure.requests[0] and unsure_then_sure.requests[1]["fallbacks"] == "default"
 
 
+def test_auto_route_also_hands_over_a_verified_confident_answer_that_another_service_explains_better():
+    # cart is the loudest victim of the slow cache: Haiku's answer passes the citation check and is 90% sure,
+    # but the cache would explain more of the outage, so Opus still starts over
+    inc = sim.simulate("cache", "latency", 1041)
+    fake = FakeClient([_submit("cart", 0.9, ["c0"]), _submit("cache", 0.9, ["c0"])])
+    events = list(inv.incident_events(inc, client=fake, model=inv.AUTO))
+    handoff = next(e for e in events if e["type"] == "handoff")
+    verdict = next(e for e in events if e["type"] == "verdict")
+    assert handoff["reason"] == "cache would explain more of the outage than cart"
+    assert verdict["answer"] == "cache" and verdict["route"] == list(inv.AUTO_ROUTE)
+
+
 def test_blast_radius_flags_an_answer_that_cannot_explain_the_outage():
     inc = sim.simulate("cache", "latency", 1041)
     assert inv.blast_radius(inc, "cache")["unexplained"] == []

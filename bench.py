@@ -44,7 +44,7 @@ VARIANT_LABELS = {
     "haiku": "Sherlog agent on Claude Haiku 5.5",
     "sonnet": "Sherlog agent on Claude Sonnet 5.5",
     "agent": "Sherlog agent on Claude Opus 5.5",
-    "auto": "Sherlog auto: Claude Haiku 5.5 first, Opus 5.5 only if Haiku can't answer",
+    "auto": "Sherlog auto: Claude Haiku 5.5 first, Opus 5.5 only if Haiku's answer does not stand",
 }
 VARIANT_LABELS.update({f"hard-{k}": v for k, v in VARIANT_LABELS.items() if k in ("one-shot", "haiku", "sonnet", "agent", "auto")})
 # list prices per million tokens (input, output), for prompts under 100K tokens

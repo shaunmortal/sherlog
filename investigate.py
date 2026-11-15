@@ -20,7 +20,7 @@ MODEL = os.environ.get("SHERLOG_MODEL", "claude-opus-5-5")
 # who can investigate, from most careful to cheapest; the console lets visitors pick one
 MODELS = {"opus": "claude-opus-5-5", "sonnet": "claude-sonnet-5-5", "haiku": "claude-haiku-5-5"}
 FALLBACK_MODELS = {"claude-opus-5-5"}  # server-side refusal fallbacks; Claude Haiku 5.5 has none
-AUTO = "auto"  # Haiku first, Opus only when Haiku cannot give a verified, confident answer
+AUTO = "auto"  # Haiku first, Opus only when Haiku's answer does not stand (see handoff_reason)
 AUTO_ROUTE = (MODELS["haiku"], MODELS["opus"])
 EFFORT = os.environ.get("SHERLOG_EFFORT", "medium")
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
@@ -426,8 +426,9 @@ def truth_event(inc: sim.Incident, verdict: dict | None) -> dict:
 
 
 def investigate_auto(inc: sim.Incident, client=None, tools: list[dict] = TOOLS) -> Iterator[dict]:
-    """Cheapest model first. Only when its answer is not verified and confident does the strongest model
-    take over, with a fresh investigation; its verdict is final."""
+    """Cheapest model first. Only when its answer does not stand (no verified, confident answer, or another
+    service would explain more of the outage) does the strongest model take over, with a fresh investigation;
+    its verdict is final."""
     cheap, strong = AUTO_ROUTE
     first_usage = None
     for event in investigate(inc, client, tools, cheap):
