@@ -1,4 +1,4 @@
-"""Score every method's test-set rankings with the benchmark's own evaluator (`rcaeval-agent evaluate`).
+"""Score every method's test-set rankings with the benchmark's own evaluator (its `evaluate` command).
 
     python -I scripts/benchmark/score.py WORK_DIR
 
@@ -11,7 +11,6 @@ report.py says how many those are. Run in the benchmark's environment.
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -19,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import report  # noqa: E402
 
-EVALUATOR = shutil.which("rcaeval-agent") or "rcaeval-agent"
+EVALUATOR = [sys.executable, "-m", "RCAEval.agent"]  # the evaluator's command-line entry point
 
 
 def evaluate(work: Path, name: str, answers: list[dict], recs: dict[str, dict]) -> dict:
@@ -28,7 +27,7 @@ def evaluate(work: Path, name: str, answers: list[dict], recs: dict[str, dict]) 
     answers_path.write_text("".join(json.dumps(a) + "\n" for a in run))
     preds_path.write_text("".join(json.dumps({"case_id": a["case_id"], "ranks": recs[a["case_id"]]["ranks"]}) + "\n"
                                   for a in run))
-    subprocess.run([EVALUATOR, "evaluate", "--answers", str(answers_path), "--predictions", str(preds_path),
+    subprocess.run([*EVALUATOR, "evaluate", "--answers", str(answers_path), "--predictions", str(preds_path),
                     "--json-out", str(out)], check=True, capture_output=True)
     service = json.loads(out.read_text())["service"]
     return {"n": service["n"], **{k: service[k] for k in ("AC@1", "AC@3", "AC@5", "Avg@5")}}
@@ -49,7 +48,7 @@ def main() -> None:
         groups = {"all": answers, **{f"system {s}": [a for a in answers if a["dataset"] == d]
                                      for d, s in report.SYSTEMS.items()}}
         official[method] = {g: evaluate(work, f"{method}-{g.replace(' ', '-')}", rows, recs)
-                            for g, rows in groups.items()}
+                            for g, rows in groups.items() if any(a["case_id"] in recs for a in rows)}
         print(method, json.dumps(official[method]["all"]), flush=True)
     (report.RUNS / "official.json").write_text(json.dumps(official, indent=1) + "\n")
 

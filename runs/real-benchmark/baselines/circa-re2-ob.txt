@@ -1,0 +1,10 @@
+342 s, 0 case(s) left out
+--- Evaluation results ---
+Avg@5-CPU:   0.77
+Avg@5-MEM:   0.93
+Avg@5-DISK:  0.87
+Avg@5-SOCKET: 0.83
+Avg@5-DELAY: 0.68
+Avg@5-LOSS:  0.84
+---
+Avg speed: 3.77

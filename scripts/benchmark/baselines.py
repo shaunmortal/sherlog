@@ -1,7 +1,7 @@
 """Re-run published baselines with the benchmark's own runner (main.py), on every case, and record their rankings
 by anonymised case id.
 
-    python -I scripts/benchmark/baselines.py MAIN_PY DATA_DIR TASKS_DIR WORK_DIR baro nsigma ...
+    python -I scripts/benchmark/baselines.py MAIN_PY DATA_DIR TASKS_DIR WORK_DIR baro nsigma circa:re2-ob,re2-ss
 
 main.py reads DATA_DIR/RE2/<suite> as it ships (WORK_DIR/<method>-<dataset>/data links to it) and writes one result
 file per case, named after the case's directory. Those names are mapped to case ids through the exporter's answers
@@ -69,7 +69,8 @@ def run(main_py: Path, data: Path, tasks: Path, work: Path, method: str, dataset
     else:
         raise RuntimeError(f"{method} on {dataset} crashed on more than {MAX_CRASHES} cases")
     wall = time.monotonic() - started
-    report = done.stdout[done.stdout.find("--- Evaluation"):] if "--- Evaluation" in done.stdout else done.stdout[-2000:]
+    start = done.stdout.find("--- Evaluation")
+    report = done.stdout[start:] if start >= 0 else done.stdout[-2000:]
     OUT.mkdir(parents=True, exist_ok=True)
     crashes = "".join(f"left out (main.py stopped on it): a case, {err}\n" for err in excluded.values())
     (OUT / f"{method}-{dataset}.txt").write_text(f"{wall:.0f} s, {len(excluded)} case(s) left out\n{crashes}{report}")
@@ -86,9 +87,11 @@ def run(main_py: Path, data: Path, tasks: Path, work: Path, method: str, dataset
 
 def main() -> None:
     main_py, data, tasks, work = (Path(a) for a in sys.argv[1:5])
-    for method in sys.argv[5:]:
-        rows = [r for d in DATASETS for r in run(main_py, data, tasks, work, method, d)]
-        (OUT / f"{method}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in sorted(rows, key=lambda r: r["case_id"])))
+    for spec in sys.argv[5:]:  # a method, or method:dataset,dataset for a method too slow for some systems
+        method, _, only = spec.partition(":")
+        rows = [r for d in (only.split(",") if only else DATASETS) for r in run(main_py, data, tasks, work, method, d)]
+        rows = sorted(rows, key=lambda r: r["case_id"])
+        (OUT / f"{method}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
         print(f"{method}: {len(rows)} cases", flush=True)
 
 

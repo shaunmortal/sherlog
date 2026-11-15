@@ -31,7 +31,7 @@ LABELS = {
     "nsigma": "Published baseline: n-sigma (metrics)",
     "mmbaro": "Published baseline: multi-source BARO (metrics, logs, traces)",
     "mmnsigma": "Published baseline: multi-source n-sigma (metrics, logs, traces)",
-    "circa": "Published baseline: CIRCA (metrics)",
+    "circa": "Published baseline: CIRCA (metrics; systems A and B only, too slow on C)",
     "e_diagnosis": "Published baseline: epsilon-Diagnosis (metrics)",
 }
 LIVE = ("auto", "opus")
@@ -93,7 +93,8 @@ def agent_stats(recs: dict[str, dict], answers: dict[str, dict]) -> dict:
         "right_when_answered": round(1 - len(wrong) / len(answered), 4) if answered else None,
         "suspects_submitted": len(suspects),
         "citation_check_pass": round(sum(c["verified"] for c in suspects) / len(suspects), 4) if suspects else None,
-        "top_suspect_verified": round(sum(bool(r["causes"]) and r["causes"][0]["verified"] for r in rows) / len(rows), 4),
+        "top_suspect_verified": round(sum(bool(r["causes"]) and r["causes"][0]["verified"] for r in rows) / len(rows),
+                                      4),
         "handed_to_opus": sum(len(r["route"]) == 2 for r in rows),
         "blast_better_than_answer": sum(bool(r["blast"] and r["blast"]["better"]) for r in answered),
         "blast_unexplained_left": sum(bool(r["blast"] and r["blast"]["unexplained"]) for r in answered),
@@ -111,7 +112,7 @@ def paired(a: dict[str, dict], b: dict[str, dict], answers: dict[str, dict]) -> 
     top = lambda recs, c: (service_ranks(recs[c]["ranks"]) or [None])[0] == answers[c]["service"]  # noqa: E731
     x, y = [top(a, c) for c in common], [top(b, c) for c in common]
     return {"n": len(common), "only_first_right": sum(p and not q for p, q in zip(x, y)),
-            "only_second_right": sum(q and not p for p, q in zip(x, y)), "mcnemar_p": round(mcnemar_p(x, y), 6)}
+            "only_second_right": sum(q and not p for p, q in zip(x, y)), "mcnemar_p": float(f"{mcnemar_p(x, y):.3g}")}
 
 
 def build() -> dict:
@@ -166,13 +167,45 @@ def _pct(x) -> str:
 
 
 def table(results: dict) -> str:
-    rows = ["| Method | Cases | AC@1 (95% CI) | AC@3 | Avg@5 | A: AC@1 | B: AC@1 | C: AC@1 |",
+    rows = ["| Method | Cases | AC@1 (95% CI) | AC@3 | Avg@5 | A: AC@1 / Avg@5 | B: AC@1 / Avg@5 | C: AC@1 / Avg@5 |",
             "|---|---:|---:|---:|---:|---:|---:|---:|"]
     for m, r in results["methods"].items():
-        a = r["all"]
-        ci = a["AC@1_ci95"]
-        rows.append(f"| {r['label']} | {a['n']} | {_pct(a['AC@1'])} ({_pct(ci[0])}-{_pct(ci[1])}) | {_pct(a['AC@3'])} | "
-                    f"{a['Avg@5']:.2f} | " + " | ".join(_pct(r[f"system {s}"].get("AC@1")) for s in "ABC") + " |")
+        a, ci = r["all"], r["all"]["AC@1_ci95"]
+        per = " | ".join(f"{_pct(g['AC@1'])} / {g['Avg@5']:.2f}" if g["n"] else "not run"
+                         for g in (r[f"system {s}"] for s in "ABC"))
+        rows.append(f"| {r['label']} | {a['n']} | {_pct(a['AC@1'])} ({_pct(ci[0])}-{_pct(ci[1])}) | "
+                    f"{_pct(a['AC@3'])} | "
+                    f"{a['Avg@5']:.2f} | {per} |")
+    return "\n".join(rows)
+
+
+def fault_table(results: dict) -> str:
+    faults = list(next(iter(results["methods"].values()))["by_fault"])
+    rows = ["| Method (AC@1 by fault) | " + " | ".join(faults) + " |", "|---|" + "---:|" * len(faults)]
+    for r in results["methods"].values():
+        rows.append(f"| {r['label']} | " + " | ".join(_pct(r["by_fault"][f].get("AC@1")) for f in faults) + " |")
+    return "\n".join(rows)
+
+
+def paired_table(results: dict) -> str:
+    rows = ["| Agent vs | Paired cases | Only the agent right | Only the other right | McNemar p |",
+            "|---|---:|---:|---:|---:|"]
+    for agent, vs in results["paired"].items():
+        for m, p in vs.items():
+            rows.append(f"| {agent} vs {results['methods'][m]['label']} | {p['n']} | {p['only_first_right']} | "
+                        f"{p['only_second_right']} | {p['mcnemar_p']:.2g} |")
+    return "\n".join(rows)
+
+
+def sherlog_table(results: dict) -> str:
+    keys = ["cases", "no_alarm", "answered", "handed_to_human", "wrong_when_answered", "right_when_answered",
+            "citation_check_pass", "top_suspect_verified", "handed_to_opus", "blast_better_than_answer",
+            "blast_unexplained_left", "failed_runs", "cost_usd_total", "cost_usd_mean", "cost_usd_median",
+            "wall_s_mean"]
+    agents = [m for m in LIVE if m in results["methods"]]
+    rows = ["| | " + " | ".join(agents) + " |", "|---|" + "---:|" * len(agents)]
+    for k in keys:
+        rows.append(f"| {k} | " + " | ".join(str(results["methods"][m]["sherlog"].get(k)) for m in agents) + " |")
     return "\n".join(rows)
 
 
@@ -180,14 +213,10 @@ def main() -> None:
     results = build()
     check_official(results)
     (RUNS / "results.json").write_text(json.dumps(results, indent=1) + "\n")
-    print(table(results))
-    for agent, vs in results["paired"].items():
-        for m, p in vs.items():
-            print(f"{agent} vs {m}: {p['n']} paired cases, only {agent} right {p['only_first_right']}, "
-                  f"only {m} right {p['only_second_right']}, McNemar p={p['mcnemar_p']:.3g}")
-    for agent in LIVE:
-        if agent in results["methods"]:
-            print(agent, json.dumps(results["methods"][agent]["sherlog"]))
+    for part in (table, fault_table, paired_table, sherlog_table):
+        print(part(results), end="\n\n")
+    print(f"metered live spend, dev and test: ${results['metered_spend_usd']}; official cross-check: "
+          f"{results.get('official_match', 'not run')}")
 
 
 if __name__ == "__main__":
