@@ -84,6 +84,14 @@ def test_the_link_preview_image_is_served_and_small(api):
     assert len(res.content) <= OG_MAX_BYTES
 
 
+@pytest.mark.parametrize("path", ["/", "/console", "/status"])
+def test_every_page_shares_a_preview_with_a_type_and_alt_text(api, path):
+    page = api.get(path).text
+    for tag in ('property="og:type"', 'property="og:image" content="https://sherlog-jade.vercel.app/static/og.jpg"',
+                'property="og:image:alt"'):
+        assert tag in page
+
+
 def test_api_docs_name_the_api_and_describe_every_route(api):
     spec = api.get("/openapi.json").json()
     assert spec["info"] == {"title": "Sherlog API", "version": app._version()}
