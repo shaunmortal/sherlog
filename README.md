@@ -38,7 +38,7 @@ Built during IceHacks 2026.
 | 2:31–3:00 | [`/console#replay/41`](https://sherlog-jade.vercel.app/console#replay/41) | A recorded outage, free, in about 11 s. The z-score ranking blames `cart`; the agent names `cache`, 90% sure, citing calls `c0`, `c1` and `c3`, all verified; rolling `cache` back clears all four broken services. |
 | 3:00–3:30 | [`/console#replay/177`](https://sherlog-jade.vercel.app/console#replay/177) (C1 in the Replay tab) | A confident wrong answer the rollback stopped. In hard mode the Haiku agent names `cart`, the decoy, 85% sure, with its citations verified, so it goes out; rolling `cart` back leaves `frontend` abnormal and the alarm on, so the rollback does not prove it. |
 | 3:30–4:00 | [Your data](https://sherlog-jade.vercel.app/console#data) → **Use the sample** → **Triage (no AI)** | No key needed. The alarm, the z-score ranking (`cart` first), the robust z-score (`cache` first) and the blast-radius check, which says `cache` would explain more of the outage than `cart`. |
-| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 169 passed and 1 skipped (the browser checks, which need a running server), in about 17 s. `python bench.py --report`: every results table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
+| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 172 passed and 1 skipped (the browser checks, which need a running server), in about 17 s. `python bench.py --report`: every results table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
 
 ```bash
 uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q
@@ -244,9 +244,9 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 - **Link previews.** All three pages carry a share preview image, [`static/og.jpg`](static/og.jpg).
 - **Clear errors, never a hang.** Every live failure ends the stream with a reason the console shows: a missing or invalid key, a model the key cannot use, the API's rate limit, a timeout, no connection, an API error. The verdict then goes to a human. Each model call gives up after 120 s, with 1 retry.
 - **Limits.** Live runs are limited to 6 an hour per visitor and 200 a day. Over the limit you get a 429, and with live mode off a 503, each saying what to try instead. A bad upload gets a 422 that names the field; a body over 2 MB gets a 413.
-- **Tests.** 169 pytest tests run in CI on every push and pull request:
+- **Tests.** 172 pytest tests run in CI on every push and pull request:
   - 115 in [`test_core.py`](test_core.py): the simulator, the agent loop against a scripted fake model, the verifier, the blast radius, the rollback, the auto route and the call-graph rule
-  - 29 in [`tests/test_api.py`](tests/test_api.py): every route and every failure path of a live run, `HEAD` answers, the API reference, the preview image, replay numbering and the caught replays
+  - 32 in [`tests/test_api.py`](tests/test_api.py): every route and every failure path of a live run, `HEAD` answers, the API reference, the preview image and tags, replay numbering and the caught replays
   - 25 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
 
   Seven browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, a guess reveals the cause, the console plays a recorded outage to its verdict, the first screen's button replays outage #41 with precise check labels, a caught replay shows the rollback disproving its answer, triaging the sample afterwards replaces that outage on screen, even while paused, and a triage started from the keyboard keeps focus on its button.
@@ -267,7 +267,7 @@ Requires Python 3.12 or newer (CI runs 3.12) and uv.
 uv venv --python 3.13 && uv pip install -r requirements.txt
 cp .env.example .env                                  # then put your Anthropic API key in .env
 uv run --env-file .env uvicorn app:app --reload       # http://localhost:8000 (story), /console, /status
-uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 169 tests
+uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 172 tests
 ```
 
 Without an API key everything except live runs works: replays, the Evidence view, triage.
