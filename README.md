@@ -37,8 +37,8 @@ Built during IceHacks 2026.
 | 0:00–2:31 | The demo video (link above) | The whole loop: an outage, a guess, the investigation, the checks and the rollback. |
 | 2:31–3:00 | [`/console#replay/41`](https://sherlog-jade.vercel.app/console#replay/41) | A recorded outage, free, in about 11 s. The z-score ranking blames `cart`; the agent names `cache`, 90% sure, citing calls `c0`, `c1` and `c3`, all verified; rolling `cache` back clears all four broken services. |
 | 3:00–3:30 | [`/console#replay/177`](https://sherlog-jade.vercel.app/console#replay/177) (C1 in the Replay tab) | A confident wrong answer the rollback stopped. In hard mode the Haiku agent names `cart`, the decoy, 85% sure, with its citations verified, so it goes out; rolling `cart` back leaves `frontend` abnormal and the alarm on, so the rollback does not prove it. |
-| 3:30–4:00 | [Your data](https://sherlog-jade.vercel.app/console#data) → **Use the sample** → **Triage (no AI)** | No key needed. The alarm, the z-score ranking (`cart` first), the robust z-score (`cache` first) and the blast-radius check, which says `cache` would explain more of the outage than `cart`. |
-| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 174 passed and 1 skipped (the browser checks, which need a running server), in about 17 s. `python bench.py --report`: every results table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
+| 3:30–4:00 | [Your data](https://sherlog-jade.vercel.app/console#data) → **Use** the shop sample → **Triage (no AI)**, then **Use** a custom-graph sample → **Triage** | No key needed. The alarm, the z-score ranking (`cart` first), the robust z-score (`cache` first) and the blast-radius check, which says `cache` would explain more of the outage than `cart`. The custom-graph sample brings its own call graph of six services, which replace the shop on the charts and the map. |
+| 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 203 passed and 1 skipped (the browser checks, which need a running server), in about 18 s. `python bench.py --report`: every results table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
 
 ```bash
 uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q
@@ -66,7 +66,7 @@ uv run --with-requirements requirements.txt python bench.py --report
 
 1. **Guess.** On the [story page](https://sherlog-jade.vercel.app), scroll to the wall of red and pick the service you think broke. It shows the cause and which ones were only victims.
 2. **Break a service.** In the [console](https://sherlog-jade.vercel.app/console), pick a service, a fault and who investigates, press **Break it live**, then lock in your guess on the map while Claude works. Or replay [outage #41](https://sherlog-jade.vercel.app/console#replay/41) for free: the z-score ranking blames `cart`, the agent names `cache`, and rolling `cache` back clears all four broken services.
-3. **Bring your own outage.** In the console's **Your data** tab, press **Use the sample**, then **Triage (no AI)**. The alarm, the z-score and robust z-score rankings and the blast-radius check run on it, with no API key. **Investigate with Claude** runs the agent on it.
+3. **Bring your own outage.** In the console's **Your data** tab, press **Use** the shop sample, then **Triage (no AI)**. The alarm, the z-score and robust z-score rankings and the blast-radius check run on it, with no API key. **Investigate with Claude** runs the agent on it. Your own system does not have to look like the shop: an upload can bring its own call graph, as the custom-graph sample does.
 
 <table>
   <tr>
@@ -227,7 +227,7 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 
 **How it was measured**
 
-- **axe-core 4.10.2**, with the WCAG 2.0, 2.1 and 2.2 A and AA rules plus best practices: **0 violations** on `/`, `/console` and `/status`, in light and dark, at 1440×900 and 390×844. The story page was also checked scrolled through, at the bottom and after a guess. The console was checked idle, on the replay list, after a replay's verdict, on the Evidence view and after triaging the sample in Your data.
+- **axe-core 4.10.2**, with the WCAG 2.0, 2.1 and 2.2 A and AA rules plus best practices: **0 violations** on `/`, `/console` and `/status`, in light and dark, at 1440×900 and 390×844. The story page was also checked scrolled through, at the bottom and after a guess. The console was checked idle, on the replay list, after a replay's verdict, on the Evidence view, and after triaging the shop sample and the custom-graph sample in Your data.
 - **Lighthouse accessibility: 100** on the story page, the console and the status page, with its mobile and desktop settings.
 
 **Not covered:** forced-colors (high contrast) mode was not tested, and no one who relies on a screen reader or other assistive technology has tested the pages. Automated checks find only some kinds of barrier.
@@ -244,18 +244,26 @@ The story page, the console and the status page were built to WCAG 2.2 AA.
 - **Link previews.** All three pages carry a share preview image, [`static/og.jpg`](static/og.jpg).
 - **Clear errors, never a hang.** Every live failure ends the stream with a reason the console shows: a missing or invalid key, a model the key cannot use, the API's rate limit, a timeout, no connection, an API error. The verdict then goes to a human. Each model call gives up after 120 s, with 1 retry.
 - **Limits.** Live runs are limited to 6 an hour per visitor and 200 a day. Over the limit you get a 429, and with live mode off a 503, each saying what to try instead. A bad upload gets a 422 that names the field; a body over 2 MB gets a 413.
-- **Tests.** 174 pytest tests run in CI on every push and pull request:
+- **Tests.** 203 pytest tests run in CI on every push and pull request:
   - 117 in [`test_core.py`](test_core.py): the simulator, the agent loop against a scripted fake model, the verifier, the blast radius, the rollback, the auto route and the call-graph rule
   - 32 in [`tests/test_api.py`](tests/test_api.py): every route and every failure path of a live run, `HEAD` answers, the API reference, the preview image and tags, replay numbering and the caught replays
   - 25 in [`tests/test_byo.py`](tests/test_byo.py): the upload format, triage and the converter
+  - 29 in [`tests/test_topology.py`](tests/test_topology.py): uploads with their own call graph, from the checks on `calls` through triage, the tools, the agent and the routes to the converter, and a guard that the shop's prompt and tool schemas are byte for byte the ones the recorded runs used
 
-  Eleven browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, a guess reveals the cause, its sections wait for a person to scroll to them but not for an automated screenshot (two checks), the console plays a recorded outage to its verdict, the first screen's button replays outage #41 with precise check labels and hands keyboard focus to the flight log, the phone's jump link lands focus on the verdict, a caught replay shows the rollback disproving its answer, triaging the sample afterwards replaces that outage on screen, even while paused, and a triage started from the keyboard keeps focus on its button.
+  Twelve browser end-to-end checks in [`tests/test_e2e.py`](tests/test_e2e.py) run against a running server: the story page loads with no console errors, a guess reveals the cause, its sections wait for a person to scroll to them but not for an automated screenshot (two checks), the console plays a recorded outage to its verdict, the first screen's button replays outage #41 with precise check labels and hands keyboard focus to the flight log, the phone's jump link lands focus on the verdict, a caught replay shows the rollback disproving its answer, triaging the sample afterwards replaces that outage on screen, even while paused, triaging the custom-graph sample draws its six services until a replay brings the shop back, and a triage started from the keyboard keeps focus on its button.
 
 ---
 
 ## Bring your own outage
 
-Real telemetry, in the same shape as the shop: 10 minutes of the 4 metrics for 11 services, each mapped onto the shop's names by the job it does, plus optional log lines. `POST /api/triage` runs the alarm, the z-score and robust z-score rankings and the blast-radius check, with no AI and no key. `POST /api/investigate` runs the agent and streams the same events as a live break, without the truth reveal, since nobody knows the culprit. `GET /api/sample-incident` gives a sample to start from, and [`scripts/prom_to_sherlog.py`](scripts/prom_to_sherlog.py) converts Prometheus range queries. Format, mapping, checks and limits: [docs/bring-your-own.md](docs/bring-your-own.md).
+Real telemetry from your own system: 10 minutes of the 4 metrics for each service, plus optional log lines, and your call graph in `calls`, from 2 to 40 services under their own names:
+
+```json
+"calls": {"gateway": ["auth", "orders"], "orders": ["inventory", "payments"], "inventory": ["postgres"],
+          "auth": [], "payments": [], "postgres": []}
+```
+
+The alarm, both rankings, the call-graph rule, the blast-radius check and the agent's tools and prompt then work on your services, not the shop's. Leave `calls` out and the services are the shop's 11, each of yours mapped onto one by the job it does. `POST /api/triage` runs the alarm, the z-score and robust z-score rankings and the blast-radius check, with no AI and no key. `POST /api/investigate` runs the agent and streams the same events as a live break, without the truth reveal, since nobody knows the culprit. `GET /api/sample-incident` gives a sample to start from, `?graph=custom` one with its own call graph, and [`scripts/prom_to_sherlog.py`](scripts/prom_to_sherlog.py) converts Prometheus range queries, with `--calls calls.json` for your graph. In one live check of the custom-graph sample, the Haiku agent named its true cause, `postgres`, 85% sure, with its citations verified, for about $0.002: one run, not a benchmark. Uploads get no rollback test, and the benchmark numbers above come from the simulated shop. Format, checks and limits: [docs/bring-your-own.md](docs/bring-your-own.md).
 
 ---
 
@@ -267,7 +275,7 @@ Requires Python 3.12 or newer (CI runs 3.12) and uv.
 uv venv --python 3.13 && uv pip install -r requirements.txt
 cp .env.example .env                                  # then put your Anthropic API key in .env
 uv run --env-file .env uvicorn app:app --reload       # http://localhost:8000 (story), /console, /status
-uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 174 tests
+uv run --with-requirements requirements.txt --with pytest --with httpx pytest -q   # 203 tests
 ```
 
 Without an API key everything except live runs works: replays, the Evidence view, triage.
@@ -294,7 +302,7 @@ python scripts/make_figures.py       # media/results.svg, from runs/evidence.jso
 | [`sim.py`](sim.py) | The seeded shop: call graph, faults, noise, the alarm, hard mode's decoy, and rollbacks |
 | [`investigate.py`](investigate.py) | The tools, the agent loop, the verifier, the blast-radius check, the call-graph rule, the rollback check and the auto route |
 | [`bench.py`](bench.py) | The benchmark: variants, no-AI baselines, Wilson intervals, McNemar tests, the rollback what-ifs, the evidence file |
-| [`byo.py`](byo.py) | Bring your own outage: the `sherlog-incident/1` format, its checks, triage and the sample |
+| [`byo.py`](byo.py) | Bring your own outage: the `sherlog-incident/1` format with an optional call graph, its checks, triage and the two samples |
 | [`app.py`](app.py) | FastAPI: the pages, live investigations as server-sent events, replays, uploads, health, rate limits |
 | [`static/landing.html`](static/landing.html), [`static/hero3d.js`](static/hero3d.js), [`static/ribbon.js`](static/ribbon.js) | The story page, its 3D call graph, and the scroll ribbon and liquid surface behind it |
 | [`static/index.html`](static/index.html) | The console |
@@ -315,7 +323,7 @@ python scripts/make_figures.py       # media/results.svg, from runs/evidence.jso
 - **The AI's accuracy edge over a good rule is small.** Against the no-AI call-graph rule, the Opus agent was right in 1 more normal and 3 more hard outages, which is not significant on benchmarks this size. Its clearer gains are handing an outage to a human when unsure and explanations a person can check.
 - **The rollback proof needs the simulator.** It replays an outage from its seed, so uploaded telemetry gets no rollback test. In the simulator, rolling back the true cause is exactly what clears the fault, so its numbers measure the gate, not field accuracy. In production it would be a canary rollback, which is noisier and which Sherlog does not perform. Over the 176 benchmark outages, rolling back a service other than the cause never counted as proof (0 of 1,760), but rolling back the cause failed once: in hard seed 2031, checkout's latency noise crossed the alarm line a tick before the fault began, and the replay keeps that noise (computed with `investigate.rollback_check`). Every Claude method handed that outage to a human, so no recorded answer met it, and the rollback-gate what-if escalates it too, though each named the cause first.
 - **The rollback gate is a what-if.** It was computed offline over recorded runs; live answers still go through the confidence gate.
-- **Uploads must fit the shop.** The same 11-service shape, these 4 metrics, one 10-minute window at 5 s, no traces. Nothing scores an uploaded answer, because nobody knows the culprit.
+- **Uploads have a fixed shape, not a fixed system.** An upload brings its own call graph of 2 to 40 services, or uses the shop's 11. Either way: these 4 metrics for every service, one 10-minute window at 5 s, no traces. Nothing scores an uploaded answer, because nobody knows the culprit, and every benchmark number comes from the simulated shop; on uploads with their own graph there is one live run, not a benchmark.
 - **The rate limiter is in memory,** so it is per server instance.
 
 **Next:** a public benchmark of real outages; harder faults; alerts in directly instead of an export, and a summary out to the team's chat.

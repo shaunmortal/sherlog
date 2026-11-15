@@ -42,8 +42,11 @@ how hard it is, and break it.
 - **Hard mode** adds a decoy: an unrelated service with a harmless anomaly at the same moment.
 - It drafts a ticket note for engineers and a plain-language update for customers.
 - The scoreboard reveals the culprit (and the decoy): you vs the agent vs the no-AI z-score ranking.
-- **Bring your own outage:** upload 10 minutes of real telemetry in the shop's shape. Triage runs the
-  alarm, the z-score and robust z-score rankings and the blast-radius check with no AI and no key; the agent can investigate it too.
+- **Bring your own outage, from any system:** upload 10 minutes of real telemetry with your own call
+  graph (2 to 40 services under their own names), or mapped onto the shop's 11. Triage runs the alarm, the
+  z-score and robust z-score rankings and the blast-radius check on your services with no AI and no key; the
+  agent can investigate it too, with its tools and prompt set to your services. The benchmark numbers come
+  from the simulated shop, and uploads get no rollback test.
 - A **status page** and a health endpoint show whether live mode is on, and the 183 recorded
   investigations replay for free whenever it is not: the Opus agent's 176 and the 7 wrong answers the
   rollback caught.
@@ -109,9 +112,10 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
   `HEAD` for uptime monitors, a scheduled workflow checks the live health endpoint every 30 minutes, `/docs`
   describes every route, `requirements.txt` pins the exact versions the tests pass with, and all three pages
   carry a link preview image.
-- **Tests:** 174 pytest tests in CI (the agent loop and the auto route against a scripted fake model, the
-  call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format),
-  plus 11 browser end-to-end checks.
+- **Tests:** 203 pytest tests in CI (the agent loop and the auto route against a scripted fake model, the
+  call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format,
+  uploads with their own call graph, and a guard that the shop's prompt and tool schemas never change),
+  plus 12 browser end-to-end checks.
 - **AI tools used:** Claude Code as a pair programmer; Claude Haiku, Sonnet and Opus 5.5 inside the product.
   Claude Code wrote and tested code under our direction, several features at once in separate agent
   worktrees joined by the `merge:` commits. The verifier, the blast-radius check, the call-graph rule and the
@@ -205,9 +209,10 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-c
    citing the tool calls that show it, and rolling cache back clears all four broken services.
 3. https://sherlog-jade.vercel.app/console#replay/177 (C1): a confident wrong answer the rollback stopped.
    The Haiku agent names the decoy, 85% sure, with its citations verified; rolling it back leaves the alarm on.
-4. Console, Your data, **Use the sample**, **Triage (no AI)**: the alarm, the z-score and robust z-score
-   rankings and the blast-radius check.
-5. In a clone: `pytest -q` (174 passed, 1 skipped) and `python bench.py --report`, which recomputes every
+4. Console, Your data, **Use** the shop sample, **Triage (no AI)**: the alarm, the z-score and robust z-score
+   rankings and the blast-radius check. Then **Use** a custom-graph sample and **Triage** again: an upload
+   with its own call graph of six services replaces the shop on the charts and the map.
+5. In a clone: `pytest -q` (203 passed, 1 skipped) and `python bench.py --report`, which recomputes every
    table from the recorded runs with no API calls.
 
 ---
