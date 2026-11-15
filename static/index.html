@@ -35,6 +35,7 @@
   .brand svg { width: 16px; height: 16px; }
   .meta { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; padding: 8px 22px; font: 13px var(--mono); }
   .meta span { color: var(--muted); margin-right: 6px; }
+  .meta b { font-weight: 400; }
   .views, .views [role="tablist"] { display: flex; }
   .views { position: relative; }
   .views button { border: 0; border-left: 1px solid var(--line); background: none; padding: 0 22px; font: 500 13px var(--mono); letter-spacing: .1em; color: var(--muted); transition: color var(--hover) var(--ease-quad); }
@@ -86,6 +87,7 @@
   .cell small { display: block; font: 13px var(--sans); color: var(--muted); }
   .cell:is([aria-pressed="true"], [aria-checked="true"]) small { color: inherit; opacity: .75; }
   .desc { margin: 10px 0 0; font-size: 14px; color: var(--muted); min-height: 3em; }
+  #modelDesc { min-height: 0; }
   .act { position: relative; isolation: isolate; overflow: hidden; margin-top: 18px; height: 52px; padding: 0 28px; border: 0; border-radius: var(--pill); background: var(--accent); color: var(--on-accent);
     font: 500 14px var(--sans); letter-spacing: .03em; text-transform: uppercase; transition: color .4s ease, transform var(--hover) var(--ease-quad); }
   .act::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--ink); transform: translateY(102%); transition: transform .5s var(--ease-snap); }
@@ -101,6 +103,7 @@
     html { scroll-padding-bottom: 84px; }
   }
   .hint { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+  .hint.first { margin: 0 0 14px; } .hint.flush { margin: 0; } .hint.near { margin: 6px 0 0; }
   .status { margin: 0; padding: 14px 22px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); min-height: 1.5em; }
   .status:empty { padding: 0; border: 0; min-height: 0; }  /* stays in the page so screen readers hear its first message */
   .status.bad { color: var(--bad); } .status.ok { color: var(--ok); }
@@ -174,6 +177,7 @@
   .tele-val { padding: 7px 14px 0 6px; border-left: 1px solid var(--line); text-align: right; font: 14px/1.35 var(--mono); white-space: nowrap; }
   .axis { height: 26px; border-bottom: 1px solid var(--line); }
   .axis canvas { width: 100%; height: 22px; display: block; }
+  .tele-wait { padding: 0 22px 16px; }
   #tip { position: fixed; z-index: 20; background: var(--tip-bg); color: var(--text); border: 1px solid var(--line-strong); border-radius: 8px; padding: 6px 9px; font: 11px/1.5 var(--mono); white-space: pre; pointer-events: none; animation: fade var(--fast) var(--ease-quad); }
   @keyframes fade { from { opacity: 0; } }
   @media (max-width: 760px) {
@@ -276,6 +280,7 @@
   .evidence h1 { margin: 0 0 12px; font: 600 34px/1.15 var(--sans); letter-spacing: -.01em; }
   .evidence p { margin: 0 0 10px; max-width: 75ch; color: var(--muted); font-size: 16px; }
   .evidence .sub { margin-top: 32px; }
+  #evTest, #evHardTest { margin-top: 12px; }
   .table-wrap { overflow-x: auto; }
   .ev-table { width: 100%; border-collapse: collapse; font: 14px var(--mono); }
   .ev-table th { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line-strong); text-align: left; font: 500 12px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -296,10 +301,10 @@
     SHERLOG
   </a>
   <div class="meta">
-    <div><span>SYSTEM</span><b id="metaSystem" style="font-weight:400">Simulated shop</b></div>
-    <div><span>MODEL</span><b id="metaModel" style="font-weight:400">Claude</b></div>
+    <div><span>SYSTEM</span><b id="metaSystem">Simulated shop</b></div>
+    <div><span>MODEL</span><b id="metaModel">Claude</b></div>
     <div><span>SOURCES</span>metrics · logs · call graph</div>
-    <div><span>MODE</span><b id="metaMode" style="font-weight:400">…</b></div>
+    <div><span>MODE</span><b id="metaMode">…</b></div>
   </div>
   <div class="views">
     <div role="tablist" aria-label="Views">
@@ -326,7 +331,7 @@
       <p class="desc" id="faultDesc"></p>
       <p class="sub">3 · Who investigates</p>
       <div class="grid" id="modelGrid" role="radiogroup" aria-label="Model that investigates"></div>
-      <p class="desc" id="modelDesc" style="min-height:0"></p>
+      <p class="desc" id="modelDesc"></p>
       <p class="sub">4 · Difficulty</p>
       <div class="grid" id="modeGrid" role="radiogroup" aria-label="Difficulty"></div>
       <div class="go-bar"><button type="button" class="act" id="go">Break it live</button></div>
@@ -334,7 +339,7 @@
     </div>
     <div class="pad" id="replayPanel" role="tabpanel" aria-labelledby="tab-replay" hidden>
       <h2 class="label">Recorded outages</h2>
-      <p class="hint" style="margin:0 0 14px"><span id="replayCount">0</span> recorded from the benchmark. The culprit stays hidden until the end, so you can still guess.</p>
+      <p class="hint first"><span id="replayCount">0</span> recorded from the benchmark. The culprit stays hidden until the end, so you can still guess.</p>
       <h3 class="sub" id="h-start">Start here</h3>
       <div class="picks" id="startHere" role="group" aria-labelledby="h-start"></div>
       <p class="hint" id="replayLegend">H = hard mode: a decoy anomaly at the same time.</p>
@@ -343,8 +348,8 @@
     </div>
     <div class="pad" id="dataPanel" role="tabpanel" aria-labelledby="tab-data" hidden>
       <h2 class="label">Your data</h2>
-      <p class="hint" style="margin:0">Bring 10 minutes of telemetry from your own system, with its call graph (2 to 40 services) or mapped onto the shop's 11, and the same alarm, rankings and checks run on it.</p>
-      <p class="hint" style="margin:6px 0 0"><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format, and how to export your telemetry</a></p>
+      <p class="hint flush">Bring 10 minutes of telemetry from your own system, with its call graph (2 to 40 services) or mapped onto the shop's 11, and the same alarm, rankings and checks run on it.</p>
+      <p class="hint near"><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format, and how to export your telemetry</a></p>
       <p class="sub">1 · Telemetry</p>
       <div class="grid">
         <a class="cell" href="/api/sample-incident" download="sherlog-sample-incident.json"><b>Download</b><small>the shop sample</small></a>
@@ -384,7 +389,7 @@
       </div>
       <div class="mtabs" id="metricTabs" role="group" aria-label="Metric shown"></div>
     </div>
-    <div id="telemetry"><p class="empty" style="padding:0 22px 16px">Loading the shop's metrics…</p></div>
+    <div id="telemetry"><p class="empty tele-wait">Loading the shop's metrics…</p></div>
     <a class="jump" id="jumpVerdict" href="#h-verdict" hidden>See the verdict <span aria-hidden="true">&nbsp;↓</span></a>
 
     <div class="head" id="mapHead"><h2 class="label">Who did it?</h2><p class="hint" id="guessHint">Click the service you suspect, here or on its telemetry row, before the agent answers.</p></div>
@@ -425,12 +430,12 @@
   <p>The telemetry is simulated: caller logs name the failing service and faults are single and clean, so the absolute numbers are optimistic. The no-AI baselines run on exactly the same data, so the comparison is fair.</p>
   <h2 class="sub" id="h-methods">What each capability and model adds · <span class="evN">132</span> outages · [95% interval]</h2>
   <div class="table-wrap" id="evMethods" role="region" tabindex="0" aria-labelledby="h-methods"></div>
-  <p id="evTest" style="margin-top:12px"></p>
+  <p id="evTest"></p>
   <h2 class="sub" id="h-robust">Robustness · one input taken away</h2>
   <div class="table-wrap" id="evRobust" role="region" tabindex="0" aria-labelledby="h-robust"></div>
   <h2 class="sub" id="h-hard">Hard mode · a decoy anomaly at the same time, callers log 60% fewer complaints · <span id="hardN">44</span> outages</h2>
   <div class="table-wrap" id="evHard" role="region" tabindex="0" aria-labelledby="h-hard"></div>
-  <p id="evHardTest" style="margin-top:12px"></p>
+  <p id="evHardTest"></p>
   <h2 class="sub" id="h-faults">By fault type · Claude Opus 5.5 agent</h2>
   <div class="table-wrap" id="evFaults" role="region" tabindex="0" aria-labelledby="h-faults"></div>
 </div>
@@ -439,7 +444,7 @@
 
 <footer class="foot">
   <span>Built from scratch for IceHacks 2026.</span>
-  <nav aria-label="Pages"><a href="/status">Status: live mode, recorded outages, version</a><a href="/docs">API</a><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/mcp.md">MCP connector</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
+  <nav aria-label="Pages"><a href="/status">Status: live mode, recorded outages, version</a><a href="/reference">API</a><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/mcp.md">MCP connector</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
 </footer>
 
 <div id="tip" aria-hidden="true" hidden></div>

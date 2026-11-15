@@ -21,6 +21,7 @@ function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs)) {
     if (key === 'class') node.className = value;
+    else if (key === 'style') node.style.cssText = value;  // through the DOM: the content security policy blocks style=""
     else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
     else node.setAttribute(key, value);
   }
@@ -33,7 +34,10 @@ function el(tag, attrs = {}, ...children) {
 
 function svg(tag, attrs = {}) {
   const node = document.createElementNS(SVG_NS, tag);
-  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === 'style') node.style.cssText = value;  // as in el()
+    else node.setAttribute(key, value);
+  }
   return node;
 }
 
