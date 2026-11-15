@@ -32,7 +32,7 @@
 </p>
 <p align="center"><sub>Every number is in <a href="runs/evidence.json"><code>runs/evidence.json</code></a>, from the recorded runs. The shop is simulated, so the absolute numbers are optimistic: see <a href="#limitations">Limitations</a>.</sub></p>
 
-**Contents:** [Built for IceHacks](#built-for-icehacks-2026) · [Who it is for](#who-it-is-for) · [Evaluate it in 5 minutes](#evaluate-it-in-5-minutes) · [What's new](#whats-new-here) · [Try it in 30 seconds](#try-it-in-30-seconds) · [How it works](#how-it-works) · [Results](#results) · [Accessibility](#accessibility) · [Reliability](#reliability) · [Bring your own outage](#bring-your-own-outage) · [Reproduce](#reproduce) · [Layout](#repository-layout) · [Limitations](#limitations) · [How it was built](#how-it-was-built)
+**Contents:** [Built for IceHacks](#built-for-icehacks-2026) · [See it work](#see-it-work) · [Who it is for](#who-it-is-for) · [Evaluate it in 5 minutes](#evaluate-it-in-5-minutes) · [What's new](#whats-new-here) · [Try it in 30 seconds](#try-it-in-30-seconds) · [How it works](#how-it-works) · [Results](#results) · [Accessibility](#accessibility) · [Reliability](#reliability) · [Bring your own outage](#bring-your-own-outage) · [Reproduce](#reproduce) · [Layout](#repository-layout) · [Limitations](#limitations) · [How it was built](#how-it-was-built)
 
 ---
 
@@ -46,7 +46,24 @@ Sherlog was built during IceHacks 2026, on Nov 14 and 15 (IST), with Claude Code
 | **Best&nbsp;Deployed&nbsp;App** | Live, with a status page and a health endpoint. All 183 recorded investigations replay with no API key; live runs are rate-limited and fail with a clear reason; 204 tests run in CI on every push; a scheduled check calls the live health endpoint every 30 minutes.<br>**Check it:** [Live site](https://sherlog-jade.vercel.app) · [`/status`](https://sherlog-jade.vercel.app/status) · [`/api/health`](https://sherlog-jade.vercel.app/api/health) · [CI](https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml) · [uptime check](.github/workflows/uptime.yml) · [Reliability](#reliability) |
 | **Best&nbsp;Design&nbsp;&amp;&nbsp;UX** | A scroll story you can play: guess which service broke, then watch the agent investigate, check and roll back. Built to WCAG 2.2 AA, with 0 axe-core violations on all three pages in both themes, at desktop and phone sizes; full keyboard use, screen-reader announcements and pausable motion.<br>**Check it:** [Story page](https://sherlog-jade.vercel.app) · [Console](https://sherlog-jade.vercel.app/console) · [Accessibility](#accessibility) |
 
-<p align="center"><a href="https://sherlog-jade.vercel.app"><img src="media/hero.jpg" alt="The Sherlog story page: the headline 'An AI on-call investigator that has to prove its answer', a line on what it does and buttons to watch outage #41 or break something, above a dark panel with the shop's eleven services in 3D, replaying outage #41. Cache, cart, frontend and checkout glow red, and cache carries the tags AI and CHECKED: its citations check out and it explains all 4 broken services. Click to open the live site." width="900"></a></p>
+## See it work
+
+<table>
+  <tr>
+    <td width="50%"><img src="media/demo-trap.gif" alt="Clip from the demo, 9 seconds: a wall of eleven charts, four red. Which one broke first? The guess is cart, the service furthest from normal; it is marked a victim of the cache it calls, and the no-AI z-score ranking makes the same mistake." width="440"></td>
+    <td width="50%"><img src="media/demo-proof.gif" alt="Clip from the demo, 8 seconds: the answer, cache, explains all four red services; the outage is replayed with cache rolled back and the alarm stops, while rolling back a decoy proves nothing." width="440"></td>
+  </tr>
+  <tr>
+    <td><b>1. The trap.</b> The loudest service is a victim. A person and the classic no-AI ranking both blame it.</td>
+    <td><b>2. The proof.</b> The answer must explain every red service, and rolling it back must stop the outage. A decoy can't fake that.</td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="media/demo-console.gif" alt="Screen recording of the live console, 12 seconds: replay of outage 41. The alarm fires, the guess cart is locked in, the agent's tool calls stream into the flight log, and the verdict names cache, 90% confident, citations verified, with the rollback line: cache rolled back, the alarm stops, cart, frontend and checkout recover." width="900"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><b>3. The real console</b>, recorded from the live site: <a href="https://sherlog-jade.vercel.app/console#replay/41">replay #41</a> plays free, with no API key.</td>
+  </tr>
+</table>
 
 ---
 
@@ -89,6 +106,8 @@ uv run --with-requirements requirements.txt python bench.py --report
 ---
 
 ## Try it in 30 seconds
+
+<p align="center"><a href="https://sherlog-jade.vercel.app"><img src="media/hero.jpg" alt="The Sherlog story page: the headline 'An AI on-call investigator that has to prove its answer', a line on what it does and buttons to watch outage #41 or break something, above a dark panel with the shop's eleven services in 3D, replaying outage #41. Cache, cart, frontend and checkout glow red, and cache carries the tags AI and CHECKED: its citations check out and it explains all 4 broken services. Click to open the live site." width="900"></a></p>
 
 1. **Guess.** On the [story page](https://sherlog-jade.vercel.app), scroll to the wall of red and pick the service you think broke. It shows the cause and which ones were only victims.
 2. **Break a service.** In the [console](https://sherlog-jade.vercel.app/console), pick a service, a fault and who investigates, press **Break it live**, then lock in your guess on the map while Claude works. Or replay [outage #41](https://sherlog-jade.vercel.app/console#replay/41) for free: the z-score ranking blames `cart`, the agent names `cache`, and rolling `cache` back clears all four broken services.
