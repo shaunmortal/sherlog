@@ -78,6 +78,7 @@
   .links a { padding: 10px 16px; border-radius: var(--pill); font: 500 13px var(--sans); letter-spacing: .03em; text-transform: uppercase; transition: background-color .4s ease; }
   .links a:hover { background: var(--card); }
   @media (max-width: 980px) { .links { display: none; } }
+  @media (max-width: 1100px) { .links .wide { display: none; } }  /* the footer links the docs too */
 
   /* ---- hero: what it is, the two ways in, then a dark panel with the shop in 3D and a scroll hint ---- */
   .hero { padding-top: 104px; }
@@ -356,8 +357,8 @@
       <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13" cy="13" r="8" fill="none" stroke="var(--accent)" stroke-width="4"/><path d="M19 19l8 8" stroke="var(--accent)" stroke-width="4.5" stroke-linecap="square"/></svg>
       <span class="wordmark">SHERLOG</span>
     </a>
-    <nav class="links" aria-label="Sections">
-      <a href="#problem">Problem</a><a href="#how">How it works</a><a href="#results">Results</a><a href="#hard">Hard mode</a>
+    <nav class="links" aria-label="Sections and docs">
+      <a href="#problem">Problem</a><a href="#how">How it works</a><a href="#results">Results</a><a href="#hard">Hard mode</a><a class="wide" href="/guide">Docs</a>
     </nav>
     <button type="button" class="round" id="themeBtn" aria-label="Switch light or dark theme">◐</button>
     <a class="pbtn dark sm" href="/console"><span class="roll" data-text="Open console"><span>Open console</span></span><span class="dot"></span></a>
@@ -458,7 +459,7 @@
       <div class="bigstats" id="realStats"></div>
       <div class="bars" id="realBars"></div>
       <p class="note" id="realNote"></p>
-      <p class="source">Data: RCAEval benchmark, MIT licence. <a href="https://github.com/shaunmortal/sherlog/blob/main/docs/real-benchmark.md">The method and every number <span aria-hidden="true">↗</span></a></p>
+      <p class="source">Data: RCAEval benchmark, MIT licence. <a href="/guide/real-benchmark">The method and every number <span aria-hidden="true">↗</span></a></p>
       <div class="controlled">
         <h3>And on <span class="evN">132</span> simulated outages it had never seen.</h3>
         <p class="sub">A controlled benchmark: a shop of 11 services, three outages for every service and fault type, on seeds kept apart while the agent was built. "Cause first": the true cause ranked first, with its citations checked.</p>
@@ -508,8 +509,8 @@
 
 <footer>
   <div class="wrap">
-    <p class="byo"><b>Bring your own outage.</b> Upload telemetry from your own services in the <a href="/console#data">console</a> and Sherlog investigates it the same way, short of the rollback, which needs the simulated shop. <a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format and a converter</a></p>
-    <nav aria-label="Pages"><a href="/console">Console</a><a href="/status">Status</a><a href="/reference">API</a><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/mcp.md">MCP connector</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
+    <p class="byo"><b>Bring your own outage.</b> Upload telemetry from your own services in the <a href="/console#data">console</a> and Sherlog investigates it the same way, short of the rollback, which needs the simulated shop. <a href="/guide/bring-your-own">The format and a converter</a></p>
+    <nav aria-label="Pages"><a href="/console">Console</a><a href="/status">Status</a><a href="/reference">API</a><a href="/guide">Docs</a><a href="/guide/mcp">MCP connector</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
   </div>
   <div class="wrap">
     <span>Built from scratch for IceHacks 2026 · Claude Haiku, Sonnet and Opus 5.5 · MIT</span>

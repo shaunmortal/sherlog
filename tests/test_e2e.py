@@ -252,7 +252,8 @@ SETTLE_MS = 2_500  # long enough for the CDN's modules, the fonts and the first 
 
 @pytest.mark.parametrize("path, ready", [("/", "#hero3d canvas"), ("/console", "#map .node"),
                                          ("/status", "#rows:not([hidden])"), ("/reference", ".op"),
-                                         ("/docs", ".opblock")])
+                                         ("/docs", ".opblock"), ("/guide", ".cards a"),
+                                         ("/guide/real-system", ".diagram pre"), ("/guide/mcp", ".doc h2")])
 def test_every_page_runs_under_the_content_security_policy(page, errors, path, ready):
     # "/" waits for the 3D shop, drawn by three.js from the CDN, and /docs for Swagger UI's operations
     page.add_init_script(VIOLATIONS)
@@ -347,7 +348,8 @@ SETTLED = """() => Promise.allSettled(document.getAnimations()
 
 @pytest.mark.parametrize("scheme", ["light", "dark"])
 @pytest.mark.parametrize("size", AXE_SIZES)
-@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/no-such-page", "/docs"])
+@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/no-such-page", "/guide", "/guide/mcp",
+                                  "/guide/real-benchmark", "/docs"])
 def test_axe_finds_no_accessibility_violations(browser, path, size, scheme):
     # the policy would block axe's injected script, so this context bypasses it; the checks above run with it on
     context = browser.new_context(viewport=AXE_SIZES[size], color_scheme=scheme, bypass_csp=True)

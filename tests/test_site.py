@@ -14,13 +14,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app
+import guide
 import investigate
 import sim
 
 client = TestClient(app.app)
 SITE = "https://sherlog-jade.vercel.app"
 BROWSER = {"accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
-PAGES = ["/", "/console", "/status", "/reference", "/docs"]
+PAGES = ["/", "/console", "/status", "/reference", "/docs", "/guide", "/guide/real-system"]
 CDN = "https://cdn.jsdelivr.net/"
 PINNED = re.compile(r"^https://cdn\.jsdelivr\.net/npm/[\w.-]+@\d+\.\d+\.\d+/")  # a package at an exact version
 HEADERS = {
@@ -126,7 +127,7 @@ def test_the_404_page_s_inline_code_is_allowed_too():
     assert all(_sha256(text) in policy["script-src"] for text in page.inline["script"])
 
 
-@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/docs"])
+@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/docs", "/guide", "/guide/real-system"])
 def test_pages_use_no_inline_style_or_handler_attributes(path):
     # a hash can allow a <style> or <script> block but not style="..." or onclick="...", which would need
     # 'unsafe-inline'; the console sets its dynamic styles through the DOM instead
@@ -217,7 +218,8 @@ def test_the_sitemap_lists_every_page_and_llms_txt():
     root = ET.fromstring(client.get("/sitemap.xml").content)
     ns = {"s": "http://www.sitemaps.org/schemas/sitemap/0.9"}
     listed = [loc.text for loc in root.findall("s:url/s:loc", ns)]
-    assert listed == [f"{SITE}{path}" for path in ("/", "/console", "/status", "/reference", "/llms.txt")]
+    docs = ("/guide", *(f"/guide/{doc.slug}" for doc in guide.DOCS))
+    assert listed == [f"{SITE}{path}" for path in ("/", "/console", "/status", "/reference", *docs, "/llms.txt")]
     for url in listed:  # each one is really served
         assert client.get(url.removeprefix(SITE)).status_code == 200
 
@@ -292,11 +294,12 @@ def test_the_api_reference_answers_head():
     assert head.status_code == 200 and head.content == b""
 
 
-@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference"])
-def test_every_footer_links_the_api_reference_page(path):
-    page = client.get(path).text
+@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/guide", "/guide/mcp", "/no-such-page"])
+def test_every_footer_links_the_api_reference_and_the_docs(path):
+    page = client.get(path, headers=BROWSER).text
     footer = page[page.index("<footer"):page.index("</footer>")]
     assert re.search(r'href="/reference"[^>]*>API</a>', footer) and 'href="/docs"' not in footer
+    assert '<a href="/guide">Docs</a>' in footer
 
 
 def test_swagger_ui_stays_at_docs_for_developers():

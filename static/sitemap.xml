@@ -4,5 +4,13 @@
   <url><loc>https://sherlog-jade.vercel.app/console</loc></url>
   <url><loc>https://sherlog-jade.vercel.app/status</loc></url>
   <url><loc>https://sherlog-jade.vercel.app/reference</loc></url>
+  <url><loc>https://sherlog-jade.vercel.app/guide</loc></url>
+  <url><loc>https://sherlog-jade.vercel.app/guide/how-it-works</loc></url>
+  <url><loc>https://sherlog-jade.vercel.app/guide/real-benchmark</loc></url>
+  <url><loc>https://sherlog-jade.vercel.app/guide/real-system</loc></url>
+  <url><loc>https://sherlog-jade.vercel.app/guide/mcp</loc></url>
+  <url><loc>https://sherlog-jade.vercel.app/guide/bring-your-own</loc></url>
+  <url><loc>https://sherlog-jade.vercel.app/guide/open-model</loc></url>
+  <url><loc>https://sherlog-jade.vercel.app/guide/reproducibility</loc></url>
   <url><loc>https://sherlog-jade.vercel.app/llms.txt</loc></url>
 </urlset>

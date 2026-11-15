@@ -379,4 +379,4 @@ def test_the_story_page_and_console_footers_link_the_connector_and_llms_txt(path
     page = client.get(path).text
     footer = page[page.index("<footer"):page.index("</footer>")]
     assert 'href="/llms.txt"' in footer
-    assert 'href="https://github.com/shaunmortal/sherlog/blob/main/docs/mcp.md"' in footer
+    assert 'href="/guide/mcp"' in footer  # docs/mcp.md, rendered on the site

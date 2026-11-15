@@ -30,6 +30,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import bench
 import byo
+import guide
 import investigate
 import mcp_investigation as inquiry
 import mcp_server
@@ -86,7 +87,7 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 THREE = "https://cdn.jsdelivr.net/npm/three@0.160.0/"
 SWAGGER_UI = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.34.1/"
 FONT_CSS, FONT_FILES = "https://fonts.googleapis.com", "https://fonts.gstatic.com"
-PAGES = ("landing.html", "index.html", "status.html", "reference.html", "404.html", "swagger.html")
+PAGES = ("landing.html", "index.html", "status.html", "reference.html", "404.html", "guide.html", "swagger.html")
 INLINE_CODE = re.compile(r'<(script|style)(?: type="importmap")?>(.*?)</\1>', re.S)
 
 
@@ -375,6 +376,27 @@ def api_reference() -> HTMLResponse:
 def swagger_ui() -> FileResponse:
     """Swagger UI, for developers who want to try each route: our own page around it, so it passes WCAG 2.2 AA."""
     return FileResponse(STATIC / "swagger.html")
+
+
+# the docs, rendered from the repository's markdown once, at start-up (guide.py)
+GUIDE = guide.build((STATIC / "guide.html").read_text(encoding="utf-8"))
+
+
+@app.get("/guide")
+@app.head("/guide", include_in_schema=False)
+def guide_index() -> HTMLResponse:
+    """The docs: how Sherlog works, the benchmarks on real outages and a real running system, the MCP connector,
+    the upload format, open-weights models and reproducibility."""
+    return HTMLResponse(GUIDE[""])
+
+
+@app.get("/guide/{page}")
+@app.head("/guide/{page}", include_in_schema=False)
+def guide_page(page: str) -> HTMLResponse:
+    """One page of the docs, rendered from the repository's markdown, such as `/guide/mcp`."""
+    if page not in GUIDE:  # "" is the index, and a path segment is never empty
+        raise HTTPException(404, "No docs page with that name.")
+    return HTMLResponse(GUIDE[page])
 
 
 # what crawlers and security researchers look for at the site's root
