@@ -20,6 +20,20 @@ checked by plain code, and we turned it into something anyone can play.
 
 ## What it does
 
+**In 30 seconds**
+- **Real outages:** on 252 held-out outages of a public benchmark (three real microservice systems), Sherlog ranked
+  the root cause first in **92%**, against 80-81% for the best published methods re-run on the same cases
+  (p = 9.3e-6), for a median $0.0024 an outage.
+- **It has to prove it:** plain code re-checks every tool call the agent cites, a blast-radius check asks whether the
+  answer explains every red service, and a rollback replay tests whether the outage stops. On a real 8-service
+  system, the real rollback caught every wrong answer it tested.
+- **Safe with cheaper models:** behind the same gate, an open-weights model (GLM-5.3) gave 0 wrong answers in 176
+  outages.
+- **Use it from your own Claude:** an MCP server where your model investigates and Sherlog's code checks its answer
+  and says ship or hand to a human. Free, no key.
+- **Shipped:** a live site with free replays and keyless live runs, a status page, an API reference, a strict content
+  security policy, 1,744 tests and 49 browser checks in CI, and WCAG 2.2 AA on every page.
+
 **On 252 real outages of a public benchmark**, three real microservice systems (12, 15 and 68 services) each broken
 on purpose by a known fault, Sherlog ranked the root cause first in **92%** (95% CI 88-95%), against 80% and 81% for
 the best published methods (n-sigma and its multi-source version) re-run on the same cases with the benchmark's own
