@@ -329,7 +329,7 @@
   footer a:hover { color: var(--text); }
   .byo { margin: 0; max-width: 72ch; }
   .byo b { color: var(--text); font-weight: 500; }
-  footer nav { display: flex; gap: 4px; margin: 0 -12px; }  /* the padding makes 44px targets; the margin keeps the words in line */
+  footer nav { display: flex; flex-wrap: wrap; gap: 0 4px; margin: 0 -12px; }  /* the padding makes 44px targets; the margin keeps the words in line */
   footer nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; }
 </style>
 </head>
@@ -488,7 +488,7 @@
 <footer>
   <div class="wrap">
     <p class="byo"><b>Bring your own outage.</b> Upload telemetry from your own services in the <a href="/console#data">console</a> and Sherlog investigates it the same way, short of the rollback, which needs the simulated shop. <a href="https://github.com/shaunmortal/sherlog/blob/main/docs/bring-your-own.md">The format and a converter</a></p>
-    <nav aria-label="Pages"><a href="/console">Console</a><a href="/status">Status</a><a href="/docs">API</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
+    <nav aria-label="Pages"><a href="/console">Console</a><a href="/status">Status</a><a href="/docs">API</a><a href="https://github.com/shaunmortal/sherlog/blob/main/docs/mcp.md">MCP connector</a><a href="/llms.txt">llms.txt</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
   </div>
   <div class="wrap">
     <span>Built from scratch for IceHacks 2026 · Claude Haiku, Sonnet and Opus 5.5 · MIT</span>

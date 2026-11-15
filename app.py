@@ -14,18 +14,19 @@ import time
 from collections import deque
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterator, Literal
+from typing import Callable, Iterator, Literal
 
 import anthropic
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 import bench
 import byo
 import investigate
+import mcp_server
 import sim
 
 STATIC = Path(__file__).parent / "static"
@@ -191,15 +192,19 @@ def _healthy_series() -> dict:
     return sim.simulate(None, None, seed=HEALTHY_SEED).series
 
 
-@app.exception_handler(RequestValidationError)
-def bad_input(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """422 with one sentence the console can show, plus each error's location for an uploader's script.
-    The path skips the leading body/path/query, so a nested field reads series.cart.cpu_pct.3, not just 3."""
-    errors = [{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]
+def _bad_input(errors: list[dict]) -> dict:
+    """One sentence the console can show, plus each error's location for an uploader's script. The sentence's paths
+    skip the leading body/path/query (or arguments, for an MCP tool), so a nested field reads series.cart.cpu_pct.3."""
     problems = "; ".join(f"{'.'.join(map(str, e['loc'][1:])) or e['loc'][0]}: {e['msg']}"
                          for e in errors[:SHOWN_PROBLEMS])
     more = f"; and {len(errors) - SHOWN_PROBLEMS} more." if len(errors) > SHOWN_PROBLEMS else ""
-    return JSONResponse({"detail": f"Bad input. {problems}{more}", "errors": errors}, status_code=422)
+    return {"detail": f"Bad input. {problems}{more}", "errors": errors}
+
+
+@app.exception_handler(RequestValidationError)
+def bad_input(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """422 with the problems in one sentence and every error listed."""
+    return JSONResponse(_bad_input([{"loc": list(e["loc"]), "msg": e["msg"]} for e in exc.errors()]), status_code=422)
 
 
 # every page and the health check also answer HEAD: uptime monitors send it, and a GET-only route answers 405.
@@ -223,6 +228,14 @@ def console() -> FileResponse:
 def status() -> FileResponse:
     """The status page: live mode, replays, today's live runs and the deployed version."""
     return FileResponse(STATIC / "status.html")
+
+
+@app.get("/llms.txt")
+@app.head("/llms.txt", include_in_schema=False)
+def llms_txt() -> FileResponse:
+    """A map of Sherlog for AI tools, in plain text: the pages, the API, the MCP endpoint and its tools, the upload
+    format and the docs."""
+    return FileResponse(STATIC / "llms.txt", media_type="text/plain; charset=utf-8")
 
 
 @app.get("/api/health")
@@ -312,9 +325,8 @@ class InvestigateRequest(BaseModel):
     model: Literal[(*investigate.MODELS, investigate.AUTO)] = "opus"
 
 
-async def _read_capped(request: Request, schema: type[BaseModel]) -> BaseModel:
-    """Read the body, refusing it with 413 as soon as it passes the cap (never holding more than that), and
-    validate it with the same 422 answer FastAPI gives everywhere else."""
+async def _read_body(request: Request) -> bytes:
+    """The body, refused with 413 as soon as it passes the cap (never holding more than that)."""
     too_big = HTTPException(413, f"The request body is over {MAX_BODY_MB} MB.")
     cap = MAX_BODY_MB * 1_000_000
     declared = request.headers.get("content-length", "")
@@ -325,8 +337,14 @@ async def _read_capped(request: Request, schema: type[BaseModel]) -> BaseModel:
         body += chunk
         if len(body) > cap:
             raise too_big
+    return bytes(body)
+
+
+async def _read_capped(request: Request, schema: type[BaseModel]) -> BaseModel:
+    """Read the body under the cap and validate it with the same 422 answer FastAPI gives everywhere else."""
+    body = await _read_body(request)
     try:
-        return schema.model_validate_json(bytes(body))
+        return schema.model_validate_json(body)
     except ValidationError as exc:
         errors = exc.errors(include_url=False, include_context=False, include_input=False)
         raise RequestValidationError([{**e, "loc": ("body", *e["loc"])} for e in errors]) from None
@@ -370,3 +388,160 @@ async def investigate_upload(request: Request) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# --- the MCP connector: the free, read-only parts of Sherlog as tools for Claude and other MCP clients -------------
+# The protocol is in mcp_server.py; docs/mcp.md says how to connect. No tool calls Claude, so none needs a key or a
+# live run, and none is limited beyond the body-size cap the upload routes have.
+
+MCP_INSTRUCTIONS = (
+    "Sherlog is an AI on-call investigator that has to prove its answer, benchmarked on a simulated 11-service shop. "
+    "These tools are free and read-only: none calls Claude or needs a key. benchmark_summary gives the headline "
+    "numbers and their caveats; list_recorded_outages and get_recorded_verdict show recorded investigations with the "
+    "checks of each answer; sample_incident and triage_incident run the no-AI checks on telemetry in the "
+    "sherlog-incident/1 format. Live investigations are not offered here: they run in the console.")
+HEADLINE_METHODS = ("one-shot", "haiku", "sonnet", "agent", "auto")  # the README's results table, in its order
+
+
+class _NoArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class _ReplayArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    number: int = Field(ge=1, description="The recorded outage's number, as list_recorded_outages lists it.")
+
+
+class _SampleArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    graph: Literal["shop", "custom"] = Field(
+        "shop", description="shop: the simulated shop's 11 services. custom: six of them under other names, with "
+                            "their own call graph in calls.")
+
+
+class _TriageArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    incident: byo.IncidentDoc = Field(
+        description="A sherlog-incident/1 document, checked as POST /api/triage checks it: sample_incident returns "
+                    "one, and docs/bring-your-own.md describes the format.")
+
+
+def _tool(args: type[BaseModel], run: Callable[[BaseModel], dict], title: str, description: str) -> mcp_server.Tool:
+    """A tool whose arguments are checked as an upload is, with the same messages, each path under arguments."""
+    def call(arguments: dict) -> dict:
+        try:  # through JSON, so a number or a string is read exactly as the upload routes read it
+            parsed = args.model_validate_json(json.dumps(arguments))
+        except ValidationError as exc:
+            answer = _bad_input([{"loc": ["arguments", *e["loc"]], "msg": e["msg"]}
+                                 for e in exc.errors(include_url=False, include_context=False, include_input=False)])
+            raise mcp_server.ToolError(answer["detail"], answer) from None
+        return run(parsed)
+
+    return mcp_server.Tool(title, description, args.model_json_schema(), call)
+
+
+def _recorded_verdict(args: _ReplayArgs) -> dict:
+    listed = replays()
+    if args.number > len(listed):
+        raise mcp_server.ToolError(f"No recorded outage with that number: they are numbered 1 to {len(listed)}.")
+    events = replay(args.number)
+    verdict = next((e for e in events if e["type"] == "verdict"), None)
+    return {
+        **listed[args.number - 1],
+        "tool_calls": [{k: e[k] for k in ("id", "name", "args", "text")} for e in events if e["type"] == "tool"],
+        "verdict": verdict and {k: v for k, v in verdict.items() if k != "type"},
+        "truth": {k: v for k, v in events[-1].items() if k != "type"},
+    }
+
+
+def _method_scores(s: dict) -> dict:
+    right = round((s["right_when_answered"] or 0) * s["answered"])  # as bench.gate_table counts them
+    return {"label": s["label"], "cause_first": s["agent_ac1"], "answered_alone": s["answered"],
+            "wrong_answers": s["answered"] - right, "median_cost_usd": s["median_cost_usd"],
+            "rollback_caught_wrong": s["rollback_caught"], "rollback_rejected_right": s["rollback_wrongly_rejected"],
+            "vs_call_graph_rule": {"only_method_right": s["only_agent_right_vs_graph"],
+                                   "only_rule_right": s["only_graph_right"], "mcnemar_p": s["graph_mcnemar_p"]}}
+
+
+def _benchmark(ev: dict, prefix: str, seed_base: int) -> dict:
+    opus = ev[f"{prefix}agent"]  # the Opus agent's rows carry the no-AI controls, computed on the same outages
+    return {
+        "outages": opus["outages"],
+        "seeds": f"{seed_base}-{seed_base + opus['outages'] - 1}",
+        "no_ai": {"zscore_cause_first": opus["baseline_ac1"], "robust_zscore_cause_first": opus["robust_ac1"],
+                  "call_graph_rule_cause_first": opus["graph_ac1"], "call_graph_rule_wrong": opus["graph_wrong"]},
+        "methods": {v: _method_scores(ev[f"{prefix}{v}"]) for v in HEADLINE_METHODS},
+    }
+
+
+def _benchmark_summary(_: BaseModel) -> dict:
+    ev = _evidence()
+    normal, hard = _benchmark(ev, "", bench.SEED_BASE), _benchmark(ev, "hard-", bench.HARD_SEED_BASE)
+    vs_rule = [b["methods"]["agent"]["vs_call_graph_rule"] for b in (normal, hard)]
+    return {
+        "source": "runs/evidence.json: every recorded run, scored by `python bench.py --report` with no API calls. "
+                  "cause_first: the true cause ranked first with its citations verified.",
+        "normal": normal,
+        "hard": {**hard, "note": "adds a decoy: a service with a harmless anomaly that starts with the fault"},
+        "caveats": [
+            "The telemetry is simulated: a shop this project wrote. The no-AI rules run on the same data, so the "
+            "comparisons are fair, but the absolute numbers are optimistic.",
+            "In the simulator, rolling back the true cause is exactly what clears the fault, so the rollback numbers "
+            "measure the gate, not accuracy in the field. Uploaded telemetry gets no rollback test.",
+            f"The Opus agent's edge over the no-AI call-graph rule is small: only the agent was right in "
+            f"{vs_rule[0]['only_method_right']} normal and {vs_rule[1]['only_method_right']} hard outages, only the "
+            f"rule in {vs_rule[0]['only_rule_right']} and {vs_rule[1]['only_rule_right']} (exact McNemar "
+            f"p = {vs_rule[0]['mcnemar_p']:.2g} and {vs_rule[1]['mcnemar_p']:.2g}).",
+            f"The benchmarks are small: one hard-mode outage moves a score by {100 / hard['outages']:.1f} points.",
+            "Auto was not run on its own: its rows apply the live route's handoff rule to the recorded Haiku and Opus "
+            "runs on the same outages.",
+        ],
+    }
+
+
+MCP = mcp_server.Server("sherlog", _version(), MCP_INSTRUCTIONS, {
+    "list_recorded_outages": _tool(
+        _NoArgs, lambda _: {"outages": replays()}, "List the recorded outages",
+        "Every recorded investigation that replays for free: its number, whether it ran in hard mode (with a decoy), "
+        "whether it is a confident wrong answer the rollback replay caught, and the Claude model that investigated. "
+        "Numbered, not named, so the culprit stays hidden. The Opus agent's runs come first (#41 is the README's "
+        "walk-through), the caught wrong answers last."),
+    "get_recorded_verdict": _tool(
+        _ReplayArgs, _recorded_verdict, "Get a recorded verdict and its checks",
+        "One recorded investigation: the agent's tool calls (ids c0, c1, ... with the text each returned), its "
+        "verdict (suspects with confidence, the cited call ids and whether plain code verified each citation, the "
+        "answer or the hand-over to a human, a ticket note and a customer update), the blast-radius check (does the "
+        "answer explain every abnormal service), the rollback replay (does the outage stop with the answer rolled "
+        "back) and the truth: the real cause, and what the no-AI z-score ranking said. Recorded, so no AI runs."),
+    "triage_incident": _tool(
+        _TriageArgs, lambda args: byo.triage(byo.to_incident(args.incident)), "Triage telemetry without AI",
+        "The no-AI checks on 10 minutes of telemetry, as POST /api/triage runs them: the tick the alarm fired at "
+        "(null if none), the z-score and robust z-score rankings, and the blast-radius check of the z-score ranking's "
+        "top suspect, whose `better` names a service that explains more of the outage. Without `calls` the services "
+        "are the shop's 11; with `calls` they are your own 2 to 40. A full document is large (the shop sample is "
+        "about 42 KB of JSON), so for a big export POST it to /api/triage instead."),
+    "sample_incident": _tool(
+        _SampleArgs, lambda args: _sample_incident(args.graph), "Get a sample incident",
+        "One simulated outage as a sherlog-incident/1 document with the culprit removed, ready for triage_incident: "
+        "graph=shop (11 services, about 42 KB of JSON) or graph=custom (6 renamed services with their own call graph, "
+        "about 27 KB). On the shop sample the z-score ranking blames cart, a loud victim; the blast-radius check "
+        "points at cache, the real cause."),
+    "benchmark_summary": _tool(
+        _NoArgs, _benchmark_summary, "Summarize the benchmark",
+        "The headline numbers from runs/evidence.json for 132 normal and 44 hard-mode simulated outages: how often "
+        "each method named the true cause first, answered alone and answered wrong, its median cost, what the rollback "
+        "replay caught, each method against the no-AI call-graph rule outage by outage, the no-AI baselines, and "
+        "the caveats that bound these numbers."),
+})
+
+
+@app.post("/mcp")
+async def mcp_endpoint(request: Request) -> Response:
+    """The MCP endpoint: the Model Context Protocol over Streamable HTTP, JSON-RPC 2.0 with one JSON answer per POST
+    and no session. Five free, read-only tools; see docs/mcp.md. GET and DELETE answer 405."""
+    try:
+        body = await _read_body(request)
+    except HTTPException as exc:
+        return JSONResponse(mcp_server.error(None, mcp_server.INVALID_REQUEST, exc.detail), status_code=exc.status_code)
+    status, answer = mcp_server.handle(body, request.headers, MCP)
+    return Response(status_code=status) if answer is None else JSONResponse(answer, status_code=status)
