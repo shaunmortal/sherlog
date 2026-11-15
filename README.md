@@ -2,7 +2,7 @@
 
 **When one service breaks, everything that calls it breaks too. Sherlog is an AI on-call investigator that finds the one that broke, and has to prove it**: plain code checks every tool call it cites, and a replay with its answer rolled back shows whether the outage really stops.
 
-<p align="center"><a href="https://sherlog-jade.vercel.app"><img src="media/hero.jpg" alt="The Sherlog story page: the headline 'An AI on-call investigator that has to prove its answer' above a dark panel with the shop's eleven services in 3D, replaying outage #41. Cache, cart and frontend glow red and red rings spread as the slowdown reaches checkout. Click to open the live site." width="900"></a></p>
+<p align="center"><a href="https://sherlog-jade.vercel.app"><img src="media/hero.jpg" alt="The Sherlog story page: the headline 'An AI on-call investigator that has to prove its answer', a line on what it does and buttons to watch outage #41 or break something, above a dark panel with the shop's eleven services in 3D, replaying outage #41. Cache, cart, frontend and checkout glow red, and cache carries the tags AI and CHECKED: its citations check out and it explains all 4 broken services. Click to open the live site." width="900"></a></p>
 
 <p align="center">
   <a href="https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml"><img src="https://github.com/shaunmortal/sherlog/actions/workflows/tests.yml/badge.svg" alt="Tests: the latest run of the test workflow"></a>
@@ -70,8 +70,8 @@ uv run --with-requirements requirements.txt python bench.py --report
 
 <table>
   <tr>
-    <td width="50%"><img src="media/wall.jpg" alt="The wall of red: eleven latency charts, four of them red. The reader guessed cart, which is marked a victim; cache is marked the cause."></td>
-    <td width="50%"><img src="media/stage.jpg" alt="How it works, step 3: the verifier checks each suspect's cited calls, marks the citations for cache, cart and checkout verified, and shows the blast radius on a small map."></td>
+    <td width="50%"><img src="media/wall.jpg" alt="One broken service, a wall of red: eleven latency charts, four of them red. The reader guessed cart, which is marked a victim; cache is marked the cause, and the line below says the classic no-AI ranking blamed cart too."></td>
+    <td width="50%"><img src="media/stage.jpg" alt="How it works, step 3 of 5: code checks each suspect's cited calls and marks the citations of cache, cart and checkout checked, since victims pass that too; the blast-radius line and a small map then show that cache explains all 4 abnormal services."></td>
   </tr>
   <tr>
     <td><em>A wall of red: pick the one that broke, then see which were victims.</em></td>
@@ -102,7 +102,7 @@ flowchart LR
 4. **Answer, or hand over.** If suspect #1's citations are verified and it is at least 80% confident, Sherlog answers and drafts the ticket note and the customer update. Anything less goes to a human; on the auto route, a doubtful Haiku answer goes to a fresh Opus investigation first.
 5. **Check the answer.** The **blast-radius check** asks whether the answer explains every service that stayed abnormal: each must be the answer or one of its callers, and only slowness and failures travel to callers. The **rollback replay** re-runs the outage from its seed with the answer rolled back and reports whether the alarm stops and which services recover. In hard mode the decoy's harmless CPU or memory anomaly can keep the alarm on, so the replay also counts as proof when every latency and error alarm ends. Both results are shown next to the verdict and neither changes it, with one exception: on the auto route, a Haiku answer that another service would explain better goes to Opus first.
 
-<p align="center"><img src="media/console.jpg" alt="The console after replaying outage 41: telemetry for all eleven services with the alarm marked, the flight log of the agent's tool calls c0 to c4, the scoreboard (you guessed cart, wrong; the Sherlog agent said cache, right; the z-score ranking said cart, wrong), the verdict with root cause cache at 90% confidence and its citations verified, the blast-radius line, and the service map tagged YOU, AI and CULPRIT." width="900"></p>
+<p align="center"><img src="media/console.jpg" alt="The console after replaying outage 41, its header reading MODE replay: telemetry for all eleven services with the alarm marked, the flight log of the agent's tool calls c0 to c4, the scoreboard (you guessed cart, wrong; the Sherlog agent said cache, right; the z-score ranking said cart, wrong), the verdict with root cause cache at 90% confidence and its citations verified, the blast-radius line, the rollback line (with cache rolled back the alarm stops, and cart, frontend and checkout recover), and the service map tagged YOU, AI and CULPRIT." width="900"></p>
 <p align="center"><em>Outage #41 in the console: the slowdown in <code>cache</code> makes cart, checkout and frontend look broken too. The z-score ranking blames <code>cart</code>; the agent names <code>cache</code>, and rolling <code>cache</code> back clears the outage.</em></p>
 
 ---
@@ -193,7 +193,7 @@ Brackets are 95% Wilson intervals. By fault type, the z-score ranking names the 
 
 The z-score ranking's 15 misses name the decoy 7 times; the call-graph rule's 4 misses all name it. Against the call-graph rule, paired outage by outage (only the method right · only the rule right, exact McNemar p): one-prompt Opus 0 · 5, p = 0.06; Haiku agent 2 · 4, p = 0.69; Sonnet agent 0 · 2, p = 0.5; Opus agent 3 · 0, p = 0.25; auto 2 · 2, p = 1.0. Opus was right where Haiku or Sonnet was not in 5 outages each, and never the reverse: suggestive, but p = 0.06 on 44 outages.
 
-<p align="center"><img src="media/hard.jpg" alt="Hard mode on the story page: bars for every method on 44 outages with a decoy. Opus agent 98% and never wrong; Haiku agent 86% with 5 wrong answers; Sonnet agent 86% with 2 wrong; auto 91%." width="900"></p>
+<p align="center"><img src="media/hard.jpg" alt="Hard mode on the story page: bars for every method on 44 outages with a decoy. No AI: z-score ranking 66%, robust z-score 57%, call-graph rule 91% with 4 wrong. Opus with one prompt 80% and never wrong; Haiku agent 86% with 5 wrong answers; Sonnet agent 86% with 2 wrong; Opus agent 98% and never wrong; auto 91% with 4 wrong." width="900"></p>
 
 </details>
 
