@@ -106,18 +106,36 @@ function maskIn(nodes, { delay = 0, stagger = 45, duration = 1100 } = {}) {
     { duration, delay: delay + i * stagger, easing: curve, fill: 'backwards' }));
 }
 
-/** The first time each node scrolls into view: reveal it and call `onShow(node)`. */
+// a full-page screenshot or a printout never scrolls, so whatever is still waiting by then is shown anyway
+const REVEAL_FALLBACK_MS = 4000;
+
+function whenLoaded(fn) {
+  if (document.readyState === 'complete') fn();
+  else addEventListener('load', fn, { once: true });
+}
+
+/** The first time each node scrolls into view (or 4 s after load, or before printing): reveal it and call `onShow(node)`. */
 function revealOnScroll(nodes, onShow = null, options = {}) {
   if (!MOTION || !('IntersectionObserver' in window)) { for (const node of nodes) onShow?.(node); return; }
+  const show = (node, i = 0) => {
+    io.unobserve(node);
+    node.classList.remove('pre');
+    if (!options.none) enter([node], { ...REVEAL, duration: 800, delay: i * 60, ...options });  // none: onShow animates it
+    onShow?.(node);
+  };
   const io = new IntersectionObserver((entries) => {
-    entries.filter((e) => e.isIntersecting).forEach((e, i) => {
-      io.unobserve(e.target);
-      e.target.classList.remove('pre');
-      if (!options.none) enter([e.target], { ...REVEAL, duration: 800, delay: i * 60, ...options });  // none: onShow animates it
-      onShow?.(e.target);
-    });
+    entries.filter((e) => e.isIntersecting).forEach((e, i) => show(e.target, i));
   }, { threshold: 0.12 });
-  for (const node of nodes) { node.classList.add('pre'); io.observe(node); }
+  const waiting = [...nodes];
+  for (const node of waiting) { node.classList.add('pre'); io.observe(node); }
+  const showRest = () => { for (const node of waiting) if (node.classList.contains('pre')) show(node); };
+  whenLoaded(() => setTimeout(showRest, REVEAL_FALLBACK_MS));
+  addEventListener('beforeprint', () => { showRest(); settleAnimations(); });
+}
+
+/** Jump every entrance to its end, so a printout shows nothing half-faded; endless loops are left alone. */
+function settleAnimations() {
+  for (const a of document.getAnimations()) if (a.effect?.getComputedTiming().iterations !== Infinity) a.finish();
 }
 
 /** Count a number up from zero. */
