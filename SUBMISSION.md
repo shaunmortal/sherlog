@@ -31,9 +31,9 @@ checked by plain code, and we turned it into something anyone can play.
   outages.
 - **Use it from your own Claude:** an MCP server where your model investigates and Sherlog's code checks its answer
   and says ship or hand to a human. Free, no key.
-- **Shipped:** a live site with free replays and keyless live runs, a status page, an API reference, a strict content
+- **Shipped:** a live site with free replays and live runs with no key of your own, a status page, an API reference, a strict content
   security policy, an 8-page docs section on the site, 1,814 tests and 73 browser checks in CI, and WCAG 2.2 AA on
-  every page.
+  the story page, the console and the status page.
 
 **On 252 real outages of a public benchmark**, three real microservice systems (12, 15 and 68 services) each broken
 on purpose by a known fault, Sherlog ranked the root cause first in **92%** (95% CI 88-95%), against 80% and 81% for
@@ -155,13 +155,14 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
 - **Real outages:** a converter from the public benchmark's cases to Sherlog's upload format, a dev/test split
   frozen before any live call, the published baselines re-run with the benchmark's own runner, scoring by its own
   evaluator, Wilson intervals and exact McNemar tests, and checks of n-sigma's window and of a learned prior.
-- **Tests:** 1,814 pytest tests in CI, 1,285 of which re-run every recorded run from its seed and compare its tool
+- **Tests:** 1,814 pytest tests in CI, 1,285 of them in a reproducibility suite that re-runs all 1,100 recorded runs
+  from their seeds and compares each one's tool
   results exactly (the agent loop and the auto route against a scripted fake model, the
   call-graph rule, every API route and failure path, `HEAD` answers, the caught replays, the upload format,
   uploads with their own call graph, the MCP connector, and a guard that the shop's prompt and tool schemas never
   change),
   plus 73 browser end-to-end checks that run in CI against the app started on the runner (security policy,
-  404 page, layout shift, axe-core on five pages in both themes).
+  404 page, layout shift, axe-core on nine pages in both themes).
 - **AI tools used:** Claude Code as a pair programmer; Claude Haiku, Sonnet and Opus 5.5 inside the product.
   Claude Code wrote and tested code under our direction, several features at once in separate agent
   worktrees joined by the `merge:` commits. The verifier, the blast-radius check, the call-graph rule and the
@@ -180,7 +181,7 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
   - Nov 15, 08:56-10:35: uploads with their own call graph, tests that re-run every recorded run, the MCP
     connector and `llms.txt`.
   - Nov 15, 10:47-12:31: the public benchmark of real outages, the split frozen at 11:09 before any live call.
-  - Nov 15, 12:40-13:45: the real-outage result leads the README, the story page and the console's evidence.
+  - Nov 15, 13:01-13:42: two open-weights models behind the same gate; the real-outage result leads the README, the story page and the console's evidence.
   - Nov 15, 13:49-14:17: security headers and policy, a 404 page, the API reference, browser checks in CI;
     Sherlog on 30 real outages of a real multi-process system, with real rollbacks.
   - Nov 15, 14:40-15:43: the 2:48 demo video; the MCP investigator, with a real model investigating outage 41
@@ -221,8 +222,8 @@ rule's pick would answer 39, also never wrong, so the gate itself needs no AI.
 - 92% of 252 real outages ranked first, ahead of the best published methods on the same cases (80-81%), for a
   median $0.0024 an outage, with every number recomputable from the committed runs.
 - An agent that shows its work: every claim links to a tool call you can open, and plain code checks each citation.
-- A check a decoy cannot fool in the simulator: over the recorded runs, the rollback replay caught every
-  wrong hard-mode answer and rejected no right one, and those 7 wrong answers replay in the console.
+- A check a decoy cannot fool in the simulator: over the recorded Claude runs, the rollback replay caught all
+  7 wrong hard-mode answers and rejected none of the 83 right ones, and those 7 replay in the console.
 - Opus-level accuracy for $0.0015 an outage on normal outages, by letting Haiku go first and checking its answer.
 - A benchmark with three no-AI baselines, three models, ablations, a hard mode, intervals and a significance
   test: one command recomputes every table from the recorded runs, and 183 recorded investigations replay
