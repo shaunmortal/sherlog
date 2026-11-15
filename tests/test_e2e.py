@@ -165,6 +165,12 @@ def test_triaging_an_upload_with_its_own_call_graph_draws_its_services_until_a_r
     page.locator("#startHere button").first.click()
     sync_api.expect(page.locator("#map .node")).to_have_count(11)
     sync_api.expect(page.locator("#metaSystem")).to_have_text("Simulated shop · 11 services")
+    # an upload on the shop's own 11 names is still an upload
+    page.locator("#tab-data").click()
+    page.locator("#sampleUse").click()
+    page.locator("#triageBtn").click()
+    sync_api.expect(page.locator("#status")).to_contain_text("Triage done.")
+    sync_api.expect(page.locator("#metaSystem")).to_have_text("Your upload · 11 services")
     assert errors == []
 
 

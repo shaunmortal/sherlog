@@ -636,7 +636,8 @@ function shopGraph() {
 }
 
 /** The graph an incident document brings in `calls`, else the shop's. Only for a document the server accepted. */
-const graphOf = (doc) => (doc.calls ? { services: Object.keys(doc.calls), calls: doc.calls, ...layout(doc.calls), own: true } : shopGraph());
+// `own`: the data is an upload (with its own graph, or on the shop's 11 names)
+const graphOf = (doc) => (doc.calls ? { services: Object.keys(doc.calls), calls: doc.calls, ...layout(doc.calls), own: true } : { ...shopGraph(), own: true });
 
 /** Callers above the services they call: a row for each depth, the longest chain of callers above a service (a cycle
     stops deepening at one row per service), and wide rows wrapped. */
@@ -662,6 +663,8 @@ function layout(calls) {
 
 /** Put these services on screen: new telemetry rows and a new map, unless they are the ones already there. */
 function useGraph(next) {
+  // the label follows where the data came from, even when the graph on screen stays the same
+  $('#metaSystem').textContent = `${next.own ? 'Your upload' : 'Simulated shop'} · ${next.services.length} services`;
   if (graph && JSON.stringify([graph.services, graph.calls]) === JSON.stringify([next.services, next.calls])) return;
   graph = next;
   ++playId;  // a playback still running would draw the other services
@@ -672,7 +675,6 @@ function useGraph(next) {
   buildTelemetry();
   drawMap();
   placeInks();
-  $('#metaSystem').textContent = `${next.own ? 'Your upload' : 'Simulated shop'} · ${next.services.length} services`;
   if (!state.running) setAgent(watching());
 }
 
