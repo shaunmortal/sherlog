@@ -200,7 +200,7 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-c
 
 **Evaluate it in 5 minutes** (no key needed):
 
-1. The video (2:31).
+1. The video (2:39).
 2. https://sherlog-jade.vercel.app/console#replay/41 : the z-score ranking blames cart; the agent names cache,
    citing the tool calls that show it, and rolling cache back clears all four broken services.
 3. https://sherlog-jade.vercel.app/console#replay/177 (C1): a confident wrong answer the rollback stopped.
@@ -222,7 +222,7 @@ javascript, canvas, svg, three.js, server-sent-events, pytest, playwright, axe-c
 | 1:00-1:35 | Flight log streaming | "Now Claude investigates with read-only tools: metrics, logs, the call graph. You can see its reasoning. It notices cart's logs complain about slow calls *to* cache, and cache itself calls nothing, so cache is the cause." |
 | 1:35-2:05 | Verdict: verified badges, blast radius line, the rollback test line, ticket note, customer update | "Every suspect cites the tool calls that prove it, and plain code checks each citation. Then Sherlog replays the outage with cache rolled back: the alarm stops, and cart, frontend and checkout recover. Anything that doesn't hold up goes to a human. It even writes the ticket note and the customer update." |
 | 2:05-2:20 | Scoreboard: You ✗, Agent ✓, z-score ✗ | "I was wrong, and so was the classic no-AI method. The agent was right." |
-| 2:20-2:50 | EVIDENCE tab: both tables | "On 132 outages the agent was right every time, against 83% for the no-AI ranking. Letting cheap Haiku go first and Opus only when Haiku's answer doesn't hold gets the same result for a median $0.0015. And in hard mode, with a decoy, Opus never gave a wrong answer, and the rollback replay would have caught every wrong answer the cheaper models gave." |
+| 2:20-2:50 | EVIDENCE tab: both tables | "On 132 outages the agent was right every time, against 83% for the no-AI z-score ranking and 99% for a no-AI call-graph rule. In hard mode, with a decoy, the rule falls to 91% with 4 wrong answers. Letting cheap Haiku go first and Opus only when Haiku's answer doesn't hold gets the same result for a median $0.0015. And in hard mode, with a decoy, Opus never gave a wrong answer, and the rollback replay would have caught every wrong answer the cheaper models gave." |
 | 2:50-3:00 | LIVE tab: Who investigates + Hard mode | "Built with Claude and Claude Code. Pick your investigator, switch on hard mode, and break something." |
 
 Recording tips: if the live API is slow, use the REPLAY tab: **#41** is the cache latency outage in the

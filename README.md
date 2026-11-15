@@ -16,7 +16,7 @@
   <a href="https://sherlog-jade.vercel.app/status"><img src="https://img.shields.io/badge/Status-health_and_version-0c0d12?style=for-the-badge&amp;labelColor=2b2e3a" alt="The status page" height="36"></a>
 </p>
 
-Demo video: VIDEO_URL (2:31)
+Demo video: VIDEO_URL (2:39)
 
 Built during IceHacks 2026.
 
@@ -34,8 +34,8 @@ Built during IceHacks 2026.
 
 | Minute | Open | What you should see |
 |---|---|---|
-| 0:00–2:31 | The demo video (link above) | The whole loop: an outage, a guess, the investigation, the checks and the rollback. |
-| 2:31–3:00 | [`/console#replay/41`](https://sherlog-jade.vercel.app/console#replay/41) | A recorded outage, free, in about 11 s. The z-score ranking blames `cart`; the agent names `cache`, 90% sure, citing calls `c0`, `c1` and `c3`, all verified; rolling `cache` back clears all four broken services. |
+| 0:00–2:40 | The demo video (link above) | The whole loop: an outage, a guess, the investigation, the checks, the rollback and the results against two no-AI rules. |
+| 2:40–3:00 | [`/console#replay/41`](https://sherlog-jade.vercel.app/console#replay/41) | A recorded outage, free, in about 11 s. The z-score ranking blames `cart`; the agent names `cache`, 90% sure, citing calls `c0`, `c1` and `c3`, all verified; rolling `cache` back clears all four broken services. |
 | 3:00–3:30 | [`/console#replay/177`](https://sherlog-jade.vercel.app/console#replay/177) (C1 in the Replay tab) | A confident wrong answer the rollback stopped. In hard mode the Haiku agent names `cart`, the decoy, 85% sure, with its citations verified, so it goes out; rolling `cart` back leaves `frontend` abnormal and the alarm on, so the rollback does not prove it. |
 | 3:30–4:00 | [Your data](https://sherlog-jade.vercel.app/console#data) → **Use the sample** → **Triage (no AI)** | No key needed. The alarm, the z-score ranking (`cart` first), the robust z-score (`cache` first) and the blast-radius check, which says `cache` would explain more of the outage than `cart`. |
 | 4:00–5:00 | A clone of this repository, no key | `pytest -q`: 174 passed and 1 skipped (the browser checks, which need a running server), in about 17 s. `python bench.py --report`: every results table and a fresh [`runs/evidence.json`](runs/evidence.json) from the recorded runs, with no API calls, in about 14 s. |
@@ -338,6 +338,7 @@ A dated log from what the repository shows: local file timestamps and `git log -
 | Nov 15, 02:21–02:45 | The rollback-as-gate what-if; the rollback shown on the story page and in the console; the Your data tab. |
 | Nov 15, 03:16–04:58 | The docs lead with what is new; fixes to triage, upload errors, keyboard focus and touch targets; corrected test counts and claims; CI actions upgraded. |
 | Nov 15, 05:54–06:19 | The no-AI call-graph rule; replays of the wrong answers the rollback caught; `HEAD` answers, the `/docs` reference, pinned dependencies, the link preview image and the uptime check; the console's first screen leads with replay #41 and hard mode, the story page's hero links to replay #41, and both label each check precisely. |
+| Nov 15, 07:10–08:50 | Review fixes: focus after the replay and jump buttons, precise check wording, the story page's headline set against the call-graph rule, the one outage where the rollback missed the true cause; the demo video's results now show both no-AI rules. |
 
 ## Built with
 
