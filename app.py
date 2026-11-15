@@ -23,7 +23,6 @@ import anthropic
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -79,16 +78,16 @@ app = FastAPI(title="Sherlog API", version=_version(), docs_url=None, redoc_url=
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 # --- headers on every response: a content security policy and the usual hardening ----------------------------------
-# Scripts and stylesheets load only from this server, the CDN (three.js on the story page, Swagger UI on /docs) and
-# the font host. Each page's inline <script>, import map and <style> is allowed by its hash, read from the page at
-# start-up, so editing a page cannot leave its own code blocked. No 'unsafe-inline' anywhere: the pages set their
-# dynamic styles through the DOM, never through style="" attributes.
-CDN = "https://cdn.jsdelivr.net"
+# Scripts and stylesheets load only from this server, the font host and two folders on the CDN: one exact version of
+# three.js (the story page's 3D shop) and of Swagger UI (/docs), each file pinned in the page with its integrity
+# hash. Each page's inline <script>, import map and <style> is allowed by its hash, read from the page at start-up,
+# so editing a page cannot leave its own code blocked. No 'unsafe-inline' anywhere: the pages set their dynamic
+# styles through the DOM, never through style="" attributes.
+THREE = "https://cdn.jsdelivr.net/npm/three@0.160.0/"
+SWAGGER_UI = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.34.1/"
 FONT_CSS, FONT_FILES = "https://fonts.googleapis.com", "https://fonts.gstatic.com"
-PAGES = ("landing.html", "index.html", "status.html", "reference.html", "404.html")
+PAGES = ("landing.html", "index.html", "status.html", "reference.html", "404.html", "swagger.html")
 INLINE_CODE = re.compile(r'<(script|style)(?: type="importmap")?>(.*?)</\1>', re.S)
-SWAGGER_PAGE = get_swagger_ui_html(openapi_url=app.openapi_url, title=f"{app.title} · Swagger UI",
-                                   swagger_favicon_url="/static/favicon.svg").body.decode()
 
 
 def _inline_hashes(pages: list[str]) -> dict[str, str]:
@@ -100,11 +99,11 @@ def _inline_hashes(pages: list[str]) -> dict[str, str]:
     return {tag: " ".join(sorted(hashes)) for tag, hashes in found.items()}
 
 
-_HASHES = _inline_hashes([*((STATIC / name).read_text(encoding="utf-8") for name in PAGES), SWAGGER_PAGE])
+_HASHES = _inline_hashes([(STATIC / name).read_text(encoding="utf-8") for name in PAGES])
 CSP = "; ".join([
     "default-src 'self'",
-    f"script-src 'self' {CDN} {_HASHES['script']}",
-    f"style-src 'self' {FONT_CSS} {CDN} {_HASHES['style']}",
+    f"script-src 'self' {THREE} {SWAGGER_UI} {_HASHES['script']}",
+    f"style-src 'self' {FONT_CSS} {SWAGGER_UI} {_HASHES['style']}",
     f"font-src {FONT_FILES}",
     "img-src 'self' data:",
     "connect-src 'self'",
@@ -373,9 +372,9 @@ def api_reference() -> HTMLResponse:
 
 
 @app.get("/docs", include_in_schema=False)
-def swagger_ui() -> HTMLResponse:
-    """Swagger UI, for developers who want to try each route."""
-    return HTMLResponse(SWAGGER_PAGE)
+def swagger_ui() -> FileResponse:
+    """Swagger UI, for developers who want to try each route: our own page around it, so it passes WCAG 2.2 AA."""
+    return FileResponse(STATIC / "swagger.html")
 
 
 # what crawlers and security researchers look for at the site's root

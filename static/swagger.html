@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sherlog API · Swagger UI</title>
+<meta name="description" content="Try every route of the Sherlog API in the browser.">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<!-- Swagger UI at an exact version, each file checked against its hash; swagger.css on top makes it pass WCAG 2.2 AA -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.34.1/swagger-ui.css" integrity="sha384-4c3vsE5f+trhFyHrFrLM1fFGUn531NIaC7dcqEWIJdoRQJ5CkJbSuSCwXLpaS1KF" crossorigin="anonymous">
+<link rel="stylesheet" href="/static/swagger.css">
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="/">SHERLOG</a>
+  <nav aria-label="Pages"><a href="/reference">API reference</a></nav>
+</header>
+<div id="swagger-ui"></div>
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.34.1/swagger-ui-bundle.js" integrity="sha384-XFYN47VzPiDY6qPtxYKg0nqUeW/upo20xf1j2SUE7gT/i35FJB4cuS/71Iegzk8Z" crossorigin="anonymous"></script>
+<script>
+// Swagger UI puts the routes in its own <main>, after the API's name and version; these wrappers give that intro a
+// landmark of its own and the routes an h2, so every heading level follows the one before it
+function landmarks({ React }) {
+  const h = React.createElement;
+  return {
+    wrapComponents: {
+      InfoContainer: (Info) => (props) => h('section', { 'aria-label': 'About the API' }, h(Info, props)),
+      operations: (Operations) => (props) => h(React.Fragment, null, h('h2', { className: 'sr-only' }, 'Routes'), h(Operations, props)),
+    },
+  };
+}
+// deepLinking off: its links sit inside each route's toggle button, a link in a button. No validator badge: an image
+// from another host, which the content security policy would block. No syntax colours: several read below 4.5:1 on
+// their dark background, and a big answer, such as the sample incident, renders far faster as plain text
+SwaggerUIBundle({
+  url: '/openapi.json',
+  dom_id: '#swagger-ui',
+  layout: 'BaseLayout',
+  deepLinking: false,
+  validatorUrl: null,
+  syntaxHighlight: false,
+  showExtensions: true,
+  showCommonExtensions: true,
+  presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+  plugins: [landmarks],
+});
+// as an opened route draws them: its responses region is named after the route, so two open routes' regions differ;
+// a long answer scrolls in its box, so the box takes keyboard focus; a parameter's choice list is named after its
+// parameter, and the request body after what it is
+new MutationObserver(() => {
+  for (const table of document.querySelectorAll('.responses-table[role="region"]:not([aria-label])')) {
+    const route = table.closest('.opblock');
+    const method = route.querySelector('.opblock-summary-method').textContent;
+    table.setAttribute('aria-label', `Responses of ${method} ${route.querySelector('[data-path]').dataset.path}`);
+  }
+  for (const pre of document.querySelectorAll('.highlight-code > pre:not([tabindex])')) pre.tabIndex = 0;
+  for (const field of document.querySelectorAll('tr[data-param-name] :is(select, input, textarea):not([aria-label])')) {
+    field.setAttribute('aria-label', field.closest('tr').dataset.paramName);
+  }
+  for (const body of document.querySelectorAll('textarea.body-param__text:not([aria-label])')) {
+    body.setAttribute('aria-label', 'Request body');
+  }
+}).observe(document.getElementById('swagger-ui'), { childList: true, subtree: true });
+</script>
+</body>
+</html>

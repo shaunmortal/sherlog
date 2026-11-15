@@ -262,6 +262,33 @@ def test_every_page_runs_under_the_content_security_policy(page, errors, path, r
     assert page.evaluate("window.__blocked") == [] and errors == []
 
 
+THREE = "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js"
+
+
+def test_a_cdn_file_that_does_not_match_its_hash_never_runs(page, errors):
+    # the CDN serves something else under the pinned name: the browser refuses it, and the story page falls back to
+    # its flat map of the shop
+    page.route(THREE, lambda route: route.fulfill(body="window.tampered = true; export const REVISION = '0';",
+                                                  content_type="text/javascript",
+                                                  headers={"access-control-allow-origin": "*"}))
+    page.goto(f"{URL}/")
+    page.locator("#hero3d.flat svg").wait_for()
+    assert page.evaluate("window.tampered") is None
+    assert any("integrity" in e for e in errors), errors
+
+
+def test_swagger_ui_still_tries_a_route(page, errors):
+    page.add_init_script(VIOLATIONS)
+    page.goto(f"{URL}/docs")
+    route = page.locator(".opblock", has=page.locator("[data-path='/api/health']"))
+    route.locator(".opblock-summary-control").click()
+    route.get_by_role("button", name="Try it out").click()
+    route.get_by_role("button", name="Execute").click()
+    sync_api.expect(route.locator(".live-responses-table .response .response-col_status")).to_have_text("200")
+    sync_api.expect(route.locator(".live-responses-table")).to_contain_text('"recorded_outages"')
+    assert page.evaluate("window.__blocked") == [] and errors == []
+
+
 def test_the_policy_blocks_an_inline_script_the_page_did_not_ship(page):
     page.add_init_script(VIOLATIONS)
     page.goto(f"{URL}/status")
@@ -320,7 +347,7 @@ SETTLED = """() => Promise.allSettled(document.getAnimations()
 
 @pytest.mark.parametrize("scheme", ["light", "dark"])
 @pytest.mark.parametrize("size", AXE_SIZES)
-@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/no-such-page"])
+@pytest.mark.parametrize("path", ["/", "/console", "/status", "/reference", "/no-such-page", "/docs"])
 def test_axe_finds_no_accessibility_violations(browser, path, size, scheme):
     # the policy would block axe's injected script, so this context bypasses it; the checks above run with it on
     context = browser.new_context(viewport=AXE_SIZES[size], color_scheme=scheme, bypass_csp=True)
@@ -329,6 +356,25 @@ def test_axe_finds_no_accessibility_violations(browser, path, size, scheme):
     page.wait_for_timeout(PAST_REVEAL_FALLBACK_MS)  # every section revealed, the data loaded
     if path == "/":
         page.locator("#cards.ready").wait_for()  # the guess cards light up one by one after their section shows
+    page.evaluate(SETTLED)
+    page.add_script_tag(url=AXE_URL)
+    result = page.evaluate("(tags) => axe.run(document, { runOnly: { type: 'tag', values: tags } })", AXE_TAGS)
+    context.close()
+    assert [(v["id"], len(v["nodes"])) for v in result["violations"]] == []
+
+
+@pytest.mark.parametrize("size", AXE_SIZES)
+def test_axe_finds_no_violations_in_swagger_ui_after_trying_a_route(browser, size):
+    # what Try it out adds: the parameter fields, the request body, the answer and its scrolling box
+    context = browser.new_context(viewport=AXE_SIZES[size], bypass_csp=True)
+    page = context.new_page()
+    page.goto(f"{URL}/docs")
+    for path in ("/api/sample-incident", "/api/triage"):  # a query parameter's choice list; a JSON request body
+        route = page.locator(".opblock", has=page.locator(f"[data-path='{path}']"))
+        route.locator(".opblock-summary-control").click()
+        route.get_by_role("button", name="Try it out").click()
+        route.get_by_role("button", name="Execute").click()
+        route.locator(".live-responses-table .response-col_status").first.wait_for()
     page.evaluate(SETTLED)
     page.add_script_tag(url=AXE_URL)
     result = page.evaluate("(tags) => axe.run(document, { runOnly: { type: 'tag', values: tags } })", AXE_TAGS)
