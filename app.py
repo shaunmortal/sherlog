@@ -43,8 +43,27 @@ SHORT_SHA = 7
 # of errors, too many for the console's alert line to read out; `errors` still lists every one for a script
 SHOWN_PROBLEMS = 3
 
+
+def _git_version() -> str:
+    """The checked-out commit, read once at start-up. Deploys carry no .git, so they report their sha from the env."""
+    try:
+        done = subprocess.run(["git", "rev-parse", f"--short={SHORT_SHA}", "HEAD"], cwd=STATIC.parent,
+                              capture_output=True, text=True, timeout=2, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return "dev"
+    return done.stdout.strip() or "dev"
+
+
+GIT_VERSION = _git_version()
+
+
+def _version() -> str:
+    """The deployed commit's short sha, else the checked-out one."""
+    return os.environ.get("VERCEL_GIT_COMMIT_SHA", "")[:SHORT_SHA] or GIT_VERSION
+
+
 log = logging.getLogger("sherlog")
-app = FastAPI(title="Sherlog")
+app = FastAPI(title="Sherlog API", version=_version())
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 # ponytail: in-memory limits are per server instance; move to Redis if the app runs on many instances.
@@ -62,19 +81,6 @@ class BreakRequest(BaseModel):
 
 def _live_enabled() -> bool:
     return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
-
-
-def _git_version() -> str:
-    """The checked-out commit, read once at start-up. Deploys carry no .git, so they report their sha from the env."""
-    try:
-        done = subprocess.run(["git", "rev-parse", f"--short={SHORT_SHA}", "HEAD"], cwd=STATIC.parent,
-                              capture_output=True, text=True, timeout=2, check=True)
-    except (OSError, subprocess.SubprocessError):
-        return "dev"
-    return done.stdout.strip() or "dev"
-
-
-GIT_VERSION = _git_version()
 
 
 def _client_ip(request: Request) -> str:
@@ -105,16 +111,31 @@ def _take_live_slot(ip: str) -> str | None:
 
 
 REPLAY_VARIANTS = ("agent", "hard-agent")  # the Opus agent's recorded runs, normal then hard mode
+# then the cheaper models' hard-mode runs that answered wrong and that the rollback replay caught, so a visitor
+# can watch the check fail an answer, not only pass one
+CAUGHT_VARIANTS = ("hard-haiku", "hard-sonnet")
 
 
 def _replays() -> list[dict]:
-    paths = [bench.runs_path(v) for v in REPLAY_VARIANTS]
+    paths = [bench.runs_path(v) for v in (*REPLAY_VARIANTS, *CAUGHT_VARIANTS)]
     return _load_replays(tuple(p.stat().st_mtime if p.exists() else 0.0 for p in paths))
+
+
+def _caught(record: dict) -> bool:
+    """The answer went out, named the wrong service, and rolling it back did not end the outage."""
+    answer = record["truth"]["ai_answer"]
+    return bool(answer) and answer != record["root"] and not bench.rollback_proves(
+        record["root"], record["fault"], record["seed"], record.get("hard", False), answer)
 
 
 @lru_cache(maxsize=1)
 def _load_replays(mtimes: tuple) -> list[dict]:
-    return [r for v in REPLAY_VARIANTS for r in bench.load(bench.runs_path(v))]
+    """Each recorded run with whether it is a caught wrong answer. The caught ones come after every Opus run, so
+    adding them renumbers nothing."""
+    opus = [{"record": r, "caught": False} for v in REPLAY_VARIANTS for r in bench.load(bench.runs_path(v))]
+    caught = [{"record": r, "caught": True} for v in CAUGHT_VARIANTS for r in bench.load(bench.runs_path(v))
+              if _caught(r)]
+    return [*opus, *caught]
 
 
 def _live_runs_today() -> int:
@@ -181,23 +202,31 @@ def bad_input(request: Request, exc: RequestValidationError) -> JSONResponse:
     return JSONResponse({"detail": f"Bad input. {problems}{more}", "errors": errors}, status_code=422)
 
 
+# every page and the health check also answer HEAD: uptime monitors send it, and a GET-only route answers 405.
+# HEAD stays out of /docs, where it would only repeat the GET.
 @app.get("/")
+@app.head("/", include_in_schema=False)
 def story() -> FileResponse:
     """The story page: what Sherlog does, told with a recorded outage and the benchmark."""
     return FileResponse(STATIC / "landing.html")
 
 
 @app.get("/console")
+@app.head("/console", include_in_schema=False)
 def console() -> FileResponse:
+    """The console: break a service, replay a recorded outage, read the evidence or upload your own."""
     return FileResponse(STATIC / "index.html")
 
 
 @app.get("/status")
+@app.head("/status", include_in_schema=False)
 def status() -> FileResponse:
+    """The status page: live mode, replays, today's live runs and the deployed version."""
     return FileResponse(STATIC / "status.html")
 
 
 @app.get("/api/health")
+@app.head("/api/health", include_in_schema=False)
 def health() -> dict:
     """What the status page shows. Local and fast: no API calls, no secrets."""
     recorded = len(_replays())
@@ -210,12 +239,13 @@ def health() -> dict:
         "live_runs_per_day": LIVE_RUNS_PER_DAY,
         "live_runs_per_visitor_per_hour": LIVE_RUNS_PER_IP_PER_HOUR,
         "server_time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "version": os.environ.get("VERCEL_GIT_COMMIT_SHA", "")[:SHORT_SHA] or GIT_VERSION,
+        "version": _version(),
     }
 
 
 @app.get("/api/meta")
 def meta() -> dict:
+    """The shop's services, call graph, faults and metrics, the models, the benchmark tables and a healthy loop."""
     return {
         "services": sim.SERVICES,
         "calls": sim.CALLS,
@@ -234,6 +264,7 @@ def meta() -> dict:
 
 @app.post("/api/break")
 def break_service(body: BreakRequest, request: Request) -> StreamingResponse:
+    """Break a service in a freshly simulated shop and stream the investigation as server-sent events."""
     if not _live_enabled():
         raise HTTPException(503, "Live mode is off on this server. Try a recorded outage.")
     refusal = _take_live_slot(_client_ip(request))
@@ -251,16 +282,20 @@ def break_service(body: BreakRequest, request: Request) -> StreamingResponse:
 
 @app.get("/api/replays")
 def replays() -> list[dict]:
-    # numbered, not named: a name like "cache-latency-1040" would give away the culprit
-    return [{"id": number, "hard": bool(r.get("hard"))} for number, r in enumerate(_replays(), 1)]
+    """The recorded outages that replay for free: the Opus agent's runs, then the wrong answers the rollback caught."""
+    # numbered, not named: a name like "cache-latency-1040" would give away the culprit. The earliest runs predate
+    # the model field; they ran on the default, Opus, as bench.summarize assumes too
+    return [{"id": number, "hard": bool(r["record"].get("hard")), "caught": r["caught"],
+             "model": r["record"].get("model", bench.OPUS)} for number, r in enumerate(_replays(), 1)]
 
 
 @app.get("/api/replays/{number}")
 def replay(number: int) -> list[dict]:
+    """One recorded outage's events, as a live run streams them, with its answer's blast radius and rollback."""
     records = _replays()
     if not 1 <= number <= len(records):
         raise HTTPException(404, "No recorded outage with that number.")
-    record = records[number - 1]
+    record = records[number - 1]["record"]
     # outages are deterministic from their seed, so the ticks after the cut-off can be re-simulated
     incident = sim.simulate(record["root"], record["fault"], record["seed"], record.get("hard", False))
     return list(_enrich(iter(record["events"]), incident))
