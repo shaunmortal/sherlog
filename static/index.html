@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sherlog console</title>
 <meta name="description" content="Break a service in a simulated shop, guess the culprit, and watch an AI agent find it and prove it.">
+<meta property="og:title" content="Sherlog: an AI on-call investigator that has to prove its answer">
+<meta property="og:description" content="Break a service in a simulated shop, guess the culprit, and watch an AI agent find it and prove it.">
+<meta property="og:image" content="https://sherlog-jade.vercel.app/static/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='13' cy='13' r='8' fill='none' stroke='%231a2ffb' stroke-width='3.5'/><path d='M19 19l8 8' stroke='%231a2ffb' stroke-width='4' stroke-linecap='square'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -60,6 +64,10 @@
     .views [role="tab"]:first-child { border-left: 0; }
     .views button, .views .theme { padding: 0 8px; }  /* four tabs and the theme button share one phone-wide row */
   }
+  @media (max-width: 420px) {
+    .wide { display: none; }  /* "YOUR DATA" would wrap: it reads "DATA" */
+    .views .theme { min-width: 44px; }  /* a whole touch target */
+  }
   .pad { padding: 20px 22px; }
   .label { margin: 0 0 12px; font: 500 12px var(--sans); letter-spacing: .11em; text-transform: uppercase; color: var(--muted); }
   .sub { margin: 18px 0 8px; font: 500 12px var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
@@ -83,10 +91,20 @@
   .act:hover:not(:disabled) { color: var(--on-ink); }
   .act:active:not(:disabled) { transform: scale(.98); }
   .act.ghost { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+  /* beside the shop the Break button sits below the fold of a laptop, so it waits at the bottom of the screen on a
+     band of page colour; the scroll padding keeps a focused choice from hiding behind it */
+  .go-bar { display: flow-root; }
+  @media (min-width: 761px) {
+    .go-bar:has(#go:not(:disabled)) { position: sticky; bottom: 0; z-index: 1; margin: 0 -22px; padding: 0 22px 16px; background: linear-gradient(transparent, var(--bg) 18px); }
+    html { scroll-padding-bottom: 84px; }
+  }
   .hint { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
   .status { margin: 0; padding: 14px 22px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); min-height: 1.5em; }
   .status:empty { padding: 0; border: 0; min-height: 0; }  /* stays in the page so screen readers hear its first message */
   .status.bad { color: var(--bad); } .status.ok { color: var(--ok); }
+  .picks { display: grid; gap: 6px; }
+  #allReplays { margin-top: 14px; }
+  #allReplays > summary { padding: 8px 0; font-size: 14px; }
 
   /* ---- left: your data ---- */
   .hint a, .foot a { color: inherit; text-underline-offset: 3px; }
@@ -128,7 +146,12 @@
   .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
   .live.on { color: var(--accent-text); } .live.on i { background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .25; } }
-  .head-l { display: flex; align-items: center; gap: 10px; }
+  .head-l { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }  /* a replay's longer badge wraps on a phone */
+  /* on a phone the verdict lands far below the charts; this pill jumps to it */
+  .jump { position: fixed; z-index: 10; bottom: 16px; left: 0; right: 0; width: max-content; margin: 0 auto; display: flex; align-items: center; min-height: 44px; padding: 0 20px;
+    border-radius: var(--pill); background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow); font: 500 13px var(--sans); letter-spacing: .03em; text-decoration: none; white-space: nowrap; }
+  .jump[hidden] { display: none; }
+  @media (min-width: 901px) { .jump { display: none; } }
   .pause { min-height: 28px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--pill); background: none; font: 600 11px var(--mono); letter-spacing: .1em; color: var(--muted); }
   .pause:hover { color: var(--text); }
   .pause[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--on-ink); }
@@ -186,6 +209,8 @@
   @keyframes scan { 0% { opacity: 1; } 12% { opacity: .25; } }
   .log { list-style: none; margin: 0; padding: 16px 22px; display: grid; gap: 10px; max-height: 62vh; overflow-y: auto; border-bottom: 1px solid var(--line); }
   .log .empty { font: 14px/1.6 var(--mono); }
+  .log .act { display: block; margin: 0 0 10px; height: auto; min-height: 52px; padding: 8px 28px; line-height: 1.3; }
+  .act small { display: block; font-size: 12px; letter-spacing: .06em; opacity: .85; }
   .log-item { border-left: 2px solid var(--line); padding: 2px 0 2px 10px; font-size: 14px; animation: rise .35s var(--ease-expo); }
   .log-item.tool { border-color: var(--text); }
   .log-item.thinking { border-color: transparent; color: var(--muted); font-style: italic; }
@@ -218,7 +243,8 @@
   .s-head::before { content: counter(rank); font: 600 12px var(--mono); color: var(--muted); }
   .s-name { font: 600 15px var(--mono); }
   .tag { font: 12px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: var(--pill); padding: 0 8px; }
-  .badge { margin-left: auto; font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 2px 9px; border-radius: var(--pill); }
+  .badge { font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; padding: 2px 9px; border-radius: var(--pill); }
+  .badges { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
   .badge.ok { background: var(--ok-soft); color: var(--ok); } .badge.bad { background: var(--bad-soft); color: var(--bad); }
   .bar { height: 3px; background: var(--line); margin: 8px 0 6px; }
   .bar span { display: block; height: 100%; background: var(--text); transform-origin: left; animation: grow .8s var(--ease-quint) backwards; animation-delay: calc(var(--i, 0) * 60ms + 120ms); }
@@ -257,6 +283,7 @@
 
   .foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0 24px; padding: 10px 22px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
   .foot a { display: inline-flex; align-items: center; min-height: 44px; }  /* a whole touch target, as in the story page's footer */
+  .foot nav { display: flex; flex-wrap: wrap; gap: 0 20px; }
 </style>
 </head>
 <body>
@@ -277,7 +304,7 @@
       <button type="button" role="tab" id="tab-live" aria-controls="breakPanel" data-view="live" aria-selected="true">LIVE</button>
       <button type="button" role="tab" id="tab-replay" aria-controls="replayPanel" data-view="replay" aria-selected="false" tabindex="-1">REPLAY</button>
       <button type="button" role="tab" id="tab-evidence" aria-controls="evidence" data-view="evidence" aria-selected="false" tabindex="-1">EVIDENCE</button>
-      <button type="button" role="tab" id="tab-data" aria-controls="dataPanel" data-view="data" aria-selected="false" tabindex="-1">YOUR DATA</button>
+      <button type="button" role="tab" id="tab-data" aria-controls="dataPanel" data-view="data" aria-selected="false" tabindex="-1"><span class="wide">YOUR </span>DATA</button>
     </div>
     <button type="button" class="theme" id="themeBtn" aria-label="Switch light or dark theme">◐</button>
     <span class="ink" aria-hidden="true"></span>
@@ -300,13 +327,16 @@
       <p class="desc" id="modelDesc" style="min-height:0"></p>
       <p class="sub">4 · Difficulty</p>
       <div class="grid" id="modeGrid" role="radiogroup" aria-label="Difficulty"></div>
-      <button type="button" class="act" id="go">Break it live</button>
+      <div class="go-bar"><button type="button" class="act" id="go">Break it live</button></div>
       <p class="hint">Claude investigates live, never told what you broke. Live runs are limited per visitor; replays are free.</p>
     </div>
     <div class="pad" id="replayPanel" role="tabpanel" aria-labelledby="tab-replay" hidden>
       <h2 class="label">Recorded outages</h2>
-      <p class="hint" style="margin:0 0 14px"><span id="replayCount">0</span> investigations recorded from the benchmark. The culprit stays hidden until the end, so you can still guess.</p>
-      <div class="grid four" id="replayGrid" role="group" aria-label="Recorded outages"></div>
+      <p class="hint" style="margin:0 0 14px"><span id="replayCount">0</span> recorded from the benchmark. The culprit stays hidden until the end, so you can still guess.</p>
+      <h3 class="sub" id="h-start">Start here</h3>
+      <div class="picks" id="startHere" role="group" aria-labelledby="h-start"></div>
+      <p class="hint" id="replayLegend">H = hard mode: a decoy anomaly at the same time.</p>
+      <details id="allReplays"><summary>Every recorded outage</summary><div id="replayGrid"></div></details>
       <button type="button" class="act ghost" id="randomReplay">Random outage</button>
     </div>
     <div class="pad" id="dataPanel" role="tabpanel" aria-labelledby="tab-data" hidden>
@@ -337,11 +367,11 @@
 
   <section class="col" id="middle" aria-label="The shop">
     <div class="stats">
-      <div class="stat"><p class="label">Agent · cause first</p><div class="big" id="statAgent">–</div><div class="small" id="statAgentSub">on recorded outages</div></div>
-      <div class="stat"><p class="label">No AI · z-score</p><div class="big" id="statBase">–</div><div class="small">ranking, same outages</div></div>
-      <div class="stat"><p class="label">Cost per outage</p><div class="big" id="statCost">–</div><div class="small">median, verified answer</div></div>
+      <div class="stat"><p class="label">Opus agent · cause first</p><div class="big" id="statAgent">–</div><div class="small" id="statAgentSub">on recorded outages</div></div>
+      <div class="stat"><p class="label">No AI · z-score</p><div class="big" id="statBase">–</div><div class="small" id="statBaseSub">ranking, same outages</div></div>
+      <div class="stat"><p class="label">Cost per outage</p><div class="big" id="statCost">–</div><div class="small" id="statCostSub">median</div></div>
     </div>
-    <p class="note">Benchmark on simulated telemetry, so the numbers are optimistic. Details under Evidence.</p>
+    <p class="note" id="statNote">Benchmark on simulated telemetry, so the numbers are optimistic. Details under Evidence.</p>
 
     <div class="head" id="teleHead">
       <div class="head-l">
@@ -351,6 +381,7 @@
       <div class="mtabs" id="metricTabs" role="group" aria-label="Metric shown"></div>
     </div>
     <div id="telemetry"><p class="empty" style="padding:0 22px 16px">Loading the shop's metrics…</p></div>
+    <a class="jump" id="jumpVerdict" href="#h-verdict" hidden>See the verdict <span aria-hidden="true">&nbsp;↓</span></a>
 
     <div class="head" id="mapHead"><h2 class="label">Who did it?</h2><p class="hint" id="guessHint">Click the service you suspect, here or on its telemetry row, before the agent answers.</p></div>
     <div class="map-wrap">
@@ -364,7 +395,7 @@
         <li><b>You pick a service and a fault</b>, and it goes into a simulated shop of 11 services. The charts above are its telemetry, played faster than real time.</li>
         <li><b>The alarm fires</b> when a metric stays 4σ above normal for 15 s. No AI is involved yet.</li>
         <li><b>Claude investigates</b> with read-only tools: metrics, logs and the call graph. Every tool call streams into the flight log.</li>
-        <li><b>A plain-code verifier checks every suspect's evidence.</b> The agent answers only when its top suspect is verified and confident; otherwise it escalates to a human.</li>
+        <li><b>A plain-code verifier checks every suspect's citations:</b> each cited tool call must really have shown that service abnormal, which a victim passes too. The agent answers only when its top suspect passes and is confident; otherwise it escalates to a human. Replaying the outage with the answer rolled back is the proof.</li>
         <li><b>The scoreboard</b> compares your guess, the agent and a no-AI z-score ranking.</li>
       </ol>
       <p>Or replay any recorded investigation for free, and see the numbers under Evidence.</p>
@@ -375,8 +406,10 @@
     <h2 class="label side-head" id="h-log">Flight log
       <span class="agent" id="agent" hidden><span class="dots" id="agentDots" aria-hidden="true"></span><span class="agent-label" id="agentLabel"></span></span>
     </h2>
-    <ol class="log" id="log" tabindex="0" aria-labelledby="h-log"><li class="empty">Nothing yet. Break a service or replay a recorded outage, and every tool call the agent makes will appear here.</li></ol>
-    <h2 class="label side-head">Verdict</h2>
+    <ol class="log" id="log" tabindex="0" aria-labelledby="h-log"><li class="empty">
+      <button type="button" class="act" id="replayStart">Replay outage #41 <small>(free, about 11 s)</small></button>
+      Every tool call the agent makes will appear here.</li></ol>
+    <h2 class="label side-head" id="h-verdict">Verdict</h2>
     <div id="verdict"><p class="empty">The ranked suspects appear here once the agent finishes.</p></div>
   </section>
 </div>
@@ -401,7 +434,7 @@
 
 <footer class="foot">
   <span>Built from scratch for IceHacks 2026.</span>
-  <a href="/status">Status: live mode, recorded outages, version</a>
+  <nav aria-label="Pages"><a href="/status">Status: live mode, recorded outages, version</a><a href="/docs">API</a><a href="https://github.com/shaunmortal/sherlog">Code</a></nav>
 </footer>
 
 <div id="tip" aria-hidden="true" hidden></div>
@@ -424,6 +457,10 @@ const ANNOUNCE_KEEP = 3;           // the hidden announcer keeps only its latest
 const TRIAGE_TOP = 5;              // the triage shows as many suspects as the agent may name
 const LEVEL_WORD = { ok: 'normal', warn: 'degraded', bad: 'failing' };
 const ARROWS = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+const PHONE = matchMedia('(max-width: 900px)');  // the charts, the controls and the verdict no longer share one screen
+// the replays to start with (the flight log's first-screen button names #41 too):
+const REPLAY_START = 41;   // the classic ranking blames cart, a victim; the agent names cache, and rolling it back clears all four
+const REPLAY_DECOY = 157;  // H25: the classic ranking blames currency, the decoy; the agent ranks cart first but, 72% sure, hands over
 const UNIT = {
   latency_ms: (v) => `${Math.round(v)} ms`, error_rate: (v) => `${(v * 100).toFixed(1)}%`,
   cpu_pct: (v) => `${Math.round(v)}%`, memory_mb: (v) => `${Math.round(v)} MB`,
@@ -440,7 +477,8 @@ const MODEL_HINT = {
   haiku: 'Claude Haiku 5.5 investigates: the fastest and cheapest model.',
 };
 const MODEL_VARIANT = { auto: 'auto', opus: 'agent', sonnet: 'sonnet', haiku: 'haiku' };  // benchmark run of each choice
-let replayIds = [];
+let replays = new Map();           // recorded outage id -> { label, model }; the model once the server names it
+let recorded = null;               // the recorded run the charts show ({ label, model }), or null for the live shop
 let teleRows = {};                 // service -> its telemetry row's DOM nodes
 let view = { metric: 'latency_ms', picked: false };  // picked: the viewer chose the metric themselves
 let frame = null;                  // what the charts show: the recording, its playhead t and the tick domain
@@ -485,6 +523,24 @@ function arrowKeys(container, items, keys = ARROWS) {
   };
 }
 
+/** A grid of chips as one tab stop: the arrow keys only move focus (up and down by a row), Home and End jump to
+    the ends, and Enter or Space plays, so walking past 132 outages starts none of them. */
+function roveGrid(grid) {
+  const chips = [...grid.children];
+  const stop = (to) => chips.forEach((c, k) => { c.tabIndex = k === to ? 0 : -1; });
+  stop(0);
+  grid.onkeydown = (e) => {
+    const i = chips.indexOf(e.target), n = chips.length;
+    const row = getComputedStyle(grid).gridTemplateColumns.split(' ').length;  // read when laid out: the list may open later
+    const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: row, ArrowUp: -row }[e.key];
+    const to = { Home: 0, End: n - 1 }[e.key] ?? (step ? Math.min(n - 1, Math.max(0, i + step)) : null);
+    if (i < 0 || to === null) return;
+    e.preventDefault();
+    stop(to);
+    chips[to].focus();
+  };
+}
+
 // ---- motion ---------------------------------------------------------------------------
 
 /** Slide a tab bar's indicator under its active button. */
@@ -526,8 +582,9 @@ function showView(name) {
   $('#dataPanel').hidden = name !== 'data';
   $('#console').hidden = name === 'evidence';
   $('#evidence').hidden = name !== 'evidence';
+  if (name === 'live' && META && !state.running) onScreen(null);  // back to choosing a live run, unless a replay still plays
   placeInks();
-  const cells = { live: '#breakPanel .cell', replay: '#replayGrid .cell', data: '#dataPanel .cell' }[name];
+  const cells = { live: '#breakPanel .cell', replay: '#replayPanel .cell', data: '#dataPanel .cell' }[name];
   if (name === 'evidence') return;  // its blocks reveal as they scroll into view
   if (fromEvidence) enter(document.querySelectorAll('#console > .col'), { duration: 500, y: 0 });
   enter(document.querySelectorAll(cells), { duration: 420, stagger: name === 'replay' ? 2 : 6, easing: 'quad', y: 0, scale: .4 });
@@ -824,7 +881,16 @@ function setLive(on) {
   playing = on;
   $('#live').classList.toggle('on', on && !still);
   $('#live').hidden = !on && !still;  // a finished recording or a still upload is not paused: the viewer never pressed Pause
-  $('#liveText').textContent = on && !still ? 'LIVE' : 'PAUSED';
+  $('#liveText').textContent = !on || still ? 'PAUSED' : recorded ? `REPLAY ${recorded.label} · recorded` : 'LIVE';
+}
+
+/** The header and the telemetry badge say what the charts show: a recorded run and the model that ran it, or the live shop. */
+function onScreen(source) {
+  recorded = source;
+  const picked = pick.model === 'auto' ? `${META.models.haiku} → ${META.models.opus}` : META.models[pick.model];
+  $('#metaModel').textContent = recorded?.model ?? picked;
+  $('#metaMode').textContent = recorded ? 'replay' : META.live ? 'live' : 'replays only';
+  setLive(playing);
 }
 
 /** Pause or resume everything that moves on its own: the charts' clock and the looping animations. */
@@ -915,19 +981,23 @@ function renderVerdict(v) {
   state = { ...state, verdictShown: true, ai: v.answer };
   drawMap();
   const top = v.causes[0];
+  // the citation check shows each cited call saw the service abnormal, which a victim passes too; the rollback is the proof
   const banner = v.answer
     ? el('div', { class: 'banner ok' }, el('strong', {}, `Root cause: ${v.answer}`),
-        el('span', {}, ` · ${top.fault_type} · ${pct(top.confidence)} confident · evidence verified`))
+        el('span', {}, ` · ${top.fault_type} · ${pct(top.confidence)} confident · citations verified`))
     : el('div', { class: 'banner warn' }, el('strong', {}, 'Escalated to a human'), el('span', {}, ` · ${v.escalation}`));
+  const victims = new Set(v.answer ? (v.blast?.explained ?? []).filter((s) => s !== v.answer) : []);
 
   const suspects = el('ol', { class: 'suspects', 'aria-label': 'Ranked suspects' }, v.causes.map((c, i) =>
     el('li', { class: c.verified ? 'verified' : 'rejected' },
       el('div', { class: 's-head' },
         el('span', { class: 's-name' }, c.service), el('span', { class: 'tag' }, c.fault_type),
-        el('span', { class: `badge ${c.verified ? 'ok' : 'bad'}` }, c.verified ? 'verified' : 'rejected')),
+        victims.has(c.service) && el('span', { class: 'tag' }, `victim of ${v.answer}`),
+        el('span', { class: 'badges' }, el('span', { class: `badge ${c.verified ? 'ok' : 'bad'}` }, c.verified ? 'citations OK' : 'rejected'),
+          c.service === v.answer && rollbackBadge(v.rollback))),
       el('div', { class: 'bar', role: 'img', 'aria-label': `confidence ${pct(c.confidence)}` }, el('span', { style: `width:${pct(c.confidence)};--i:${i}` })),
       el('p', { class: 's-reason' }, c.reason),
-      el('p', { class: 's-note' }, `Verifier: ${c.verify_note} · evidence ${c.evidence.join(', ') || 'none'}`))));
+      el('p', { class: 's-note' }, `Citation check: ${c.verify_note} · cites ${c.evidence.join(', ') || 'nothing'}`))));
 
   const notes = el('div', { class: 'notes' },
     noteCard('Ticket note · engineers', v.ticket_note),
@@ -938,10 +1008,24 @@ function renderVerdict(v) {
   const rollback = rollbackNote(v.rollback);
   $('#verdict').replaceChildren(banner, blastNote(v.blast) ?? '', rollback ?? '', v.causes.length ? suspects : el('p', { class: 'empty' }, 'No suspects were submitted.'), notes, usage ?? '');
   setAgent(watching());
-  announce(v.answer ? `Verdict: root cause ${v.answer}, ${top.fault_type}, ${pct(top.confidence)} confident, evidence verified.`
+  announce(v.answer ? `Verdict: root cause ${v.answer}, ${top.fault_type}, ${pct(top.confidence)} confident, citations verified.`
     : `Verdict: escalated to a human. ${v.escalation}`);
   if (rollback) announce(rollback.textContent);
   enter($('#verdict').querySelectorAll(':scope > :not(.suspects):not(.notes), .suspects > li, .notes > *'), { duration: 600, stagger: 50, easing: 'quint', y: 8 });
+  offerJump();
+}
+
+/** The answer's own result of the rollback replay, next to its citation badge. */
+function rollbackBadge(r) {
+  if (!r) return null;
+  return el('span', { class: `badge ${r.proves ? 'ok' : 'bad'}` }, r.proves ? 'rollback clears it' : 'rollback does not clear it');
+}
+
+/** On a phone the verdict lands far below the charts: a pill jumps to it, unless it is in view already. */
+function offerJump() {
+  const jump = $('#jumpVerdict');
+  jump.hidden = !PHONE.matches || $('#verdict').getBoundingClientRect().top < innerHeight;
+  if (!jump.hidden) enter([jump], { duration: 500, easing: 'spring', y: 12 });
 }
 
 /** The blast-radius check: does the answer explain every service that looks broken? `head` says whose answer it is. */
@@ -1042,9 +1126,13 @@ function begin(message, investigator) {
   view = { ...view, picked: false };
   $('#log').replaceChildren();
   $('#verdict').replaceChildren(el('p', { class: 'empty' }, 'The agent is working on it…'));
+  $('#jumpVerdict').hidden = true;
+  onScreen(null);  // a replay names itself once its recording has loaded
   drawMap();
   setBusy(true);
   setStatus(message);
+  // on a phone the controls fill the screen and the charts sit below them
+  if (PHONE.matches) $('#teleHead').scrollIntoView({ behavior: MOTION ? 'smooth' : 'auto', block: 'start' });
 }
 
 function end(message = 'Done. Break something else?', tone = 'ok') {
@@ -1058,8 +1146,8 @@ function setBusy(busy) {
   const focused = document.activeElement;
   $('#go').disabled = busy || !META.live;
   $('#investigateBtn').disabled = busy || !META.live;
-  $('#randomReplay').disabled = busy || !replayIds.length;
-  for (const b of [...$('#replayGrid').children, $('#triageBtn'), $('#sampleUse')]) b.disabled = busy;  // each would redraw the charts
+  $('#randomReplay').disabled = busy || !replays.size;
+  for (const b of [...document.querySelectorAll('#replayPanel .cell'), $('#triageBtn'), $('#sampleUse')]) b.disabled = busy;  // each would redraw the charts
   // disabling the focused button drops keyboard focus to the page; once the buttons work again it goes back,
   // unless the viewer has moved on, and without scrolling, since they may be reading the verdict by then
   if (busy && focused?.disabled) busyFocus = focused;
@@ -1107,12 +1195,18 @@ async function runStream(url, body, message, doneMessage) {
 const runLive = () => runStream('/api/break', pick, `Breaking ${pick.service}… waiting for the alarm.`);
 
 async function runReplay(id) {
-  const chosen = id ?? replayIds[Math.floor(Math.random() * replayIds.length)];
+  const ids = [...replays.keys()];
+  const chosen = id ?? ids[Math.floor(Math.random() * ids.length)];
   if (!chosen) return;
-  press($('#replayGrid'), String(chosen));
-  begin(`Replaying recorded outage #${chosen}…`, 'Opus');  // every replay is a recorded Opus run
+  for (const grid of document.querySelectorAll('#replayPanel [role="group"]')) press(grid, String(chosen));
+  const { label = `#${chosen}`, model } = replays.get(chosen) ?? {};
+  begin(`Replaying recorded outage ${label}…`, shortModel(model));
   try {
     const events = await getJSON(`/api/replays/${encodeURIComponent(chosen)}`);
+    // the replay list names the model that ran it; a server that does not still names it in the verdict event
+    const ran = model ?? events.find((ev) => ev.type === 'verdict')?.model ?? META.model;
+    state = { ...state, investigator: shortModel(ran) };
+    onScreen({ label, model: ran });
     for (const ev of events) {
       await handle(ev);
       await sleep(REPLAY_DELAY_MS[ev.type] ?? 0);
@@ -1181,6 +1275,7 @@ function showUploaded(series, result) {
   // the charts now hold the upload, so the last outage's map tags, flight log and verdict go too
   state = freshState();
   seenPills = new Set();
+  onScreen(null);
   $('#log').replaceChildren(BLANK.log.cloneNode(true));
   $('#verdict').replaceChildren(BLANK.verdict.cloneNode(true));
   drawMap();
@@ -1220,12 +1315,28 @@ const runUpload = () => {
 
 const withCI = (share, ci) => (ci ? `${pct(share)} [${Math.round(ci[0] * 100)}–${Math.round(ci[1] * 100)}]` : pct(share));
 
-function renderStats(b) {
-  if (!b || !b.outages) return;
-  countUp($('#statAgent'), b.agent_ac1, pct);
-  $('#statAgentSub').textContent = `on ${b.outages} recorded outages`;
-  countUp($('#statBase'), b.baseline_ac1, pct);
-  countUp($('#statCost'), b.median_cost_usd, usd);
+const pValue = (p) => (p < 0.001 ? 'p < 0.001' : `p = ${p.toFixed(3)}`);
+const wrongAnswers = (s) => Math.round(s.answered * (1 - s.right_when_answered));
+
+/** The strip leads with hard mode, where a decoy separates the methods; on normal outages every Claude variant scores 100%. */
+function renderStats(ev) {
+  const hard = ev?.['hard-agent'], normal = ev?.agent;
+  if (!hard?.outages || !normal?.outages) return;
+  const lines = (...texts) => texts.flatMap((t, i) => (i ? [el('br'), t] : [t]));
+  countUp($('#statAgent'), hard.agent_ac1, pct);
+  $('#statAgentSub').replaceChildren(...lines('in hard mode', `${wrongAnswers(hard)} wrong answers`, `normal mode: ${pct(normal.agent_ac1)}`));
+  countUp($('#statBase'), hard.baseline_ac1, pct);
+  $('#statBaseSub').replaceChildren(...lines('same hard outages', `normal mode: ${pct(normal.baseline_ac1)}`,
+    ...(hard.graph_ac1 != null ? [`call-graph rule: ${pct(hard.graph_ac1)}`] : [])));
+  $('#statNote').textContent = `${hard.outages} hard-mode outages, each with a decoy anomaly at the same time, and ${normal.outages} normal ones. ` +
+    'Simulated telemetry, so the numbers are optimistic. Details under Evidence.';
+}
+
+/** The cost tile follows the investigator picked for a live run. */
+function renderCost(model) {
+  const s = META.evidence?.[MODEL_VARIANT[model]];
+  $('#statCost').textContent = usd(s?.median_cost_usd);
+  $('#statCostSub').textContent = `${MODEL_NAME[model].replace('Claude ', '')}, median per normal outage`;
 }
 
 function table(head, rows) {
@@ -1238,6 +1349,24 @@ function methodRow(s) {
   return [s.label, withCI(s.agent_ac1, s.agent_ac1_ci), pct(s.agent_ac3), `${s.answered} of ${s.outages}`, usd(s.median_cost_usd)];
 }
 
+/** The no-AI rules on the same outages as `s`: the classic z-score ranking, then the stronger ones the benchmark has. */
+function noAIRows(s) {
+  return [
+    ['No AI: rank services by z-score', s.baseline_ac1, s.baseline_ac1_ci, s.baseline_ac3],
+    ['No AI: robust z-score (median and MAD)', s.robust_ac1, s.robust_ac1_ci, s.robust_ac3],
+    ['No AI: call-graph rule', s.graph_ac1, s.graph_ac1_ci, s.graph_ac3],
+  ].filter(([, ac1]) => ac1 != null).map(([label, ac1, ci, ac3]) => [label, withCI(ac1, ci), pct(ac3), '–', '–']);
+}
+
+/** What the agent adds over the call-graph rule, which names the cause first nearly as often but always answers. */
+function graphTest(s, who) {
+  if (s.graph_mcnemar_p == null) return '';
+  return ` ${who} vs the call-graph rule: the agent alone was right in ${s.only_agent_right_vs_graph}, the rule alone in ${s.only_graph_right} ` +
+    `(exact McNemar test, ${pValue(s.graph_mcnemar_p)}). The rule always answers, so it was wrong in ${s.graph_wrong} of ${s.outages}; ` +
+    `the agent answered ${s.answered} and was wrong in ${wrongAnswers(s)}` +
+    (s.answered < s.outages ? `, handing the other ${s.outages - s.answered} to a human.` : '.');
+}
+
 function renderEvidence(ev) {
   const agent = ev?.agent;
   if (!agent?.outages) {
@@ -1248,13 +1377,11 @@ function renderEvidence(ev) {
   const head = ['Method', 'Cause first', 'In top 3', 'Answered alone', 'Median cost'];
   const ladder = ['one-shot', 'haiku', 'sonnet', 'agent', 'auto'].filter((v) => ev[v]?.outages === agent.outages);
   const auto = ev.auto?.outages ? { ...ev.auto, label: `${ev.auto.label} (Opus needed in ${ev.auto.escalated_to_strong})` } : null;
-  const noAI = [['No AI: rank services by z-score', withCI(agent.baseline_ac1, agent.baseline_ac1_ci), pct(agent.baseline_ac3), '–', '–']];
-  if (agent.robust_ac1 != null) noAI.push(['No AI: robust z-score (median and MAD)', withCI(agent.robust_ac1, agent.robust_ac1_ci), pct(agent.robust_ac3), '–', '–']);
   $('#evMethods').replaceChildren(table(head,
-    [...noAI, ...ladder.map((v) => methodRow(v === 'auto' ? auto : ev[v]))]));
-  const p = agent.mcnemar_p < 0.001 ? 'p < 0.001' : `p = ${agent.mcnemar_p.toFixed(3)}`;
+    [...noAIRows(agent), ...ladder.map((v) => methodRow(v === 'auto' ? auto : ev[v]))]));
   $('#evTest').textContent = `Agent vs the no-AI ranking on the same outages: the agent alone was right in ${agent.only_agent_right}, ` +
-    `the ranking alone in ${agent.only_baseline_right} (exact McNemar test, ${p}).` +
+    `the ranking alone in ${agent.only_baseline_right} (exact McNemar test, ${pValue(agent.mcnemar_p)}).` +
+    graphTest(agent, 'Agent') +
     (agent.answers_checked ? ` Blast-radius check: ${agent.answers_explain_all} of the agent's ${agent.answers_checked} answers explain ` +
       `every abnormal service through the call graph, and the check flags ${agent.baseline_wrong_caught} of the no-AI ranking's ` +
       `${agent.baseline_wrong} wrong answers.` : '');
@@ -1270,17 +1397,11 @@ function renderHard(ev, head) {
   const hard = ev['hard-agent'];
   if (!hard?.outages) { $('#evHard').replaceChildren(el('p', {}, 'No hard-mode runs yet.')); return; }
   $('#hardN').textContent = hard.outages;
-  const rows = [['No AI: rank services by z-score', withCI(hard.baseline_ac1, hard.baseline_ac1_ci), pct(hard.baseline_ac3), '–', '–']];
-  if (hard.robust_ac1 != null) rows.push(['No AI: robust z-score (median and MAD)', withCI(hard.robust_ac1, hard.robust_ac1_ci), pct(hard.robust_ac3), '–', '–']);
-  for (const v of ['hard-one-shot', 'hard-haiku', 'hard-sonnet', 'hard-agent', 'hard-auto']) {
-    const s = ev[v];
-    if (!s?.outages) continue;
-    rows.push(methodRow(v === 'hard-auto' ? { ...s, label: `${s.label} (Opus needed in ${s.escalated_to_strong})` } : s));
-  }
-  $('#evHard').replaceChildren(table(head, rows));
-  const p = hard.mcnemar_p < 0.001 ? 'p < 0.001' : `p = ${hard.mcnemar_p.toFixed(3)}`;
+  const methods = ['hard-one-shot', 'hard-haiku', 'hard-sonnet', 'hard-agent', 'hard-auto'].filter((v) => ev[v]?.outages)
+    .map((v) => methodRow(v === 'hard-auto' ? { ...ev[v], label: `${ev[v].label} (Opus needed in ${ev[v].escalated_to_strong})` } : ev[v]));
+  $('#evHard').replaceChildren(table(head, [...noAIRows(hard), ...methods]));
   $('#evHardTest').textContent = `Opus agent vs the no-AI ranking: the agent alone was right in ${hard.only_agent_right}, the ranking alone in ` +
-    `${hard.only_baseline_right} (exact McNemar test, ${p}).`;
+    `${hard.only_baseline_right} (exact McNemar test, ${pValue(hard.mcnemar_p)}).` + graphTest(hard, 'Opus agent');
 }
 
 function renderModels(ev) {
@@ -1292,7 +1413,8 @@ function renderModels(ev) {
   const choose = (k) => {
     pick = { ...pick, model: k };
     for (const grid of grids) press(grid, k);
-    $('#metaModel').textContent = k === 'auto' ? `${META.models.haiku} → ${META.models.opus}` : META.models[k];
+    onScreen(recorded);  // the header names the pick, unless a replay is on screen
+    renderCost(k);
     $('#modelDesc').textContent = `${MODEL_HINT[k]} Numbers: cause named first, median cost per outage on the benchmark.`;
   };
   for (const grid of grids) choiceGrid(grid, items, pick.model, choose);
@@ -1301,14 +1423,35 @@ function renderModels(ev) {
 
 // ---- start-up ---------------------------------------------------------------------------
 
+// the caught wrong answers are hard-mode runs too, listed apart
+const REPLAY_KINDS = { Normal: (r) => !r.hard, Hard: (r) => r.hard && !r.caught, Caught: (r) => r.caught };
+
 async function loadReplays() {
   const list = await getJSON('/api/replays');
-  replayIds = list.map((r) => r.id);
-  const firstHard = list.find((r) => r.hard)?.id ?? Infinity;
-  // numbered, never named: the culprit stays hidden so the guessing game still works; H = hard mode
-  choiceGrid($('#replayGrid'), list.map((r) => [String(r.id), r.hard ? `H${r.id - firstHard + 1}` : `#${r.id}`]), null,
-    (id) => runReplay(Number(id)));
-  $('#replayCount').textContent = `${list.filter((r) => !r.hard).length} normal and ${list.filter((r) => r.hard).length} hard-mode`;
+  const first = (test) => list.find(test)?.id ?? Infinity;
+  const firstHard = first(REPLAY_KINDS.Hard), firstCaught = first(REPLAY_KINDS.Caught);
+  // numbered, never named: the culprit stays hidden so the guessing game still works; H = hard mode, C = caught
+  const label = (r) => (r.caught ? `C${r.id - firstCaught + 1}` : r.hard ? `H${r.id - firstHard + 1}` : `#${r.id}`);
+  replays = new Map(list.map((r) => [r.id, { label: label(r), model: r.model }]));
+  const play = (id) => runReplay(Number(id));
+  const kinds = Object.entries(REPLAY_KINDS).map(([name, test]) => [name, list.filter(test)]).filter(([, rows]) => rows.length);
+  $('#replayGrid').replaceChildren(...kinds.flatMap(([name, rows]) => {
+    const id = `h-${name.toLowerCase()}`;
+    const grid = el('div', { class: 'grid four', role: 'group', 'aria-labelledby': id });
+    choiceGrid(grid, rows.map((r) => [String(r.id), label(r)]), null, play);
+    roveGrid(grid);
+    return [el('h3', { class: 'sub', id }, `${name} · ${rows.length}`), grid];
+  }));
+  $('#allReplays > summary').textContent = `Every recorded outage · ${list.length}`;
+
+  const caught = list.filter(REPLAY_KINDS.Caught);
+  const starts = [[REPLAY_START, 'the classic ranking blames a victim'], [REPLAY_DECOY, 'hard mode: a decoy fools the ranking'],
+    [caught[0]?.id, 'caught: a wrong answer the rollback disproves']].filter(([id]) => replays.has(id));
+  choiceGrid($('#startHere'), starts.map(([id, text]) => [String(id), replays.get(id).label, text]), null, play);
+  const models = [...new Set(caught.map((r) => shortModel(r.model)))].join(' and ');
+  $('#replayCount').textContent = `${list.filter(REPLAY_KINDS.Normal).length} normal and ${list.filter(REPLAY_KINDS.Hard).length} hard-mode investigations` +
+    (caught.length ? `, plus ${caught.length} wrong answers by ${models},` : '');
+  if (caught.length) $('#replayLegend').append(' C = caught by the rollback.');
 }
 
 async function init() {
@@ -1331,7 +1474,6 @@ async function init() {
     return;
   }
   $('#metaSystem').textContent = `Simulated shop · ${META.services.length} services`;
-  $('#metaMode').textContent = META.live ? 'live' : 'replays only';
   setAgent(watching());
   choiceGrid($('#svcGrid'), META.services.map((s) => [s, s]), pick.service, (s) => { pick = { ...pick, service: s }; press($('#svcGrid'), s); });
   choiceGrid($('#faultGrid'), Object.keys(META.faults).map((f) => [f, f, FAULT_SHORT[f] ?? '']), pick.fault,
@@ -1339,7 +1481,7 @@ async function init() {
   describeFault();
   choiceGrid($('#modeGrid'), [['normal', 'Normal', 'one clean fault'], ['hard', 'Hard', 'a decoy, fewer logs']], 'normal',
     (m) => { pick = { ...pick, hard: m === 'hard' }; press($('#modeGrid'), m); });
-  renderStats(META.benchmark);
+  renderStats(META.evidence);
   renderEvidence(META.evidence);
   renderModels(META.evidence);
   drawMap();
@@ -1349,6 +1491,9 @@ async function init() {
   runIdle();
   $('#go').addEventListener('click', runLive);
   $('#randomReplay').addEventListener('click', () => runReplay(null));
+  // the first-screen button lives in the flight log, which a run clears and an upload puts back as a copy
+  $('#log').addEventListener('click', (e) => { if (e.target.closest('#replayStart')) runReplay(REPLAY_START); });
+  new IntersectionObserver(([e]) => { if (e.isIntersecting) $('#jumpVerdict').hidden = true; }).observe($('#verdict'));
   $('#sampleUse').addEventListener('click', useSample);
   $('#dataFile').addEventListener('change', (e) => openFile(e.target));
   $('#dataText').addEventListener('input', () => $('#triage').replaceChildren());
@@ -1368,7 +1513,7 @@ function openFromLink() {
   const [view, number] = location.hash.slice(1).split('/');
   if (!['live', 'replay', 'evidence', 'data'].includes(view)) return;
   showView(view);
-  if (view === 'replay' && replayIds.includes(Number(number))) runReplay(Number(number));
+  if (view === 'replay' && replays.has(Number(number))) runReplay(Number(number));
 }
 
 init();
