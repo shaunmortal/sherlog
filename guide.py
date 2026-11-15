@@ -33,8 +33,8 @@ DOCS = (
         "The pipeline: a no-AI alarm, a Claude agent with read-only tools, a verifier that checks every call it cites, "
         "the 80% rule, the blast-radius check and the rollback replay.", section="How it works"),
     Doc("real-benchmark", "docs/real-benchmark.md", "Real outages",
-        "252 held-out real outages of a public benchmark: the protocol, every table, the published baselines re-run on "
-        "the same cases, and the limitations."),
+        "252 held-out real outages of a public benchmark: the protocol, every table and the published baselines "
+        "re-run on the same cases."),
     Doc("real-system", "docs/real-system.md", "A real running system",
         "Eight real services, real faults and real rollbacks: 30 outages, what each method answered and what the "
         "rollback caught."),

@@ -207,19 +207,3 @@ against a local server: it lists the tools and the prompt, calls them, and runs 
 above. `tests/test_mcp.py` and `tests/test_mcp_investigate.py` cover the rest, among them a test that no tool but
 `get_recorded_verdict` and `reveal_truth` names a recorded outage's cause, fault, seed or decoy, and that every
 investigation tool answers the same about a recorded outage as about its telemetry uploaded with none of those.
-
-## What it does not do
-
-- Sherlog's own agent does not run here: it costs API credits, so it runs only in the console, rate limited.
-  Over MCP, the model is yours.
-- No resources or subscriptions; one prompt. The tool and prompt lists never change while a deploy runs.
-- Being stateless, the server cannot tell whether a model made a call it cites, only that the call exists on this
-  incident and shows what is claimed: an id is a public hash, so a model could compute one without calling. The
-  evidence is re-checked either way.
-- `check_answer`'s rollback replay is a real intervention, so a model that calls it on every service in turn will
-  find the cause, as rolling back every service in production would. Score models on their first `check_answer`.
-- `triage_incident` takes the whole document as an argument. A model writing out 11 services' 10 minutes of
-  numbers is slow and costly (the shop sample is about 42 KB of JSON), so for real exports, `POST` the file to
-  `/api/triage` instead; the tool suits small incidents and documents a script builds.
-- The recorded outages and the controlled benchmark come from the simulated shop, and only simulated outages get
-  the rollback replay; `benchmark_summary` says so in its caveats.

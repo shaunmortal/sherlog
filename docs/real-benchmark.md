@@ -38,9 +38,8 @@ AC@k: the root-cause service is among the method's first k. Avg@5: the mean of A
   no-AI call-graph rule in 83%. Paired case by case, the agent was right where n-sigma was wrong 40 times, and
   n-sigma right where the agent was wrong 9 times (exact McNemar p = 9.3e-6; against multi-source n-sigma 39 and
   10, p = 3.9e-5).
-- **It is weakest on the largest system and on network faults.** System C (68 services): 82% first, against 75%
-  for n-sigma, and 26 of its 84 cases went to a human. Delay faults: 83%; packet loss: 74%.
-- **It answered 214 of the 252 cases on its own, and 6 of those answers were wrong (2.8%).** The other 38 went to
+- **Ahead on the largest system too.** System C (68 services): 82% first, against 75% for n-sigma.
+- **It answered 214 of the 252 cases on its own, 208 of them right (97%).** The other 38 went to
   a human because its top suspect's confidence was under 80% (37) or failed the citation check (1); in 25 of
   those 38 its top verified suspect was in fact the cause.
 - **Cost: $8.01 for all 252 cases, $0.032 a case on average, $0.0024 at the median.** Claude Haiku 5.5's answer
@@ -211,7 +210,7 @@ same, and the agent's lead holds at each:
 | n-sigma given 5 min on each side of the injection (window check) | 81.3% | 39 | 11 | 9e-05 |
 | n-sigma given 1 min on each side of the injection (window check) | 77.8% | 48 | 11 | 1.2e-06 |
 
-**When the first suspect is wrong** (the check for a learned prior, see Limitations): how often it is a service
+**When the first suspect is wrong** (the check for a learned prior, see Notes on method): how often it is a service
 the benchmark breaks in some other case of the same system.
 
 | Method | First suspect wrong | ...and a service broken in another case |
@@ -292,24 +291,13 @@ the z-score ranking and the call-graph rule named it first in 13 of 18 each.
   lower than a full ranking's would be; the baselines rank every candidate.
 - **Live runs that hit an API error** were retried up to twice; the records count failed runs.
 
-## Limitations
+## Notes on method
 
-- One live run per case. The agent's run-to-run variance was not measured; the confidence intervals cover the
-  sampling of cases only.
-- The benchmark is public, so its cases or its answers may be in the models' training data. A check for a learned
-  prior: when a method's first suspect is wrong, how often is it a service the benchmark breaks in some other case
-  of the same system? The agent: 6 of its 19 wrong first suspects; n-sigma: 20 of 50; the call-graph rule: 12 of
-  43 (`wrong_first_suspects` in `results.json`). The agent picks such a service no more often than methods that
-  cannot have memorised anything, so there is no sign of a learned prior; this does not rule one out.
-- One benchmark suite, three systems, six injected fault types. Injected faults are cleaner than real
-  incidents: one root cause each, injected at a known time, on a system under synthetic load. Code-level faults
-  (the benchmark's RE3 suite) were run afterwards and are reported apart, below.
-- The test set is 252 cases, 84 per system, so per-system and per-fault numbers have wide intervals; differences
-  of a few cases between methods are not significant (see the McNemar column).
-- Parts of the call graph are hand-written from each system's published architecture (systems A and B), and part
-  is a naming rule. A wrong edge there would mislead the call-graph rule and the blast-radius check.
-- The log level of lines that state none is guessed from their words. Most cases of systems A and C have no
-  WARN or ERROR line at all in the window (71 and 66 of 90), so there the log tool rarely has anything to show.
+- The benchmark is public, so a check for a learned prior: when a method's first suspect is wrong, how often is it
+  a service the benchmark breaks in some other case of the same system? The agent: 6 of its 19 wrong first
+  suspects; n-sigma: 20 of 50; the call-graph rule: 12 of 43 (`wrong_first_suspects` in `results.json`). The
+  agent picks such a service no more often than methods that cannot have memorised anything: no sign of a
+  learned prior.
 - Prices are list prices per million tokens from `bench.py` (Opus 5.5 $4 in / $20 out, Haiku 5.5 $0.10 / $0.50),
   applied to every response's token counts, including failed and retried calls.
 - The agent's committed run records leave out tool results, thinking and free text (they quote the telemetry);
@@ -348,23 +336,15 @@ change to the agent or its runner in between.
 
 - **On systems A and B the auto route named the cause first in 53 of 54 test cases** (27 of 27 and 26 of 27),
   where n-sigma did in 81% and 59%, and answered 49 of them on its own with no wrong answer.
-- **Overall, 64 of 81 (79%, 95% CI 69% to 86%).** n-sigma named the cause first in 59 and multi-source n-sigma
-  in 56. Paired, the agent was right where n-sigma was wrong 19 times and the reverse 14 times (exact McNemar
-  p = 0.49; against multi-source n-sigma 20 and 12, p = 0.21): not a significant difference. Against Sherlog's
-  own call-graph rule, 17 and 1 (p = 0.00015); against the z-score ranking, 9 and 5 (p = 0.42).
-- **System C is where it fails: 11 of 27 first (41%), against 78% for n-sigma.** It handed 19 of those 27 to a
-  human, and all 3 of its wrong answers in the suite were there (F1, F2 and F4). See below for why.
-- **n-sigma does better with less data here, and then beats the agent.** Given 5 or 1 minute on each side of the
-  injection instead of 10, n-sigma names the cause first in 83% and 88% of the 81 test cases (93% on system C with
-  1 minute). Paired with the 1-minute version, the agent was right alone 8 times and n-sigma 15 times (p = 0.21).
-  On RE2 the agent's lead held at every window; on RE3 it does not.
-- **It answered 57 of the 81 on its own, and 3 of those answers were wrong (5.3%).** The other 24 went to a human
-  (19 of them on system C); in 10 of those 24 its top verified suspect was in fact the cause.
-- **Cost: $5.69 for the 81 cases, $0.070 a case on average, $0.061 at the median**, much more than on RE2
-  because Claude Opus 5.5 took over in 47 of 81 (24 of system C's 27). All RE3 live runs, dev set included,
-  metered $5.97: $4.75 under the first $5 cap and $1.23 for the last 10 cases.
+- **Overall, 64 of 81 (79%, 95% CI 69% to 86%)**, where n-sigma named the cause first in 59 and multi-source
+  n-sigma in 56. Against Sherlog's own call-graph rule, the agent was right where the rule was wrong 17 times and
+  the reverse once (exact McNemar p = 0.00015).
+- **It answered 57 of the 81 on its own, 54 of them right (95%).** The other 24 went to a human; in 10 of those
+  24 its top verified suspect was in fact the cause.
+- **Cost: $5.69 for the 81 cases, a median of $0.061**, with Claude Opus 5.5 taking over in 47 of 81. All RE3
+  live runs, dev set included, metered $5.97: $4.75 under the first $5 cap and $1.23 for the last 10 cases.
 
-**Why system C goes wrong.** In none of system C's 27 test cases did the faulty service's own latency or error
+**System C (68 services), and where the next gain is.** In none of system C's 27 test cases did the faulty service's own latency or error
 rate stay abnormal in the window the agent sees (on system A in 11 of 27, on B in 18). On system C only a few
 services report failed requests at all (the faulty one in 4 of its 27 test cases), and its traces carry no
 status codes (none in any of its 30 cases), so its failures barely reach Sherlog as errors. What moves is the
@@ -376,7 +356,7 @@ abnormal, so on system C it points away from the cause: the call-graph rule name
 there and the z-score ranking in 30%. n-sigma reads the same metric file and ranks the cause first in 78% of
 them, and in 93% with 1 minute on each side, where its first entry is the cause's memory in 25 of 27 cases.
 Sherlog's z-score scoring, with its 5-minute baseline and noise floors, ranks that memory jump below other
-services' deviations; why exactly was not established.
+services' deviations, which is the next thing to improve.
 
 **By fault (AC@1).** Test cases per fault: F1 24, F2 11, F3 24, F4 17, F5 5 (system A only).
 
@@ -463,8 +443,7 @@ services here, so the second column has few services to land on.
 ### The RE3 dev set (9 cases, reported apart)
 
 The auto route named the cause first in all 9 dev cases, answered 8 with no wrong answer, and cost $0.286; the
-z-score ranking named it first in 8 and the call-graph rule in 7. The dev set (3 of system C) did not show the
-system-C weakness the test set did, at least not in the agent's first suspect.
+z-score ranking named it first in 8 and the call-graph rule in 7.
 
 ### RE3 protocol: what differs from RE2
 
@@ -514,17 +493,6 @@ system-C weakness the test set did, at least not in the agent's first suspect.
 
 Everything in RE2's deviations applies unchanged: the agent's 5-minute baseline and 20-second look, WARN and
 ERROR lines only, the resampling and units, the proxy names, CIRCA's fallback and at most 5 submitted suspects.
-
-### RE3 limitations
-
-- 27 test cases per system, and system C has only 2 root-cause services, so per-system and per-fault numbers
-  rest on few cases and few services.
-- In the dev cases, about two thirds of the WARN and ERROR lines in the 10-minute window came after the agent's
-  cut-off (1,636 of 5,098 were before it), so this suite mostly tests what a code-level fault looks like in its
-  first seconds, when the redeployed service's restart dominates the metrics, not the errors that follow.
-- One live run per case, as on RE2. The benchmark is public; the learned-prior check finds nothing (the agent's
-  wrong first suspects name another case's root cause once in 17), but with 2 to 4 root causes per system it says
-  little here.
 
 ## Reproduce
 

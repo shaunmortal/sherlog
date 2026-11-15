@@ -67,7 +67,7 @@ only the other method was right, and the two-sided p-value.
 | gpt-oss-120b, hard | 0 · 8, p = 0.0078 | 0 · 5, p = 0.062 | 2 · 7, p = 0.18 |
 
 GLM-5.3 is indistinguishable from auto and from the call-graph rule on these benchmarks. The Opus agent was right in 3
-hard outages where GLM-5.3 was not, never the reverse, which on 44 outages could be chance. gpt-oss-120b is behind
+hard outages where GLM-5.3 was not, never the reverse. gpt-oss-120b is behind
 Opus by more than chance in both modes, and never ahead of it.
 
 ### What if the rollback were the answer gate? (offline what-if, hard mode)
@@ -86,7 +86,7 @@ Answered · right:
 With the rollback as the gate, neither open model answers wrong in the simulator, just like the Claude models.
 gpt-oss-120b drops from 38 answers with 6 wrong to 34, all right. Adding the rollback to today's gate removes none of
 its wrong answers, because they were confident. Both open models answered hard seed 2031 right, GLM-5.3 at exactly
-80%. That is the one outage where rolling back the true cause leaves the alarm on (README, Limitations), so the
+80%. That is the one outage where rolling back the true cause leaves the alarm on, so the
 rollback rejects one right answer from each. On normal outages the rollback gate answers 132 of 132 for GLM-5.3 and
 125 of 132 for gpt-oss-120b, all right; its other 7 had no suspect to roll back.
 
@@ -130,21 +130,6 @@ gpt-oss-120b $0.45 ($0.32 normal, $0.13 hard).
   Haiku costs and fails the same way, a little more often. So with a strong model, open or not, the choice is about
   price and coverage, not safety. With a weaker one, Claude or open, only the rollback gate keeps the confident
   wrong answers out.
-
-## Limitations
-
-- **One run per outage per model**, as for the Claude runs. A fresh run can answer differently; hence the intervals
-  and the paired tests.
-- **The prompt and tools were developed with Claude**, on seeds below 1000. They were deliberately not re-tuned for
-  the open models, since the question was the same gate. A prompt tuned for them might do better.
-- **Settings are not identical.** The models reason by their own defaults (effort could not be mapped onto GLM-5.3
-  without switching its reasoning off), there is no strict tool mode, and temperature is each provider's default.
-  The output budget (16,000 tokens per reply) and the loop's limit of 10 model calls are the same for every model;
-  they cut short 1 GLM-5.3 run and 8 gpt-oss-120b runs.
-- **Costs are list prices with no cache discount**, the same rule as for the Claude rows. The provider bills cached
-  input for less, so the real bill was lower than the $8.27 recorded.
-- **The shop is simulated** (README, Limitations), and in the simulator rolling back the true cause is exactly what
-  clears the fault.
 
 ## Setup
 

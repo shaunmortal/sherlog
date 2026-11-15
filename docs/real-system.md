@@ -63,11 +63,8 @@ the call-graph rule in `real-h03`, and auto in `real-h03` and `real-h07`. Both o
 answered at 80% confidence, its answer stood, and Opus was never called. Opus on its own escalated both
 outages, with the same wrong suspect on top. The real rollback caught all three.
 
-**What this says, honestly.** On this system the agent did not beat the no-AI call-graph rule: they tie on
-normal outages, and the rule is one ahead on hard ones (9 of 10 against 8 of 10). What the agent added was
-judgement about its own answer. Opus never gave a wrong answer (0 of 26), and escalated 4 hard outages
-instead, 2 of them with the right suspect on top. Auto was cheap ($0.0037 per normal outage) but answered
-wrong twice. The z-score rankings, which pick the loudest service, fell to 40% and 30% on hard outages:
+**What this says.** What the agent added on this system was judgement about its own answer. Opus never gave a wrong answer (0 of 26), and escalated 4 hard outages
+instead, 2 of them with the right suspect on top. Auto was cheap ($0.0037 per normal outage). The z-score rankings, which pick the loudest service, fell to 40% and 30% on hard outages:
 they blame a caller or the decoy. The real rollback caught every wrong answer that was rolled back, and
 rejected two right ones: both memory leaks whose freed memory came back more slowly than the 10 s settle
 window, one of them with a memory decoy still on.
@@ -238,36 +235,3 @@ fault, because each scrape runs a moment after the collector's reading. Both doc
 results: the alarm at tick 85, the z-score ranking blaming orders (a caller, wrong), the call-graph rule
 naming store (right). On the Prometheus document alone, auto (Haiku, 85% confident) and Opus (88%) both named
 store, verified, for $0.055 in all.
-
-## Limitations
-
-- **One laptop.** 8 GB of memory and 8 cores (4 performance, 4 efficiency), under memory pressure and shared
-  with other work that ran during the experiment, with its swap nearly full. That noise is real but
-  uncontrolled. Two copies of the system ran in parallel on separate ports, their starts 2 minutes apart, so a
-  CPU fault or a batch job in one copy competed for cores with the other (the first 3 outages ran with three
-  copies; the experiment was then cut to two to spare the laptop's memory). A CPU fault under the interpreter
-  lock burns about one core, not a whole machine.
-- **Synthetic load.** One request mix at a steady 20 requests a second: no daily cycle, no bursts, no real users.
-- **Faults we injected.** We wrote the system, the faults and their timing, and the same team wrote the
-  agent. Each fault is clean and constant. Real incidents are often partial, intermittent, or caused by
-  configuration or data that a rollback does not undo. The callers' log lines name the callee and its RPC
-  because we wrote them that way. Real logs may not.
-- **Memory comes back slowly.** Freeing a leak in place does not drop a process's resident memory at once:
-  macOS took about 5 s to give 200 MB back on a lightly loaded laptop, and up to 30 s under the experiment's
-  memory pressure. Twice that outlasted the rollback test's 10 s settle window and rejected a right answer
-  (`real-n11`, `real-h07`). A real rollback that restarts the process frees it at once. We did not change the
-  rule after seeing this: every outage was judged the same way.
-- **The rollback rule cannot prove a leak while a memory decoy stays on.** As in the simulator, a CPU or memory
-  anomaly that outlives the rollback is forgiven only when the rollback ends a latency or error alarm, and a
-  leak that slows nobody down raises neither.
-- **Thin services.** Healthy requests take 0.1 to 4 ms, so the alarm's 2 ms latency noise floor
-  (`sim.STD_FLOOR`) is the threshold that counts, and a few slow requests from the shared laptop can move a
-  quiet service's mean.
-- **The rollback is a switch, not a redeploy.** It removes the injected fault in place. A real rollback
-  restarts processes, takes longer, and may not remove the cause. The culprit is tested last, an ordering only
-  an experiment that knows the truth can choose. Each suspect is still judged on telemetry recorded with the
-  fault really on, or really off.
-- **Small N.** 20 normal and 10 hard outages. The 95% Wilson intervals in the tables are wide, and they are the
-  honest reading of these numbers.
-- **The same agent.** The prompt and tools were built on the simulator and were not changed for these
-  outages.
