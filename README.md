@@ -21,8 +21,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2b2e3a" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="VIDEO_URL"><picture><source media="(prefers-color-scheme: dark)" srcset="media/video-thumb-dark.jpg"><img src="media/video-thumb-light.jpg" alt="Play the demo video, 2:48. Its frame shows the shop's call graph after outage #41: the answer, cache, explains all four red services, with cart, checkout and frontend ticked." width="900"></picture></a></p>
-<p align="center"><a href="VIDEO_URL"><b>▶&nbsp;Watch the 2:48 demo</b></a></p>
+<p align="center"><a href="https://youtu.be/UfL1R6MzmKQ"><picture><source media="(prefers-color-scheme: dark)" srcset="media/video-thumb-dark.jpg"><img src="media/video-thumb-light.jpg" alt="Play the demo video, 2:48. Its frame shows the shop's call graph after outage #41: the answer, cache, explains all four red services, with cart, checkout and frontend ticked." width="900"></picture></a></p>
+<p align="center"><a href="https://youtu.be/UfL1R6MzmKQ"><b>▶&nbsp;Watch the 2:48 demo</b></a></p>
 
 <p align="center">
   <picture>

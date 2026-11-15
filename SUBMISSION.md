@@ -1,6 +1,6 @@
 # Submission kit (for the team, not part of the app)
 
-Paste these sections into the submission form. Replace `VIDEO_URL` once the video is up.
+Paste these sections into the submission form.
 Tracks to select: **Best AI Hack** (main), **Best Deployed / Shipped App**, **Best Design & UX**.
 
 ---
@@ -261,7 +261,7 @@ model-context-protocol, fireworks-ai, glm-5.3, gpt-oss-120b, javascript, canvas,
 - Live demo: https://sherlog-jade.vercel.app (console: https://sherlog-jade.vercel.app/console,
   status: https://sherlog-jade.vercel.app/status)
 - Code: https://github.com/shaunmortal/sherlog
-- Video: VIDEO_URL
+- Video: https://youtu.be/UfL1R6MzmKQ
 
 **Evaluate it in 5 minutes** (no key needed):
 
