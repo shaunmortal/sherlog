@@ -21,8 +21,8 @@ import byo  # noqa: E402
 import investigate as inv  # noqa: E402
 import sim  # noqa: E402
 from testbed import outage as plan_  # noqa: E402
-from testbed import run  # noqa: E402
-from testbed.system import CALLS, SERVICES, callers_of  # noqa: E402
+from testbed import prom, run, service  # noqa: E402
+from testbed.system import CALLS, GRAPH, SERVICES, callers_of  # noqa: E402
 
 BASE_MS = {"gateway": 3.0, "auth": 0.3, "catalog": 0.2, "orders": 3.0, "inventory": 1.0, "payments": 2.0,
            "store": 0.4, "ledger": 0.3}
@@ -242,3 +242,48 @@ def test_stopping_a_bed_ends_its_running_process_groups(tmp_path):
     bed.stop()
     assert p.returncode == -signal.SIGTERM
 
+
+# --- the Prometheus path ---------------------------------------------------------------------
+
+def _scrapes(slow_store_from: int = 100) -> list:
+    """121 scrapes 5 s apart of all eight /metrics: 20 requests and 0.1 CPU s per 5 s, 2 ms per request; the
+    store's requests take 400 ms more from `slow_store_from`; the ledger finishes nothing in one interval."""
+    totals = {s: {"testbed_requests_total": 0.0, "testbed_request_errors_total": 0.0,
+                  "testbed_request_duration_seconds_sum": 0.0, "process_cpu_seconds_total": 0.0} for s in SERVICES}
+    out = []
+    for k in range(sim.WINDOW_TICKS + 1):
+        if k:
+            for s in SERVICES:
+                done = 0 if (s, k) == ("ledger", 50) else 20
+                ms = 402.0 if s == "store" and k >= slow_store_from else 2.0
+                totals[s] = {**totals[s], "testbed_requests_total": totals[s]["testbed_requests_total"] + done,
+                             "testbed_request_duration_seconds_sum":
+                                 totals[s]["testbed_request_duration_seconds_sum"] + done * ms / 1000,
+                             "process_cpu_seconds_total": totals[s]["process_cpu_seconds_total"] + 0.1}
+        text = {s: service.METRICS_TEXT.format(
+            requests=int(totals[s]["testbed_requests_total"]), errors=0,
+            seconds=repr(totals[s]["testbed_request_duration_seconds_sum"]),
+            cpu=repr(totals[s]["process_cpu_seconds_total"]), rss=30 * 2**20) for s in SERVICES}
+        out.append((1000.0 + 5 * k, {s: prom.parse(text[s]) for s in SERVICES}))
+    return out
+
+
+def test_metrics_text_parses_back_to_its_counters():
+    text = service.METRICS_TEXT.format(requests=7, errors=2, seconds="0.5", cpu="1.25", rss=1024)
+    assert prom.parse(text) == {"testbed_requests_total": 7, "testbed_request_errors_total": 2,
+                                "testbed_request_duration_seconds_sum": 0.5,
+                                "testbed_request_duration_seconds_count": 7, "process_cpu_seconds_total": 1.25,
+                                "process_resident_memory_bytes": 1024}
+
+
+def test_scraped_metrics_become_a_document_through_the_unchanged_converter(tmp_path):
+    answers = prom.answers(_scrapes())
+    assert answers["latency_ms"]["data"]["result"][SERVICES.index("ledger")]["values"][49][1] == "NaN"  # 0/0
+    doc = prom.convert(answers, tmp_path)
+    store = doc["series"]["store"]
+    assert store["latency_ms"][0] == pytest.approx(2.0) and store["latency_ms"][-1] == pytest.approx(402.0)
+    assert store["cpu_pct"][0] == pytest.approx(2.0) and store["memory_mb"][0] == 30.0
+    assert doc["series"]["ledger"]["latency_ms"][49] == pytest.approx(2.0)  # one missing reading, filled
+    assert doc["calls"] == GRAPH and doc["logs"] == []
+    inc = plan_.incident(doc)
+    assert inc.alarm == 99 + sim.ALARM_SUSTAIN_TICKS - 1 and inv.graph_ranking(inc)[0] == "store"  # slow from tick 99

@@ -4,8 +4,9 @@
 
 GET /rpc does the service's own work, then calls its callees over HTTP, one after another, each with a timeout.
 A failed call fails the request (502), and the caller logs a WARN naming the callee and its RPC; so does a slow
-one. GET /_stats returns cumulative counters for the collector. POST /_control injects or rolls back a fault
-or a decoy. Log lines go to <dir>/<service>.log as "<unix time> <LEVEL> <text>". Stdlib only.
+one. GET /_stats returns cumulative counters for the collector; GET /metrics returns them and the process's CPU
+and memory in the Prometheus text format. POST /_control injects or rolls back a fault or a decoy. Log lines go
+to <dir>/<service>.log as "<unix time> <LEVEL> <text>". Stdlib only, but for psutil behind /metrics.
 """
 from __future__ import annotations
 
@@ -60,6 +61,25 @@ while os.getppid() == parent:
 """
 DECOY_LINES = {"cpu": "nightly batch job running: reindexing, worker pool busy",
                "memory": "cache warm-up: loading entries into memory"}
+# GET /metrics, in the Prometheus text format; the scrape job adds the `service` label
+METRICS_TEXT = """# HELP testbed_requests_total Requests this service finished.
+# TYPE testbed_requests_total counter
+testbed_requests_total {requests}
+# HELP testbed_request_errors_total Requests this service answered with a 5xx.
+# TYPE testbed_request_errors_total counter
+testbed_request_errors_total {errors}
+# HELP testbed_request_duration_seconds Server-side time of the requests this service finished.
+# TYPE testbed_request_duration_seconds summary
+testbed_request_duration_seconds_sum {seconds}
+testbed_request_duration_seconds_count {requests}
+# HELP process_cpu_seconds_total User and system CPU time of the process and its children, in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total {cpu}
+# HELP process_resident_memory_bytes Resident memory of the process and its children, in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes {rss}
+"""
+METRICS_CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8"
 
 logging.addLevelName(logging.WARNING, "WARN")
 log = logging.getLogger("service")
@@ -203,6 +223,26 @@ class Service:
             return {"requests": self.requests, "errors": self.errors, "latency_ms": round(self.latency_ms, 3),
                     "fault": self.fault, "decoy": self.decoy, "pid": os.getpid()}
 
+    def metrics(self) -> str:
+        """The counters of /_stats and the standard process metrics, over the process and its children as the
+        collector counts them (a decoy's batch job included; a reaped one stays in the CPU counter)."""
+        import psutil  # the testbed's only extra dependency; only /metrics needs it
+
+        root = psutil.Process()
+        cpu, rss = 0.0, root.memory_info().rss
+        for child in root.children(recursive=True):
+            try:
+                times, rss = child.cpu_times(), rss + child.memory_info().rss
+            except psutil.Error:  # a child that just exited
+                continue
+            cpu += times.user + times.system
+        for who in (resource.RUSAGE_SELF, resource.RUSAGE_CHILDREN):
+            usage = resource.getrusage(who)
+            cpu += usage.ru_utime + usage.ru_stime
+        with self.lock:
+            requests, errors, seconds = self.requests, self.errors, self.latency_ms / 1000
+        return METRICS_TEXT.format(requests=requests, errors=errors, seconds=repr(seconds), cpu=repr(cpu), rss=rss)
+
     def throttled(self, key: tuple, level: int, text: str, every: float = LOG_EVERY_S) -> None:
         slot = int(time.time() // every)
         with self.lock:
@@ -299,10 +339,11 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args) -> None:  # no access log; the collector reads /_stats
         pass
 
-    def _send(self, status: int, body: dict) -> None:
-        data = json.dumps(body).encode()
+    def _send(self, status: int, body: dict | str) -> None:
+        text = isinstance(body, str)
+        data = (body if text else json.dumps(body)).encode()
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", METRICS_CONTENT_TYPE if text else "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -311,6 +352,8 @@ class Handler(BaseHTTPRequestHandler):
         path, _, query = self.path.partition("?")
         if path == "/_stats":
             return self._send(200, self.service.stats())
+        if path == "/metrics":
+            return self._send(200, self.service.metrics())
         if path != "/rpc":
             return self._send(404, {"error": "not found"})
         start, status = time.perf_counter(), 200
