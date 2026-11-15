@@ -1,0 +1,476 @@
+{
+ "id": "prom-n00",
+ "truth": {
+  "service": "store",
+  "fault": "latency",
+  "onset": 83,
+  "decoy": null,
+  "decoy_kind": null,
+  "decoy_level": null,
+  "decoy_onset": null
+ },
+ "queries": {
+  "latency_ms": "1000 * irate(testbed_request_duration_seconds_sum[10s]) / irate(testbed_request_duration_seconds_count[10s])",
+  "error_rate": "irate(testbed_request_errors_total[10s]) / irate(testbed_requests_total[10s])",
+  "cpu_pct": "100 * irate(process_cpu_seconds_total[10s])",
+  "memory_mb": "process_resident_memory_bytes / 2^20"
+ },
+ "window_start": 1794730381.813967,
+ "doc": "prom-n00/incident.json",
+ "collector_doc": "prom-n00/collector.json",
+ "runs": {
+  "auto": {
+   "cost_usd": 0.002186,
+   "seconds": 12.7,
+   "errors": [],
+   "events": [
+    {
+     "type": "tool",
+     "id": "c0",
+     "name": "top_anomalies",
+     "args": {},
+     "text": "[c0] top_anomalies()\norders     latency_ms  z=+327.3   normal 2.783 -> now 667.3\npayments   latency_ms  z=+203.8   normal 1.661 -> now 409.6\ninventory  latency_ms  z=+203.6   normal 0.9554 -> now 407.7\nstore      latency_ms  z=+203.4   normal 0.3498 -> now 407.7\ngateway    latency_ms  z= +97.0   normal 2.351 -> now 193.7\nstore      cpu_pct     z=  +0.2   normal 0.5477 -> now 0.5297\ngateway    cpu_pct     z=  +0.1   normal 1.581 -> now 1.118\norders     cpu_pct     z=  +0.1   normal 0.5019 -> now 0.4516",
+     "error": false
+    },
+    {
+     "type": "thinking",
+     "text": "I'll start by pulling the dependencies for orders, payments, inventory, and store, and maybe the relevant metric too, batching the calls into one round.\n\n"
+    },
+    {
+     "type": "tool",
+     "id": "c1",
+     "name": "get_dependencies",
+     "args": {
+      "service": "orders"
+     },
+     "text": "[c1] get_dependencies(orders)\norders (latency_ms z=+327.3)\ncalls (downstream): inventory (latency_ms z=+203.6), payments (latency_ms z=+203.8)\ncalled by (upstream): gateway (latency_ms z=+97.0)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c2",
+     "name": "get_dependencies",
+     "args": {
+      "service": "payments"
+     },
+     "text": "[c2] get_dependencies(payments)\npayments (latency_ms z=+203.8)\ncalls (downstream): store (latency_ms z=+203.4), ledger (normal)\ncalled by (upstream): orders (latency_ms z=+327.3)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c3",
+     "name": "get_dependencies",
+     "args": {
+      "service": "inventory"
+     },
+     "text": "[c3] get_dependencies(inventory)\ninventory (latency_ms z=+203.6)\ncalls (downstream): store (latency_ms z=+203.4)\ncalled by (upstream): orders (latency_ms z=+327.3)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c4",
+     "name": "get_dependencies",
+     "args": {
+      "service": "store"
+     },
+     "text": "[c4] get_dependencies(store)\nstore (latency_ms z=+203.4)\ncalls (downstream): nothing\ncalled by (upstream): inventory (latency_ms z=+203.6), payments (latency_ms z=+203.8)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c5",
+     "name": "get_dependencies",
+     "args": {
+      "service": "gateway"
+     },
+     "text": "[c5] get_dependencies(gateway)\ngateway (latency_ms z=+97.0)\ncalls (downstream): auth (normal), catalog (normal), orders (latency_ms z=+327.3)\ncalled by (upstream): nobody (entry point)",
+     "error": false
+    },
+    {
+     "type": "thinking",
+     "text": "The store is the leaf that's showing latency, so I'll start by checking its metrics and logs.\n\n"
+    },
+    {
+     "type": "tool",
+     "id": "c6",
+     "name": "get_metric",
+     "args": {
+      "service": "store",
+      "metric": "latency_ms"
+     },
+     "text": "[c6] get_metric(store, latency_ms)\nnormal 0.3498 \u00b1 2; now 407.7; z over the alarm window +203.4; abnormal since t-10s\nlast 12 values, 5s apart, oldest first: 0.101921 0.105221 0.104227 0.113566 2.64004 409.192 407.345 407.866 407.103 406.609 406.864 407.657",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c7",
+     "name": "get_metric",
+     "args": {
+      "service": "store",
+      "metric": "cpu_pct"
+     },
+     "text": "[c7] get_metric(store, cpu_pct)\nnormal 0.5477 \u00b1 1.5; now 0.5297; z over the alarm window +0.2; not abnormal now\nlast 12 values, 5s apart, oldest first: 0.29199 0.252249 0.269763 0.27743 0.253811 0.313018 0.518957 0.615268 0.936207 0.955014 0.993875 0.529685",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c8",
+     "name": "get_metric",
+     "args": {
+      "service": "store",
+      "metric": "memory_mb"
+     },
+     "text": "[c8] get_metric(store, memory_mb)\nnormal 17.9 \u00b1 6; now 18.51; z over the alarm window -0.1; not abnormal now\nlast 12 values, 5s apart, oldest first: 22.1407 22.1555 22.0423 21.2777 20.704 20.8115 15.4531 15.4403 16.5299 17.64 19.1209 18.5141",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c9",
+     "name": "get_metric",
+     "args": {
+      "service": "store",
+      "metric": "error_rate"
+     },
+     "text": "[c9] get_metric(store, error_rate)\nnormal 0 \u00b1 0.01; now 0; z over the alarm window +0.0; not abnormal now\nlast 12 values, 5s apart, oldest first: 0 0 0 0 0 0 0 0 0 0 0 0",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c10",
+     "name": "get_logs",
+     "args": {
+      "service": "store"
+     },
+     "text": "[c10] get_logs(store)\n0 WARN/ERROR and 0 INFO lines in the last 7 min; newest 0:\n(no warnings or errors)",
+     "error": false
+    },
+    {
+     "type": "thinking",
+     "text": "Store's latency spiked to about 407ms at t-10s, with no log entries and no CPU or memory change. It has no downstream dependencies, so the fault looks like it sits inside store itself. Ledger and payments both look normal, so I'm checking whether anything upstream explains it, and the evidence still points at store.\n\nI'm also checking the inventory logs, to confirm that payments and inventory are only reporting slow calls to store.\n\n"
+    },
+    {
+     "type": "tool",
+     "id": "c11",
+     "name": "get_logs",
+     "args": {
+      "service": "payments"
+     },
+     "text": "[c11] get_logs(payments)\n0 WARN/ERROR and 0 INFO lines in the last 7 min; newest 0:\n(no warnings or errors)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c12",
+     "name": "get_logs",
+     "args": {
+      "service": "inventory"
+     },
+     "text": "[c12] get_logs(inventory)\n0 WARN/ERROR and 0 INFO lines in the last 7 min; newest 0:\n(no warnings or errors)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c13",
+     "name": "get_metric",
+     "args": {
+      "service": "payments",
+      "metric": "latency_ms"
+     },
+     "text": "[c13] get_metric(payments, latency_ms)\nnormal 1.661 \u00b1 2; now 409.6; z over the alarm window +203.8; abnormal since t-10s\nlast 12 values, 5s apart, oldest first: 0.849744 0.822464 0.852405 0.878951 3.40017 411.067 408.156 409.076 408.868 408.514 409.791 409.572",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c14",
+     "name": "get_metric",
+     "args": {
+      "service": "inventory",
+      "metric": "latency_ms"
+     },
+     "text": "[c14] get_metric(inventory, latency_ms)\nnormal 0.9554 \u00b1 2; now 407.7; z over the alarm window +203.6; abnormal since t-10s\nlast 12 values, 5s apart, oldest first: 0.419671 0.424729 0.426707 0.449048 2.95455 409.499 408.373 409.116 408.568 407.969 407.059 407.73",
+     "error": false
+    },
+    {
+     "type": "verdict",
+     "causes": [
+      {
+       "service": "store",
+       "fault_type": "latency",
+       "reason": "Store is the leaf service with no downstream calls, its latency jumped from ~0.35ms to ~408ms at t-10s, and both its callers (payments and inventory) jumped at the same moment, which is the signature of a slow dependency rather than a slow caller; store's CPU, memory and error rate stayed normal and its logs are empty.",
+       "confidence": 0.85,
+       "evidence": [
+        "c6",
+        "c2",
+        "c3",
+        "c4"
+       ],
+       "verified": true,
+       "verify_note": "c6, c2, c3, c4 show store abnormal"
+      },
+      {
+       "service": "payments",
+       "fault_type": "latency",
+       "reason": "Payments latency rose to ~410ms, but its own logs are clean and its slowness matches the store dependency it calls, so it is a victim.",
+       "confidence": 0.08,
+       "evidence": [
+        "c13",
+        "c2"
+       ],
+       "verified": true,
+       "verify_note": "c13, c2 show payments abnormal"
+      },
+      {
+       "service": "inventory",
+       "fault_type": "latency",
+       "reason": "Inventory latency rose to ~408ms in step with store, and it only calls store, so it is a victim.",
+       "confidence": 0.04,
+       "evidence": [
+        "c14",
+        "c3"
+       ],
+       "verified": true,
+       "verify_note": "c14, c3 show inventory abnormal"
+      }
+     ],
+     "answer": "store",
+     "escalation": null,
+     "ticket_note": "Root cause is most likely store: its latency jumped from ~0.35ms to ~408ms at t-10s with no CPU, memory, or error change and no log output, and it has no downstream calls. payments and inventory (which call store) and orders and gateway (which call them) all show the same delay and are victims. Next step: inspect store's process health, connection pool, and recent deploy/config changes, and check whether its storage backend is blocking.",
+     "customer_update": "Some customers are seeing slow responses when placing orders or checking payments and inventory. Our team has identified the source of the slowdown and is working on restoring normal speed.",
+     "calls": 15,
+     "usage": {
+      "input_tokens": 13348,
+      "output_tokens": 1703,
+      "model_calls": 4
+     },
+     "model": "claude-haiku-5-5",
+     "route": [
+      "claude-haiku-5-5"
+     ],
+     "blast": {
+      "service": "store",
+      "abnormal": [
+       "orders",
+       "payments",
+       "inventory",
+       "store",
+       "gateway"
+      ],
+      "explained": [
+       "orders",
+       "payments",
+       "inventory",
+       "store",
+       "gateway"
+      ],
+      "unexplained": [],
+      "better": null
+     }
+    }
+   ],
+   "top": "store"
+  },
+  "opus": {
+   "cost_usd": 0.053028,
+   "seconds": 13.7,
+   "errors": [],
+   "events": [
+    {
+     "type": "tool",
+     "id": "c0",
+     "name": "top_anomalies",
+     "args": {},
+     "text": "[c0] top_anomalies()\norders     latency_ms  z=+327.3   normal 2.783 -> now 667.3\npayments   latency_ms  z=+203.8   normal 1.661 -> now 409.6\ninventory  latency_ms  z=+203.6   normal 0.9554 -> now 407.7\nstore      latency_ms  z=+203.4   normal 0.3498 -> now 407.7\ngateway    latency_ms  z= +97.0   normal 2.351 -> now 193.7\nstore      cpu_pct     z=  +0.2   normal 0.5477 -> now 0.5297\ngateway    cpu_pct     z=  +0.1   normal 1.581 -> now 1.118\norders     cpu_pct     z=  +0.1   normal 0.5019 -> now 0.4516",
+     "error": false
+    },
+    {
+     "type": "thinking",
+     "text": "I think store is the leaf here, since inventory and payments both call it and orders calls both of them. Next I'll check what store and logs depend on.\n\n"
+    },
+    {
+     "type": "tool",
+     "id": "c1",
+     "name": "get_dependencies",
+     "args": {
+      "service": "store"
+     },
+     "text": "[c1] get_dependencies(store)\nstore (latency_ms z=+203.4)\ncalls (downstream): nothing\ncalled by (upstream): inventory (latency_ms z=+203.6), payments (latency_ms z=+203.8)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c2",
+     "name": "get_logs",
+     "args": {
+      "service": "store"
+     },
+     "text": "[c2] get_logs(store)\n0 WARN/ERROR and 0 INFO lines in the last 7 min; newest 0:\n(no warnings or errors)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c3",
+     "name": "get_dependencies",
+     "args": {
+      "service": "inventory"
+     },
+     "text": "[c3] get_dependencies(inventory)\ninventory (latency_ms z=+203.6)\ncalls (downstream): store (latency_ms z=+203.4)\ncalled by (upstream): orders (latency_ms z=+327.3)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c4",
+     "name": "get_dependencies",
+     "args": {
+      "service": "payments"
+     },
+     "text": "[c4] get_dependencies(payments)\npayments (latency_ms z=+203.8)\ncalls (downstream): store (latency_ms z=+203.4), ledger (normal)\ncalled by (upstream): orders (latency_ms z=+327.3)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c5",
+     "name": "get_metric",
+     "args": {
+      "service": "store",
+      "metric": "latency_ms"
+     },
+     "text": "[c5] get_metric(store, latency_ms)\nnormal 0.3498 \u00b1 2; now 407.7; z over the alarm window +203.4; abnormal since t-10s\nlast 12 values, 5s apart, oldest first: 0.101921 0.105221 0.104227 0.113566 2.64004 409.192 407.345 407.866 407.103 406.609 406.864 407.657",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c6",
+     "name": "get_logs",
+     "args": {
+      "service": "inventory"
+     },
+     "text": "[c6] get_logs(inventory)\n0 WARN/ERROR and 0 INFO lines in the last 7 min; newest 0:\n(no warnings or errors)",
+     "error": false
+    },
+    {
+     "type": "tool",
+     "id": "c7",
+     "name": "get_dependencies",
+     "args": {
+      "service": "orders"
+     },
+     "text": "[c7] get_dependencies(orders)\norders (latency_ms z=+327.3)\ncalls (downstream): inventory (latency_ms z=+203.6), payments (latency_ms z=+203.8)\ncalled by (upstream): gateway (latency_ms z=+97.0)",
+     "error": false
+    },
+    {
+     "type": "thinking",
+     "text": "Store is the leaf with roughly 407ms of latency, while inventory and payments contribute almost nothing. Orders at 667ms is close to the combined total of those two, less a small remainder. That's enough to submit.\n\n"
+    },
+    {
+     "type": "verdict",
+     "causes": [
+      {
+       "service": "store",
+       "fault_type": "latency",
+       "reason": "Store calls nothing else, yet its latency jumped from about 0.35ms to about 407ms at t-10s, and every slow service sits upstream of it carrying the same ~407ms.",
+       "confidence": 0.88,
+       "evidence": [
+        "c0",
+        "c1",
+        "c5"
+       ],
+       "verified": true,
+       "verify_note": "c0, c1, c5 show store abnormal"
+      },
+      {
+       "service": "inventory",
+       "fault_type": "latency",
+       "reason": "Inventory is slow (~408ms), but almost all of that matches the delay of the store it calls.",
+       "confidence": 0.04,
+       "evidence": [
+        "c0",
+        "c3"
+       ],
+       "verified": true,
+       "verify_note": "c0, c3 show inventory abnormal"
+      },
+      {
+       "service": "payments",
+       "fault_type": "latency",
+       "reason": "Payments is slow (~410ms), which matches the store delay; its other callee, ledger, is normal.",
+       "confidence": 0.04,
+       "evidence": [
+        "c0",
+        "c4"
+       ],
+       "verified": true,
+       "verify_note": "c0, c4 show payments abnormal"
+      },
+      {
+       "service": "orders",
+       "fault_type": "latency",
+       "reason": "Orders' high latency comes from its two slow callees, inventory and payments.",
+       "confidence": 0.02,
+       "evidence": [
+        "c0",
+        "c7"
+       ],
+       "verified": true,
+       "verify_note": "c0, c7 show orders abnormal"
+      },
+      {
+       "service": "gateway",
+       "fault_type": "latency",
+       "reason": "Gateway is the top-level caller and is slow because orders is slow.",
+       "confidence": 0.01,
+       "evidence": [
+        "c0"
+       ],
+       "verified": true,
+       "verify_note": "c0 show gateway abnormal"
+      }
+     ],
+     "answer": "store",
+     "escalation": null,
+     "ticket_note": "Store is the most likely cause: its latency jumped from about 0.35ms to about 407ms at t-10s (c5), and it calls no other service (c1). Inventory and payments each show the same ~407ms, and it builds up through orders (667ms) to gateway (c0). Store has written no warning or error logs (c2), so next check store's datastore, disk and locks and any recent change or deploy around t-10s.",
+     "customer_update": "Some requests, especially placing orders and payments, are much slower than usual right now. We're working on it and will post an update when speeds are back to normal.",
+     "calls": 8,
+     "usage": {
+      "input_tokens": 7647,
+      "output_tokens": 1122,
+      "model_calls": 3
+     },
+     "model": "claude-opus-5-5",
+     "blast": {
+      "service": "store",
+      "abnormal": [
+       "orders",
+       "payments",
+       "inventory",
+       "store",
+       "gateway"
+      ],
+      "explained": [
+       "orders",
+       "payments",
+       "inventory",
+       "store",
+       "gateway"
+      ],
+      "unexplained": [],
+      "better": null
+     }
+    }
+   ],
+   "top": "store"
+  }
+ },
+ "prom": {
+  "alarm": 85,
+  "zscore": "orders",
+  "robust": "orders",
+  "graph": "store"
+ },
+ "collector": {
+  "alarm": 85,
+  "zscore": "orders",
+  "robust": "orders",
+  "graph": "store"
+ },
+ "doc_sha256": "a090c3bb48f2dd3d5865f8453f9a5c8eddbc074af530c58f99adf154fa7c0835"
+}

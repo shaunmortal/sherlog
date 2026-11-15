@@ -1,0 +1,1 @@
+{"gateway": ["auth", "catalog", "orders"], "auth": [], "catalog": [], "orders": ["inventory", "payments"], "inventory": ["store"], "payments": ["store", "ledger"], "store": [], "ledger": []}
